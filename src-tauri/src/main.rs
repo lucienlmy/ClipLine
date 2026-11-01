@@ -600,10 +600,13 @@ fn open_settings(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 async fn pick_folder(app: AppHandle) -> Option<String> {
     use tauri_plugin_dialog::DialogExt;
-    app.dialog()
-        .file()
-        .blocking_pick_folder()
-        .map(|p| p.to_string())
+    let mut b = app.dialog().file();
+    if let Some(w) = app.get_webview_window("settings") {
+        b = b.set_parent(&w);
+    }
+    b.blocking_pick_folder()
+        .and_then(|p| p.into_path().ok())
+        .map(|pb| pb.to_string_lossy().to_string())
 }
 
 #[tauri::command]

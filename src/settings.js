@@ -167,7 +167,12 @@ function render() {
   renderWatch();
   sw.appendChild(list);
   const addBtn = document.createElement("button"); addBtn.className = "btn-mini"; addBtn.textContent = "+ " + t("addFolder"); addBtn.style.marginTop = "8px";
-  addBtn.onclick = () => { invoke("pick_folder").then((p) => { if (p) { draft.watch_folders = draft.watch_folders || []; if (!draft.watch_folders.includes(p)) draft.watch_folders.push(p); renderWatch(); } }).catch(() => {}); };
+  addBtn.onclick = () => {
+    const err = $("setErr"); if (err) err.textContent = "";
+    invoke("pick_folder")
+      .then((p) => { if (p) { draft.watch_folders = draft.watch_folders || []; if (!draft.watch_folders.includes(p)) draft.watch_folders.push(p); renderWatch(); } })
+      .catch((e) => { if (err) err.textContent = "选择文件夹失败: " + e; });
+  };
   sw.appendChild(addBtn);
   body.appendChild(sw);
 
@@ -198,6 +203,8 @@ $("saveBtn").addEventListener("click", saveSettings);
 $("cancelBtn").addEventListener("click", cancelSettings);
 window.addEventListener("keydown", (e) => { if (e.key === "Escape" && !capturing) cancelSettings(); });
 
+window.addEventListener("error", (e) => { const el = document.getElementById("setErr"); if (el) el.textContent = "错误: " + (e.message || e.error || e); });
+window.addEventListener("unhandledrejection", (e) => { const el = document.getElementById("setErr"); if (el) { const r = e.reason; el.textContent = "错误: " + (r && r.toString ? r.toString() : r); } });
 (async function boot() {
   try { const s = await invoke("get_settings"); if (s) cfg = JSON.parse(s); } catch (e) {}
   draft = Object.assign({ hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [] }, cfg);

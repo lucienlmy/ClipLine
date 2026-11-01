@@ -385,9 +385,9 @@ function addCorners(card, body, item, isNote) {
 
 /* ---------- copy / remove ---------- */
 function copyClip(item, card) {
-  if (item.vis === "image") invoke("copy_image", { path: item.path }).catch(()=>{});
-  else if (item.vis === "file") invoke("copy_files", { paths: item.files || [] }).catch(()=>{});
-  else invoke("copy_text", { text: item.text || "" }).catch(()=>{});
+  if (item.vis === "image") invoke("copy_image", { path: item.path }).catch((e) => toast("复制失败: " + e));
+  else if (item.vis === "file") invoke("copy_files", { paths: item.files || [] }).catch((e) => toast("复制失败: " + e));
+  else invoke("copy_text", { text: item.text || "" }).catch((e) => toast("复制失败: " + e));
   flash(card);
 }
 
@@ -507,7 +507,7 @@ function openPreview(item) {
   const imgPath = imagePathOf(item);
   if (imgPath) {
     // Images open in their own floating, draggable, resize-to-fit window.
-    invoke("pin_image", { path: imgPath, w: item.w || 640, h: item.h || 480 }).catch(() => {});
+    invoke("pin_image", { path: imgPath, w: item.w || 640, h: item.h || 480 }).catch((e) => toast("预览失败: " + e));
     return;
   }
   const inner = $("previewInner");
@@ -933,6 +933,8 @@ async function wire() {
 
 /* ---------- boot ---------- */
 (async function boot() {
+  window.addEventListener("error", (e) => { try { toast("错误: " + (e.message || e.error || e)); } catch (x) {} });
+  window.addEventListener("unhandledrejection", (e) => { try { const r = e.reason; toast("错误: " + (r && r.toString ? r.toString() : r)); } catch (x) {} });
   try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
   await load();
   applyLang();

@@ -161,8 +161,14 @@ mod imp {
         if let Ok(mut g) = LAST_SET_TEXT.lock() {
             *g = s.to_string();
         }
-        if let Ok(mut cb) = arboard::Clipboard::new() {
-            let _ = cb.set_text(s.to_string());
+        // Retry: the clipboard watcher may briefly hold the clipboard open.
+        for _ in 0..4 {
+            if let Ok(mut cb) = arboard::Clipboard::new() {
+                if cb.set_text(s.to_string()).is_ok() {
+                    return;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(40));
         }
     }
 
@@ -170,13 +176,19 @@ mod imp {
         if let Ok(dynimg) = image::open(path) {
             let rgba = dynimg.to_rgba8();
             let (w, h) = (rgba.width() as usize, rgba.height() as usize);
-            let data = arboard::ImageData {
-                width: w,
-                height: h,
-                bytes: std::borrow::Cow::from(rgba.into_raw()),
-            };
-            if let Ok(mut cb) = arboard::Clipboard::new() {
-                let _ = cb.set_image(data);
+            let raw = rgba.into_raw();
+            for _ in 0..4 {
+                let data = arboard::ImageData {
+                    width: w,
+                    height: h,
+                    bytes: std::borrow::Cow::from(raw.clone()),
+                };
+                if let Ok(mut cb) = arboard::Clipboard::new() {
+                    if cb.set_image(data).is_ok() {
+                        return;
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_millis(40));
             }
         }
     }
