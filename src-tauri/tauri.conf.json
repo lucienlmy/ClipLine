@@ -24,7 +24,7 @@
         "maximizable": false,
         "minimizable": false,
         "shadow": false,
-        "visible": true,
+        "visible": false,
         "focus": false,
         "dragDropEnabled": true
       }

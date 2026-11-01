@@ -48,7 +48,17 @@
   const params = new URLSearchParams(location.search);
   const path = decodeURIComponent(params.get("path") || "");
   const img = document.getElementById("img");
-  try { img.src = T ? T.core.convertFileSrc(path) : path; } catch (e) { img.src = path; }
+  (async () => {
+    try {
+      const data = await T.core.invoke("read_image_data", { path });
+      img.src = data;
+    } catch (e) {
+      try { img.src = T.core.convertFileSrc(path); } catch (err) { img.src = path; }
+    }
+  })();
+
+  function closeSelf() { try { T.window.getCurrentWindow().close(); } catch (err) { window.close(); } }
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSelf(); });
 
   let scale = 1;
   document.getElementById("wrap").addEventListener("wheel", (e) => {
@@ -58,10 +68,7 @@
     img.style.transform = `scale(${scale})`;
   }, { passive: false });
 
-  document.getElementById("close").addEventListener("click", (e) => {
-    e.stopPropagation();
-    try { T.window.getCurrentWindow().close(); } catch (err) { window.close(); }
-  });
+  document.getElementById("close").addEventListener("click", (e) => { e.stopPropagation(); closeSelf(); });
 </script>
 </body>
 </html>

@@ -5,6 +5,8 @@ const TAURI = window.__TAURI__;
 const invoke = TAURI ? TAURI.core.invoke : async () => {};
 const listen = TAURI ? TAURI.event.listen : async () => () => {};
 const convertFileSrc = (p) => { try { return TAURI ? TAURI.core.convertFileSrc(p) : p; } catch (e) { return p; } };
+const isImagePath = (p) => /\.(png|jpe?g|gif|bmp|webp)$/i.test(p || "");
+const FILE_SVG = '<svg width="40" height="44" viewBox="0 0 40 44" xmlns="http://www.w3.org/2000/svg"><path d="M7 2h18l9 9v29a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#f1efe8" stroke="#c9b79a" stroke-width="2"/><path d="M25 2v9h9" fill="none" stroke="#c9b79a" stroke-width="2"/><line x1="11" y1="20" x2="29" y2="20" stroke="#d8d3c8" stroke-width="2.5" stroke-linecap="round"/><line x1="11" y1="27" x2="29" y2="27" stroke="#d8d3c8" stroke-width="2.5" stroke-linecap="round"/><line x1="11" y1="34" x2="23" y2="34" stroke="#d8d3c8" stroke-width="2.5" stroke-linecap="round"/></svg>';
 const DRAG_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADgAAAA4CAYAAACohjseAAAABmJLR0QA/wD/AP+gvaeTAAADMklEQVRoge2azWsTQRjGf7NJbJN+6KEqQooIfvQg9mCt7aFi9aL2rv9B8T/opVI/QNCLnu3Nk2gRWpAKNgpeKsEPBCmkaAUteolF25pNm2TGy6aINDqbmY1p2N8lG9h53nl23uwDmYGQkJCQkJCKCD83z06Pn4ygxhQcA1oCmtNPIC3hdv/Z4SlTMW2D6ek7owquAI5pUV2E4GrvmeExIw2dm2anx086qJRwIk7yQA+7kl1EYttM6lakVFgn+2WeT5k0SpakkHKwd+ji82r1tFbDQV0GnOSBHvbsOxKYOYBIbBu79x4muf8ogKMc57KJnm67HQXYlewyqeWLnZ0btXpMdHQNtuI93VoRjTWVL9tMdGr2wvhfNLzBqA2R3MIcSzMT5Bc/INfXbEgCsMP7zIxcUOV8VErc7rp5TzsfjVdw6elDFsevkVuYs2puE1qAQSHUZGbkwhXdQUYrmFuYI/vkASISoXVgiER3H6I5YSJZEZXP4b57yfKzSSgVR+dHzqcO3rj/z3w0WsFvMxOgFK0DQ7QcPxWYOQDRnCDRc4K2gXMAjkJo5aORwbXFBQAS3X0mMr6Id/eXL7Xy0cigXM+D93RrhRPfqKWVjw0fE6HBrY6VoP+T5ewixbW8Fa1oUzPtHcnqx1uZxW/8yH7m6/s3VjUViu0dnVWNDVvUL9s7OhEI8u6yFb3meHt9tShAe0eS9iCEq6DhWzQ0uNUJ5Dfo5laRxZIVLScaIZ5orXq8dYNubpXvS1nbslWbDFvUL+UnXSgWrOjForH6alE8k/EghKug4Vs0NLjVqZscNM27StRdDto2GbaoX6rNQdO8q4SuwRWgrVRY19oj3HI5KOAVQPbLfOATso2WwRLcAviUSfP141uKhUB3kayiZbD/7PCUEFxVsiQ/Z9K8Tt0l/Xg8+NlZQPst2ntmeExIOQg8BVaDnZY9fL1FvfMqp8vfvZ3XuqbhczA0+A9W8LaXa4V0N2pp/bNsZLCcj+67lyYyvnDfznpXSquo2Q6vErcAlp9Nsvoihcy7JnJ/r+Xm+PkixcrzRwASqXeGzdd50c3wjnSM1vD3LEFcOnTj3nWdm38BEHbzQzZC4kIAAAAASUVORK5CYII=";
 
 /* Keep the line from auto-rolling-up while a menu / overlay is open. */
@@ -20,10 +22,10 @@ const I18N = {
     search: "搜索…", copied: "已复制", savedTo: "已保存到桌面", hung: "已挂上绳",
     emptyClip: "绳上还空着 — 复制点什么试试",
     emptyNotes: "绳上还没有便签 — 点上方的 + 写一张",
-    plus: "新建便签", gear: "设置", prev: "上一屏", next: "下一屏", pinOnly: "只看盯住的",
-    take: "取下", preview: "预览", edit: "编辑", confirmTake: "确认取下盯住的卡？",
+    plus: "新建便签", gear: "设置", prev: "上一屏", next: "下一屏", pinOnly: "只看钉住的",
+    take: "取下", preview: "预览", edit: "编辑", confirmTake: "确认取下钉住的卡？",
     copy: "复制", copyImg: "复制图片", copyPath: "复制文件地址",
-    pin: "盯住", unpin: "取消盯住", reveal: "在资源管理器中显示", openIt: "打开",
+    pin: "钉住", unpin: "取消钉住", reveal: "在资源管理器中显示", openIt: "打开",
     openLink: "在浏览器打开", saveDesktop: "保存到桌面", toNote: "转为便签",
     editorPh: "写点什么…\n第一行是标题\n用 [] 开头的行会变成勾选项",
     editorHint: "Ctrl+S 保存 · Esc 关闭", save: "保存", remind: "提醒",
@@ -275,13 +277,20 @@ function buildClipCard(item) {
     d.innerHTML = `<div class="u">${escapeHtml(url)}</div><div class="host">${escapeHtml(host)}</div>`;
     body.appendChild(d);
   } else if (item.vis === "file") {
-    const d = document.createElement("div"); d.className = "c-file";
     const files = item.files || [];
     const first = files[0] || "";
     const base = first.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || first;
     const more = files.length > 1 ? `<div class="fcount">+${files.length - 1}</div>` : "";
-    d.innerHTML = `<div class="ico">🗂</div><div class="fname">${escapeHtml(base)}</div>${more}`;
-    body.appendChild(d);
+    if (files.length === 1 && isImagePath(first)) {
+      const d = document.createElement("div"); d.className = "c-image";
+      d.innerHTML = `<img alt="">${more}`;
+      body.appendChild(d);
+      invoke("read_image_data", { path: first }).then((data) => { if (data) d.querySelector("img").src = data; }).catch(() => {});
+    } else {
+      const d = document.createElement("div"); d.className = "c-file";
+      d.innerHTML = `<div class="ico">${FILE_SVG}</div><div class="fname">${escapeHtml(base)}</div>${more}`;
+      body.appendChild(d);
+    }
   } else {
     const d = document.createElement("div"); d.className = "c-text" + (item.vis === "code" ? " code" : "");
     d.textContent = item.text || ""; body.appendChild(d);
@@ -489,7 +498,8 @@ function openPreview(item) {
     pinBtn.onclick = (e) => { e.stopPropagation(); invoke("pin_image", { path: item.path, w: item.w || 480, h: item.h || 360 }).catch(()=>{}); closePreview(); };
     bar.appendChild(pinBtn);
     const wrap = document.createElement("div"); wrap.className = "pv-imgwrap";
-    const img = document.createElement("img"); img.id = "pvimg"; img.src = convertFileSrc(item.path) || item.thumb || "";
+    const img = document.createElement("img"); img.id = "pvimg"; img.src = item.thumb || "";
+    if (item.path) invoke("read_image_data", { path: item.path }).then((d) => { if (d) img.src = d; }).catch(() => {});
     img.onerror = () => { img.src = item.thumb || ""; };
     wrap.appendChild(img);
     wrap.addEventListener("wheel", (e) => {
@@ -811,7 +821,7 @@ function onRollup() {
 }
 
 $("panel").addEventListener("transitionend", (ev) => {
-  if (ev.propertyName === "transform" && stage.classList.contains("up")) invoke("set_passthrough", { on: true }).catch(() => {});
+  if (ev.propertyName === "transform" && stage.classList.contains("up")) invoke("rollup_done").catch(() => {});
 });
 
 /* ---------- global input ---------- */
@@ -827,16 +837,19 @@ document.addEventListener("keydown", (e) => {
 });
 document.addEventListener("click", (e) => {
   if (!$("ctx").hidden && !e.target.closest("#ctx")) hideCtx();
+  if (pointerInsideLine) return;
   if (e.target.closest(".card") || e.target.closest("#pill") || e.target.closest("#plus") ||
       e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#ctx") || e.target.closest("#settings")) return;
   if (!stage.classList.contains("up")) invoke("rollup_now").catch(() => {});
 });
-// Any interaction with the dropped line makes it stay open (stop auto-rollup).
+// Track (at pointerdown, before any re-render detaches the target) whether the
+// interaction began inside the line/overlays. The click handler uses this
+// instead of inspecting the click target, which may already be detached.
+let pointerInsideLine = false;
 document.addEventListener("pointerdown", (e) => {
-  if (stage.classList.contains("up")) return;
-  if (e.target.closest("#stage") || e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#ctx") || e.target.closest("#settings")) {
-    invoke("set_sticky", { on: true }).catch(() => {});
-  }
+  if (stage.classList.contains("up")) { pointerInsideLine = false; return; }
+  pointerInsideLine = !!(e.target.closest("#stage") || e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#ctx") || e.target.closest("#settings"));
+  if (pointerInsideLine) invoke("set_sticky", { on: true }).catch(() => {});
 }, true);
 $("preview").addEventListener("click", (e) => { if (e.target.id === "preview") closePreview(); });
 $("settings").addEventListener("click", (e) => { if (e.target.id === "settings") closeSettings(); });

@@ -476,6 +476,41 @@ fn delete_file(path: String) {
     let _ = std::fs::remove_file(path);
 }
 
+/// Read an image file and return it as a base64 data URL (so the webview can
+/// show it without relying on the asset protocol).
+#[tauri::command]
+fn read_image_data(path: String) -> Result<String, String> {
+    use base64::Engine;
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    let ext = std::path::Path::new(&path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("png")
+        .to_ascii_lowercase();
+    let mime = match ext.as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "bmp" => "image/bmp",
+        "webp" => "image/webp",
+        _ => "image/png",
+    };
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Ok(format!("data:{mime};base64,{b64}"))
+}
+
+/// Called by the frontend after the roll-up animation finishes: hide the
+/// whole window so nothing is left on screen (no stray band, nothing to block
+/// the desktop or the taskbar).
+#[tauri::command]
+fn rollup_done() {
+    let dropped = STATE.lock().unwrap().dropped;
+    if !dropped {
+        with_window(|w| {
+            let _ = w.hide();
+        });
+    }
+}
+
 #[tauri::command]
 fn set_modal(on: bool) {
     MODAL.store(on, Ordering::Relaxed);
@@ -563,8 +598,9 @@ fn setup_geometry(app: &AppHandle) {
             let _ = w.set_size(PhysicalSize::new(size.width, notes_h.max(1) as u32));
             let _ = w.set_position(PhysicalPosition::new(pos.x, pos.y));
         }
-        let _ = w.set_ignore_cursor_events(true);
-        let _ = w.show();
+        // Start hidden; the window is only shown while the line is down.
+        let _ = w.set_ignore_cursor_events(false);
+        let _ = w.hide();
     }
 }
 
@@ -730,6 +766,8 @@ fn main() {
             save_state,
             load_state,
             delete_file,
+            read_image_data,
+            rollup_done,
             set_modal,
             set_sticky,
             pin_image,
