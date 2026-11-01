@@ -504,33 +504,17 @@ function imagePathOf(item) {
   return "";
 }
 function openPreview(item) {
-  const inner = $("previewInner");
-  inner.innerHTML = "";
   const imgPath = imagePathOf(item);
   if (imgPath) {
-    pvScale = 1;
-    const bar = document.createElement("div"); bar.className = "pv-bar";
-    const pinBtn = document.createElement("button"); pinBtn.className = "btn-mini"; pinBtn.textContent = "📌 " + t("pinDesktop");
-    pinBtn.onclick = (e) => { e.stopPropagation(); invoke("pin_image", { path: imgPath, w: item.w || 640, h: item.h || 480 }).catch(()=>{}); closePreview(); };
-    bar.appendChild(pinBtn);
-    const wrap = document.createElement("div"); wrap.className = "pv-imgwrap";
-    const img = document.createElement("img"); img.id = "pvimg"; img.src = item.thumb || "";
-    invoke("read_image_data", { path: imgPath }).then((d) => { if (d) img.src = d; }).catch(() => {});
-    img.onerror = () => { img.src = item.thumb || ""; };
-    wrap.appendChild(img);
-    wrap.addEventListener("wheel", (e) => {
-      e.preventDefault();
-      pvScale += e.deltaY < 0 ? 0.15 : -0.15;
-      pvScale = Math.max(0.2, Math.min(8, pvScale));
-      img.style.transform = `scale(${pvScale})`;
-    }, { passive: false });
-    inner.appendChild(bar); inner.appendChild(wrap);
-    inner.classList.add("is-image");
-  } else {
-    inner.classList.remove("is-image");
-    const txt = (item.text || "").trim();
-    inner.textContent = txt || "（空）";
+    // Images open in their own floating, draggable, resize-to-fit window.
+    invoke("pin_image", { path: imgPath, w: item.w || 640, h: item.h || 480 }).catch(() => {});
+    return;
   }
+  const inner = $("previewInner");
+  inner.innerHTML = "";
+  inner.classList.remove("is-image");
+  const txt = (item.text || "").trim();
+  inner.textContent = txt || "（空）";
   $("preview").hidden = false; refreshModal();
 }
 function closePreview() { $("preview").hidden = true; refreshModal(); }
@@ -906,8 +890,7 @@ document.addEventListener("click", (e) => {
 let pointerInsideLine = false;
 document.addEventListener("pointerdown", (e) => {
   if (stage.classList.contains("up")) { pointerInsideLine = false; return; }
-  pointerInsideLine = !!(e.target.closest("#stage") || e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#ctx") || e.target.closest("#settings"));
-  if (pointerInsideLine) invoke("set_sticky", { on: true }).catch(() => {});
+  pointerInsideLine = !!(e.target.closest("#stage") || e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#ctx"));
 }, true);
 $("preview").addEventListener("click", (e) => { if (e.target.id === "preview") closePreview(); });
 $("settings").addEventListener("click", (e) => { if (e.target.id === "settings") closeSettings(); });
@@ -915,7 +898,7 @@ $("setClose").addEventListener("click", closeSettings);
 $("editorClose").addEventListener("click", closeEditor);
 $("editorSave").addEventListener("click", closeEditor);
 $("plus").addEventListener("click", newNote);
-$("gear").addEventListener("click", openSettings);
+$("gear").addEventListener("click", () => { invoke("rollup_now").catch(() => {}); invoke("open_settings").catch(() => {}); });
 $("bell").addEventListener("click", (e) => { if (editing) showReminderPanel(e, editing, () => { $("bellText").textContent = editing.remindAt ? fmtWhen(editing.remindAt) : t("remind"); }); });
 $("prev").addEventListener("click", () => { ui.page--; render(); });
 $("next").addEventListener("click", () => { ui.page++; render(); });
@@ -935,7 +918,12 @@ async function wire() {
   await listen("line:drop", (ev) => onDrop(ev.payload.deck));
   await listen("line:rollup", () => onRollup());
   await listen("ui:newnote", () => { setDeck("notes"); stage.classList.remove("up"); render(); newNote(); });
-  await listen("ui:settings", () => { stage.classList.remove("up"); setDeck("clipboard"); render(); openSettings(); });
+  await listen("theme:preview", (ev) => applyTheme(ev.payload || "soft"));
+  await listen("settings:changed", async () => {
+    try { const s = await invoke("get_settings"); if (s) cfg = Object.assign(cfg, JSON.parse(s)); } catch (e) {}
+    LANG = cfg.lang === "en" ? "en" : "zh";
+    applyLang(); applyTheme(cfg.theme); cleanup(); render();
+  });
   await listen("tauri://drag-drop", (ev) => {
     const p = ev.payload || {};
     const paths = p.paths || (Array.isArray(p) ? p : []);

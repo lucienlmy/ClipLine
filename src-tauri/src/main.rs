@@ -576,6 +576,28 @@ fn pin_image(app: AppHandle, path: String, w: Option<u32>, h: Option<u32>) -> Re
 }
 
 #[tauri::command]
+fn open_settings(app: AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("settings") {
+        let _ = w.show();
+        let _ = w.set_focus();
+        return Ok(());
+    }
+    tauri::WebviewWindowBuilder::new(
+        &app,
+        "settings",
+        tauri::WebviewUrl::App("settings.html".into()),
+    )
+    .title("ClipLine 设置")
+    .inner_size(580.0, 640.0)
+    .min_inner_size(440.0, 420.0)
+    .resizable(true)
+    .center()
+    .build()
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 async fn pick_folder(app: AppHandle) -> Option<String> {
     use tauri_plugin_dialog::DialogExt;
     app.dialog()
@@ -760,8 +782,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                 let _ = app.emit("ui:monitor", active);
             }
             "settings" => {
-                drop_line(Deck::Clipboard, true);
-                let _ = app.emit("ui:settings", ());
+                let _ = open_settings(app.clone());
             }
             "restart" => app.restart(),
             "quit" => app.exit(0),
@@ -833,6 +854,7 @@ fn main() {
             set_sticky,
             pin_image,
             pick_folder,
+            open_settings,
             quit
         ])
         .setup(|app| {
