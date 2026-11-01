@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClipLine</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="stage" class="up deck-clipboard">
+    <div id="panel">
+      <svg id="rope" preserveAspectRatio="none">
+        <path id="ropePath" d="" />
+      </svg>
+
+      <button id="plus" title="新建便签">+</button>
+
+      <div id="line">
+        <div id="cards"></div>
+      </div>
+
+      <div id="pill">
+        <button class="nav" id="prev" title="上一屏">‹</button>
+        <div class="filters" id="filters"></div>
+        <div class="search">
+          <input id="searchInput" type="text" placeholder="搜索…" spellcheck="false" />
+        </div>
+        <button class="pinOnly" id="pinOnly" title="只看盯住的">★</button>
+        <span class="count" id="count"></span>
+        <button class="nav" id="next" title="下一屏">›</button>
+        <button class="gear" id="gear" title="设置">⚙</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <!-- Note editor -->
+  <div id="editor" hidden>
+    <div class="editor-sheet">
+      <div class="editor-head">
+        <div class="tints" id="tints"></div>
+        <button class="editor-close" id="editorClose" title="保存并关闭 (Esc)">✕</button>
+      </div>
+      <textarea id="editorBody" placeholder="写点什么…&#10;第一行是标题&#10;用 [] 开头的行会变成勾选项"></textarea>
+      <div class="editor-foot">
+        <button id="bell" title="提醒">🔔 <span id="bellText">提醒</span></button>
+        <span class="hint">Ctrl+S 保存 · Esc 关闭</span>
+        <button id="editorSave" class="primary">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview overlay -->
+  <div id="preview" hidden>
+    <div class="preview-inner" id="previewInner"></div>
+  </div>
+
+  <!-- Context menu -->
+  <div id="ctx" hidden></div>
+
+  <!-- Settings -->
+  <div id="settings" hidden>
+    <div class="settings-sheet">
+      <div class="settings-head">
+        <h2 id="setTitle">设置</h2>
+        <button class="editor-close" id="setClose" title="关闭">✕</button>
+      </div>
+      <div class="settings-body" id="settingsBody"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

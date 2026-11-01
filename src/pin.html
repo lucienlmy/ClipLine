@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<title>ClipLine Pin</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+  html, body { width: 100%; height: 100%; background: transparent; overflow: hidden; font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
+  #frame {
+    width: 100%; height: 100%;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 14px 40px rgba(0,0,0,0.4);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    border: 1px solid rgba(0,0,0,0.12);
+  }
+  #bar {
+    height: 30px; flex: none;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 8px;
+    background: linear-gradient(#faf7f2, #efece5);
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+  }
+  #bar .pin { font-size: 14px; }
+  #bar .title { font-size: 11px; color: #8a847b; }
+  #close { border: none; background: rgba(0,0,0,0.06); width: 20px; height: 20px; border-radius: 50%; cursor: pointer; font-size: 11px; line-height: 1; }
+  #close:hover { background: #e9573f; color: #fff; }
+  #wrap { flex: 1; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #f3f1ec; position: relative; }
+  #img { transform-origin: center center; transition: transform 0.05s linear; max-width: 100%; max-height: 100%; display: block; }
+  #hint { position: absolute; bottom: 6px; right: 8px; font-size: 10px; color: #a79f93; background: rgba(255,255,255,0.7); padding: 1px 6px; border-radius: 6px; }
+</style>
+</head>
+<body>
+  <div id="frame">
+    <div id="bar" data-tauri-drag-region>
+      <span class="pin" data-tauri-drag-region>📌</span>
+      <span class="title" data-tauri-drag-region>钉在桌面 · 可拖动 · 滚轮缩放</span>
+      <button id="close" title="关闭">✕</button>
+    </div>
+    <div id="wrap" data-tauri-drag-region>
+      <img id="img" alt="" draggable="false" />
+      <span id="hint">滚轮缩放</span>
+    </div>
+  </div>
+<script>
+  const T = window.__TAURI__;
+  const params = new URLSearchParams(location.search);
+  const path = decodeURIComponent(params.get("path") || "");
+  const img = document.getElementById("img");
+  try { img.src = T ? T.core.convertFileSrc(path) : path; } catch (e) { img.src = path; }
+
+  let scale = 1;
+  document.getElementById("wrap").addEventListener("wheel", (e) => {
+    e.preventDefault();
+    scale += e.deltaY < 0 ? 0.12 : -0.12;
+    scale = Math.max(0.2, Math.min(6, scale));
+    img.style.transform = `scale(${scale})`;
+  }, { passive: false });
+
+  document.getElementById("close").addEventListener("click", (e) => {
+    e.stopPropagation();
+    try { T.window.getCurrentWindow().close(); } catch (err) { window.close(); }
+  });
+</script>
+</body>
+</html>
