@@ -40,6 +40,8 @@ const I18N = {
     flipNone: "关闭", mShift: "Shift", mCtrl: "Ctrl", mAlt: "Alt",
     secClean: "自动清理", retention: "保留天数", days: "天",
     secGeneral: "常规", language: "语言", autostart: "开机自启动",
+    secTheme: "主题", tSoft: "柔彩日常", tSilver: "经典银灰", tLinen: "棉麻木夹", tPorcelain: "奶白轻盈", tGraphite: "石墨金属",
+    secWatch: "监听文件夹", addFolder: "添加文件夹", watchHint: "这些文件夹新增文件会自动上绳", noFolders: "（未添加）",
     secHelp: "使用说明", secAbout: "关于",
     cancel: "取消", close: "关闭", saved: "已保存",
     helpBody: [
@@ -75,6 +77,8 @@ const I18N = {
     flipNone: "Off", mShift: "Shift", mCtrl: "Ctrl", mAlt: "Alt",
     secClean: "Auto cleanup", retention: "Keep for", days: "days",
     secGeneral: "General", language: "Language", autostart: "Launch at startup",
+    secTheme: "Theme", tSoft: "Soft color", tSilver: "Classic silver", tLinen: "Linen & wood", tPorcelain: "Porcelain", tGraphite: "Graphite",
+    secWatch: "Watched folders", addFolder: "Add folder", watchHint: "New files in these folders hang automatically", noFolders: "(none)",
     secHelp: "How to use", secAbout: "About",
     cancel: "Cancel", close: "Close", saved: "Saved",
     helpBody: [
@@ -106,7 +110,8 @@ const tintOf = (k) => TINTS.find((x) => x.key === k) || TINTS[0];
 
 /* ---------- state ---------- */
 let state = { clips: [], notes: [] };
-let cfg = { hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false };
+let cfg = { hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [] };
+function applyTheme(name) { stage.dataset.theme = name || "soft"; }
 const ui = { deck: "clipboard", filter: "all", search: "", pinnedOnly: false, page: 0 };
 
 const $ = (id) => document.getElementById(id);
@@ -667,7 +672,7 @@ function openSettings() {
   renderSettings();
   $("settings").hidden = false; refreshModal();
 }
-function closeSettings() { capturing = null; $("settings").hidden = true; refreshModal(); }
+function closeSettings() { capturing = null; $("settings").hidden = true; applyTheme(cfg.theme); refreshModal(); }
 
 function renderSettings() {
   $("setTitle").textContent = t("setTitle");
@@ -729,6 +734,46 @@ function renderSettings() {
   const autoSw = switchEl(draft.autostart, (v) => draft.autostart = v);
   s4.appendChild(row(t("autostart"), autoSw));
   body.appendChild(s4);
+
+  // Theme
+  const st = section(t("secTheme"));
+  const themeSeg = document.createElement("div"); themeSeg.className = "seg"; themeSeg.style.flexWrap = "wrap";
+  [["soft", t("tSoft")], ["silver", t("tSilver")], ["linen", t("tLinen")], ["porcelain", t("tPorcelain")], ["graphite", t("tGraphite")]].forEach(([v, l]) => {
+    const b = document.createElement("button"); b.textContent = l; if ((draft.theme || "soft") === v) b.classList.add("on");
+    b.onclick = () => { draft.theme = v; themeSeg.querySelectorAll("button").forEach((z) => z.classList.remove("on")); b.classList.add("on"); applyTheme(v); };
+    themeSeg.appendChild(b);
+  });
+  const tr = document.createElement("div"); tr.className = "set-row"; tr.style.flexDirection = "column"; tr.style.alignItems = "stretch"; tr.appendChild(themeSeg);
+  st.appendChild(tr);
+  body.appendChild(st);
+
+  // Watched folders
+  const sw = section(t("secWatch"));
+  const hint = document.createElement("div"); hint.className = "sub"; hint.style.marginBottom = "8px"; hint.textContent = t("watchHint");
+  sw.appendChild(hint);
+  const list = document.createElement("div"); list.id = "watchList";
+  const renderWatch = () => {
+    list.innerHTML = "";
+    const fs = draft.watch_folders || [];
+    if (!fs.length) { const e = document.createElement("div"); e.className = "sub"; e.textContent = t("noFolders"); list.appendChild(e); }
+    fs.forEach((f, i) => {
+      const r = document.createElement("div"); r.className = "set-row"; r.style.margin = "4px 0";
+      const p = document.createElement("div"); p.textContent = f; p.style.cssText = "font-size:12px;word-break:break-all;flex:1;";
+      const rm = document.createElement("button"); rm.className = "btn-mini"; rm.textContent = "✕";
+      rm.onclick = () => { draft.watch_folders.splice(i, 1); renderWatch(); };
+      r.appendChild(p); r.appendChild(rm); list.appendChild(r);
+    });
+  };
+  renderWatch();
+  sw.appendChild(list);
+  const addBtn = document.createElement("button"); addBtn.className = "btn-mini"; addBtn.textContent = "+ " + t("addFolder"); addBtn.style.marginTop = "8px";
+  addBtn.onclick = () => {
+    invoke("pick_folder").then((p) => {
+      if (p) { draft.watch_folders = draft.watch_folders || []; if (!draft.watch_folders.includes(p)) draft.watch_folders.push(p); renderWatch(); }
+    }).catch(() => {});
+  };
+  sw.appendChild(addBtn);
+  body.appendChild(sw);
 
   // Help
   const s5 = section(t("secHelp"));
@@ -797,6 +842,7 @@ function saveSettings() {
       if (res) cfg = JSON.parse(res);
       LANG = cfg.lang === "en" ? "en" : "zh";
       applyLang();
+      applyTheme(cfg.theme);
       cleanup(); render();
       toast(t("saved"));
       closeSettings();
@@ -902,6 +948,7 @@ async function wire() {
   try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
   await load();
   applyLang();
+  applyTheme(cfg.theme);
   await wire();
   render();
 })();

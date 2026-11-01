@@ -4,6 +4,7 @@ mod native;
 
 use once_cell::sync::{Lazy, OnceCell};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
@@ -46,6 +47,8 @@ struct Settings {
     retention_days: u32,
     lang: String, // zh | en
     autostart: bool,
+    theme: String, // soft | silver | linen | porcelain | graphite
+    watch_folders: Vec<String>,
 }
 
 impl Default for Settings {
@@ -59,6 +62,8 @@ impl Default for Settings {
             retention_days: 30,
             lang: "zh".into(),
             autostart: false,
+            theme: "soft".into(),
+            watch_folders: Vec::new(),
         }
     }
 }
@@ -571,8 +576,61 @@ fn pin_image(app: AppHandle, path: String, w: Option<u32>, h: Option<u32>) -> Re
 }
 
 #[tauri::command]
+async fn pick_folder(app: AppHandle) -> Option<String> {
+    use tauri_plugin_dialog::DialogExt;
+    app.dialog()
+        .file()
+        .blocking_pick_folder()
+        .map(|p| p.to_string())
+}
+
+#[tauri::command]
 fn quit(app: AppHandle) {
     app.exit(0);
+}
+
+static WATCH_SEEN: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+static WATCH_INIT: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+
+/// Poll the user's watched folders; when a new file appears, hang it as a
+/// file card. Existing files present when a folder is first seen are seeded,
+/// not emitted, so only genuinely new files hang.
+fn start_folder_watch() {
+    std::thread::spawn(|| loop {
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+        if native::paused() {
+            continue;
+        }
+        let folders = SETTINGS.lock().unwrap().watch_folders.clone();
+        for folder in folders {
+            let first_time = !WATCH_INIT.lock().unwrap().contains(&folder);
+            let entries = match std::fs::read_dir(&folder) {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_file() {
+                    continue;
+                }
+                let ps = path.to_string_lossy().to_string();
+                let is_new = WATCH_SEEN.lock().unwrap().insert(ps.clone());
+                if is_new && !first_time {
+                    if let Some(app) = APP.get() {
+                        let item = serde_json::json!({
+                            "id": format!("w{}", now_ms()),
+                            "kind": "file",
+                            "text": ps,
+                            "files": [ps],
+                            "ts": now_ms() as i64,
+                        });
+                        let _ = app.emit("clip:add", item);
+                    }
+                }
+            }
+            WATCH_INIT.lock().unwrap().insert(folder);
+        }
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -729,6 +787,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_drag::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -773,6 +832,7 @@ fn main() {
             set_modal,
             set_sticky,
             pin_image,
+            pick_folder,
             quit
         ])
         .setup(|app| {
@@ -801,6 +861,7 @@ fn main() {
 
             native::start_clipboard_watch(handle.clone());
             start_cursor_thread();
+            start_folder_watch();
 
             Ok(())
         })

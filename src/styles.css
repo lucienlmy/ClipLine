@@ -11,7 +11,16 @@
   --note-w: 220px;
   --pitch: 188px;
   --note-pitch: 240px;
+  --peg-grad: linear-gradient(#e6a985, #d97757);
+  --pin-grad: radial-gradient(circle at 50% 35%, #f0b49a, #c05b3b);
+  --wood-grad: linear-gradient(#d9c7a6, #b89a6e);
 }
+
+/* ---------- themes ---------- */
+#stage[data-theme="silver"] { --rope: #9aa0a8; --peg-grad: linear-gradient(#f2f3f5, #b4b9c0); --pin-grad: radial-gradient(circle at 50% 35%, #eef0f3, #9aa0a8); --wood-grad: linear-gradient(#e8eaee, #aeb4bc); }
+#stage[data-theme="linen"] { --rope: #b8a07a; --peg-grad: linear-gradient(#ead8b2, #c3a570); --pin-grad: radial-gradient(circle at 50% 35%, #efe0bf, #b08d52); --wood-grad: linear-gradient(#e2cfa4, #b89a6e); }
+#stage[data-theme="porcelain"] { --rope: #d7d7db; --peg-grad: linear-gradient(#ffffff, #e4e4e8); --pin-grad: radial-gradient(circle at 50% 35%, #ffffff, #cfcfd6); --wood-grad: linear-gradient(#f6f6f8, #dcdce1); }
+#stage[data-theme="graphite"] { --rope: #4a4e56; --peg-grad: linear-gradient(#5c616a, #2e323a); --pin-grad: radial-gradient(circle at 50% 35%, #6b7079, #23262c); --wood-grad: linear-gradient(#53575f, #2b2e34); }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
 html, body {
@@ -67,15 +76,15 @@ html, body {
 .card .peg {
   position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
   width: 16px; height: 30px; border-radius: 6px;
-  background: linear-gradient(#e6a985, var(--clay));
+  background: var(--peg-grad);
   box-shadow: 0 2px 3px rgba(0,0,0,0.25);
   z-index: 3;
 }
 .card.pinned .peg {
   width: 18px; height: 26px; border-radius: 50% 50% 4px 4px;
-  background: radial-gradient(circle at 50% 35%, #f0b49a, #c05b3b);
+  background: var(--pin-grad);
 }
-.card.wooden .peg { background: linear-gradient(#d9c7a6, #b89a6e); height: 34px; top: -16px; }
+.card.wooden .peg { background: var(--wood-grad); height: 34px; top: -16px; }
 
 .card-body {
   position: relative;
