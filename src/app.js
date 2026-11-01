@@ -399,9 +399,14 @@ function attachDragOut(card, item) {
     const paths = item.vis === "image" ? (item.path ? [item.path] : []) : (item.files || []);
     if (!paths.length) return;
     const icon = item.vis === "image" ? (item.thumb || DRAG_ICON) : DRAG_ICON;
-    const mode = e.ctrlKey ? "move" : "copy";
+    const mode = e.shiftKey ? "move" : "copy"; // Windows: Shift = move, default = copy
     suppressClickUntil = Date.now() + 500;
-    try { window.__TAURI__.drag.startDrag({ item: paths, icon, mode }); } catch (err) {}
+    try {
+      window.__TAURI__.drag.startDrag({ item: paths, icon, mode }, () => {
+        // Drag finished (dropped or cancelled) — get the line out of the way.
+        invoke("rollup_now").catch(() => {});
+      });
+    } catch (err) {}
   });
   card.addEventListener("pointerup", () => { armed = false; });
   card.addEventListener("pointercancel", () => { armed = false; });
@@ -488,18 +493,24 @@ function convertToNote(item) {
 
 /* ---------- preview ---------- */
 let pvScale = 1;
+function imagePathOf(item) {
+  if (item.vis === "image") return item.path || "";
+  if (item.vis === "file" && (item.files || []).length === 1 && isImagePath(item.files[0])) return item.files[0];
+  return "";
+}
 function openPreview(item) {
   const inner = $("previewInner");
   inner.innerHTML = "";
-  if (item.vis === "image") {
+  const imgPath = imagePathOf(item);
+  if (imgPath) {
     pvScale = 1;
     const bar = document.createElement("div"); bar.className = "pv-bar";
     const pinBtn = document.createElement("button"); pinBtn.className = "btn-mini"; pinBtn.textContent = "📌 " + t("pinDesktop");
-    pinBtn.onclick = (e) => { e.stopPropagation(); invoke("pin_image", { path: item.path, w: item.w || 480, h: item.h || 360 }).catch(()=>{}); closePreview(); };
+    pinBtn.onclick = (e) => { e.stopPropagation(); invoke("pin_image", { path: imgPath, w: item.w || 640, h: item.h || 480 }).catch(()=>{}); closePreview(); };
     bar.appendChild(pinBtn);
     const wrap = document.createElement("div"); wrap.className = "pv-imgwrap";
     const img = document.createElement("img"); img.id = "pvimg"; img.src = item.thumb || "";
-    if (item.path) invoke("read_image_data", { path: item.path }).then((d) => { if (d) img.src = d; }).catch(() => {});
+    invoke("read_image_data", { path: imgPath }).then((d) => { if (d) img.src = d; }).catch(() => {});
     img.onerror = () => { img.src = item.thumb || ""; };
     wrap.appendChild(img);
     wrap.addEventListener("wheel", (e) => {
@@ -512,7 +523,8 @@ function openPreview(item) {
     inner.classList.add("is-image");
   } else {
     inner.classList.remove("is-image");
-    inner.textContent = item.text || "";
+    const txt = (item.text || "").trim();
+    inner.textContent = txt || "（空）";
   }
   $("preview").hidden = false; refreshModal();
 }

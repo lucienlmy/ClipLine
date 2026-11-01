@@ -677,13 +677,14 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let item_new = MenuItemBuilder::with_id("newnote", "新建便签 / New note").build(app)?;
     let item_mon = MenuItemBuilder::with_id("togglemon", "暂停 / 恢复监控").build(app)?;
     let item_set = MenuItemBuilder::with_id("settings", "设置 / Settings").build(app)?;
+    let item_restart = MenuItemBuilder::with_id("restart", "重启 / Restart").build(app)?;
     let item_quit = MenuItemBuilder::with_id("quit", "退出 / Quit").build(app)?;
     let menu = MenuBuilder::new(app)
         .items(&[&item_clip, &item_notes])
         .separator()
         .items(&[&item_new, &item_mon, &item_set])
         .separator()
-        .items(&[&item_quit])
+        .items(&[&item_restart, &item_quit])
         .build()?;
 
     let mut builder = TrayIconBuilder::with_id("tray")
@@ -704,6 +705,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                 drop_line(Deck::Clipboard, true);
                 let _ = app.emit("ui:settings", ());
             }
+            "restart" => app.restart(),
             "quit" => app.exit(0),
             _ => {}
         })
