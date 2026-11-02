@@ -1035,6 +1035,7 @@ function setDeck(deck) {
 }
 function onDrop(deck) { setDeck(deck); stage.classList.remove("up"); render(); }
 function onRollup() {
+  catching = false; clearTimeout(catchTimer); stage.classList.remove("catching", "catch-over");
   hideCtx(); closePreview();
   if (!$("editor").hidden) closeEditor();
   if (!$("settings").hidden) closeSettings();
@@ -1094,15 +1095,17 @@ window.addEventListener("wheel", (e) => {
 window.addEventListener("resize", () => { if (!stage.classList.contains("up")) render(); });
 
 /* ---------- drag files to the top edge: the line comes down to catch them ---------- */
-let catching = false, catchTimer = 0;
+let catching = false, catchTimer = 0, dragInside = false;
 function startCatch() {
   catching = true;
   stage.classList.add("catching");
   toast(t("catchHint"));
-  // No file drag arrives (e.g. a window being snapped to the top, or a
-  // text selection) — not for us, go back up.
   clearTimeout(catchTimer);
-  catchTimer = setTimeout(endCatch, 700);
+  // The file drag may already be over us (its drag-enter can arrive before
+  // this event). Only if none shows up is it not for us — e.g. a window being
+  // snapped to the top, or a text selection — and we go back up.
+  if (dragInside) stage.classList.add("catch-over");
+  else catchTimer = setTimeout(() => { if (!dragInside) endCatch(); }, 900);
 }
 function endCatch() {
   if (!catching) return;
@@ -1124,12 +1127,19 @@ async function wire() {
     applyLang(); applyTheme(cfg.theme); applyFont(cfg); cleanup(); render();
   });
   await listen("line:catch", () => startCatch());
-  await listen("tauri://drag-enter", () => { if (catching) { clearTimeout(catchTimer); stage.classList.add("catch-over"); } });
+  const onEnterOver = () => {
+    dragInside = true;
+    if (catching) { clearTimeout(catchTimer); stage.classList.add("catch-over"); }
+  };
+  await listen("tauri://drag-enter", onEnterOver);
+  await listen("tauri://drag-over", onEnterOver);
   await listen("tauri://drag-leave", () => {
+    dragInside = false;
     stage.classList.remove("catch-over");
-    if (catching) { clearTimeout(catchTimer); catchTimer = setTimeout(endCatch, 1500); }
+    if (catching) { clearTimeout(catchTimer); catchTimer = setTimeout(() => { if (!dragInside) endCatch(); }, 1500); }
   });
   await listen("tauri://drag-drop", (ev) => {
+    dragInside = false;
     if (catching) { catching = false; clearTimeout(catchTimer); stage.classList.remove("catching", "catch-over"); }
     const p = ev.payload || {};
     const paths = p.paths || (Array.isArray(p) ? p : []);

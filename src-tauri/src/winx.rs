@@ -12,7 +12,6 @@
 
 #[cfg(target_os = "windows")]
 mod imp {
-    use std::cell::RefCell;
     use std::os::windows::ffi::OsStrExt;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering::Relaxed};
@@ -31,13 +30,23 @@ mod imp {
     use windows::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
     use windows::Win32::System::Ole::{
-        DoDragDrop, IDropSource, IDropSource_Impl, OleInitialize, CF_HDROP, CF_UNICODETEXT,
-        DROPEFFECT, DROPEFFECT_COPY,
+        DoDragDrop, IDropSource, IDropSource_Impl, OleInitialize, CF_UNICODETEXT, DROPEFFECT,
+        DROPEFFECT_COPY, DROPEFFECT_MOVE,
     };
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
+        PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+    use windows::Win32::UI::Shell::{
+        ILCreateFromPathW, ILFree, SHCreateShellItemArrayFromIDLists, BHID_DataObject,
+    };
+    use windows::core::PCWSTR;
     use windows::Win32::System::SystemServices::{MK_LBUTTON, MODIFIERKEYS_FLAGS};
-    use windows::Win32::UI::Shell::{SHCreateDataObject, SHCreateStdEnumFmtEtc, DROPFILES};
+    use windows::Win32::UI::Shell::SHCreateStdEnumFmtEtc;
     use windows::Win32::UI::WindowsAndMessaging::{
-        CallNextHookEx, GetAncestor, GetClassNameW, GetCursorPos, GetMessageW, SetWindowsHookExW,
+        CallNextHookEx, GetAncestor, GetClassNameW, GetCursorPos, GetMessageW,
+        GetWindowThreadProcessId, SetWindowsHookExW,
         WindowFromPoint, GA_ROOT, MSG, MSLLHOOKSTRUCT, WH_MOUSE_LL, WM_LBUTTONDOWN, WM_LBUTTONUP,
     };
 
@@ -138,11 +147,55 @@ mod imp {
                 return false;
             }
             let cls = String::from_utf16_lossy(&buf[..n as usize]);
-            matches!(
+            if matches!(
                 cls.as_str(),
                 "CabinetWClass" | "ExploreWClass" | "Progman" | "WorkerW"
-            )
+            ) {
+                return true;
+            }
+            // Fallback: any window that belongs to explorer.exe.
+            process_is_explorer(root)
         }
+    }
+
+    unsafe fn process_is_explorer(h: HWND) -> bool {
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(h, Some(&mut pid));
+        if pid == 0 {
+            return false;
+        }
+        let Ok(ph) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else {
+            return false;
+        };
+        let mut buf = [0u16; 520];
+        let mut len = buf.len() as u32;
+        let ok = QueryFullProcessImageNameW(
+            ph,
+            PROCESS_NAME_WIN32,
+            windows::core::PWSTR(buf.as_mut_ptr()),
+            &mut len,
+        )
+        .is_ok();
+        let _ = CloseHandle(ph);
+        if !ok {
+            return false;
+        }
+        String::from_utf16_lossy(&buf[..len as usize])
+            .to_ascii_lowercase()
+            .ends_with("\\explorer.exe")
+    }
+
+    /// The same shell data object Explorer itself produces for a file —
+    /// this is what image/file card drags use, and Explorer accepts it.
+    unsafe fn shell_file_object(file: &[u16]) -> Result<IDataObject> {
+        let pidl = ILCreateFromPathW(PCWSTR(file.as_ptr()));
+        if pidl.is_null() {
+            return Err(Error::from_win32());
+        }
+        let arr = SHCreateShellItemArrayFromIDLists(&[pidl as *const _]);
+        let r = arr.and_then(|a| a.BindToHandler::<_, IDataObject>(None, &BHID_DataObject));
+        ILFree(Some(pidl as *const _));
+        r
     }
 
     #[implement(IDropSource)]
@@ -163,57 +216,22 @@ mod imp {
         }
     }
 
+    /// Over Explorer / the desktop this object *is* the shell file object
+    /// (everything is forwarded); over anything else it only offers text.
     #[implement(IDataObject)]
     struct TextData {
-        text: Vec<u16>,          // UTF-16 incl. trailing NUL
-        file: Vec<u16>,          // wide path incl. trailing NUL
-        inner: IDataObject,      // stores whatever drop targets SetData on us
-        explorer: RefCell<bool>, // last answer for the current target
+        text: Vec<u16>,     // UTF-16 incl. trailing NUL
+        file: IDataObject,  // shell data object for the temp .txt/.md
     }
 
-    impl TextData {
-        fn which(f: *const FORMATETC) -> Option<u16> {
-            let f = unsafe { f.as_ref()? };
-            if (f.tymed & TYMED_HGLOBAL.0 as u32) == 0 || f.dwAspect != DVASPECT_CONTENT.0 {
-                return None;
+    fn is_text(f: *const FORMATETC) -> bool {
+        match unsafe { f.as_ref() } {
+            Some(f) => {
+                f.cfFormat == CF_UNICODETEXT.0
+                    && (f.tymed & TYMED_HGLOBAL.0 as u32) != 0
+                    && f.dwAspect == DVASPECT_CONTENT.0
             }
-            if f.cfFormat == CF_UNICODETEXT.0 || f.cfFormat == CF_HDROP.0 {
-                Some(f.cfFormat)
-            } else {
-                None
-            }
-        }
-        /// Files for Explorer, text for everybody else.
-        fn offers(&self, cf: u16) -> bool {
-            let ex = cursor_over_explorer();
-            *self.explorer.borrow_mut() = ex;
-            if ex {
-                cf == CF_HDROP.0
-            } else {
-                cf == CF_UNICODETEXT.0
-            }
-        }
-        fn hglobal_text(&self) -> Result<HGLOBAL> {
-            alloc_bytes(&[], &self.text)
-        }
-        fn hglobal_drop(&self) -> Result<HGLOBAL> {
-            let mut list = self.file.clone();
-            list.push(0); // double NUL terminator
-            let mut hdr = vec![0u8; std::mem::size_of::<DROPFILES>()];
-            let df = DROPFILES {
-                pFiles: std::mem::size_of::<DROPFILES>() as u32,
-                pt: POINT::default(),
-                fNC: BOOL(0),
-                fWide: BOOL(1),
-            };
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    &df as *const DROPFILES as *const u8,
-                    hdr.as_mut_ptr(),
-                    hdr.len(),
-                );
-            }
-            alloc_bytes(&hdr, &list)
+            None => false,
         }
     }
 
@@ -246,29 +264,31 @@ mod imp {
 
     impl IDataObject_Impl for TextData_Impl {
         fn GetData(&self, f: *const FORMATETC) -> Result<STGMEDIUM> {
-            if let Some(cf) = TextData::which(f) {
-                if self.offers(cf) {
-                    let h = if cf == CF_HDROP.0 {
-                        self.hglobal_drop()?
-                    } else {
-                        self.hglobal_text()?
-                    };
-                    return Ok(medium(h));
-                }
-                return Err(Error::from(DV_E_FORMATETC));
+            if cursor_over_explorer() {
+                return unsafe { self.file.GetData(f) };
             }
-            unsafe { self.inner.GetData(f) }
+            if is_text(f) {
+                return Ok(medium(alloc_bytes(&[], &self.text)?));
+            }
+            Err(Error::from(DV_E_FORMATETC))
         }
 
-        fn GetDataHere(&self, _f: *const FORMATETC, _m: *mut STGMEDIUM) -> Result<()> {
+        fn GetDataHere(&self, f: *const FORMATETC, m: *mut STGMEDIUM) -> Result<()> {
+            if cursor_over_explorer() {
+                return unsafe { self.file.GetDataHere(f, m) };
+            }
             Err(Error::from(DV_E_FORMATETC))
         }
 
         fn QueryGetData(&self, f: *const FORMATETC) -> windows::core::HRESULT {
-            if let Some(cf) = TextData::which(f) {
-                return if self.offers(cf) { S_OK } else { DV_E_FORMATETC };
+            if cursor_over_explorer() {
+                return unsafe { self.file.QueryGetData(f) };
             }
-            unsafe { self.inner.QueryGetData(f) }
+            if is_text(f) {
+                S_OK
+            } else {
+                DV_E_FORMATETC
+            }
         }
 
         fn GetCanonicalFormatEtc(
@@ -283,17 +303,15 @@ mod imp {
         }
 
         fn SetData(&self, f: *const FORMATETC, m: *const STGMEDIUM, release: BOOL) -> Result<()> {
-            unsafe { self.inner.SetData(f, m, release) }
+            unsafe { self.file.SetData(f, m, release) }
         }
 
-        fn EnumFormatEtc(&self, _dir: u32) -> Result<IEnumFORMATETC> {
-            let cf = if cursor_over_explorer() {
-                CF_HDROP.0
-            } else {
-                CF_UNICODETEXT.0
-            };
+        fn EnumFormatEtc(&self, dir: u32) -> Result<IEnumFORMATETC> {
+            if cursor_over_explorer() {
+                return unsafe { self.file.EnumFormatEtc(dir) };
+            }
             let fmt = FORMATETC {
-                cfFormat: cf,
+                cfFormat: CF_UNICODETEXT.0,
                 ptd: std::ptr::null_mut(),
                 dwAspect: DVASPECT_CONTENT.0,
                 lindex: -1,
@@ -321,18 +339,11 @@ mod imp {
         wtext.push(0);
         let wfile: Vec<u16> = file.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
         unsafe {
-            let inner: IDataObject =
-                SHCreateDataObject(None, None, None).map_err(|e| e.to_string())?;
-            let data: IDataObject = TextData {
-                text: wtext,
-                file: wfile,
-                inner,
-                explorer: RefCell::new(false),
-            }
-            .into();
+            let file = shell_file_object(&wfile).map_err(|e| e.to_string())?;
+            let data: IDataObject = TextData { text: wtext, file }.into();
             let src: IDropSource = DropSource.into();
             let mut eff = DROPEFFECT::default();
-            let hr = DoDragDrop(&data, &src, DROPEFFECT_COPY, &mut eff);
+            let hr = DoDragDrop(&data, &src, DROPEFFECT_COPY | DROPEFFECT_MOVE, &mut eff);
             Ok(hr == DRAGDROP_S_DROP)
         }
     }

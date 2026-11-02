@@ -120,6 +120,8 @@ static CUR_CLIP: Lazy<Mutex<Option<Shortcut>>> = Lazy::new(|| Mutex::new(None));
 static CUR_NOTES: Lazy<Mutex<Option<Shortcut>>> = Lazy::new(|| Mutex::new(None));
 // While a menu / editor / preview / settings overlay is open, the line must
 // not auto-roll-up even if the pointer leaves the panel to reach it.
+/// True while the line was dropped to catch a file drag (until rollup).
+static CATCHING: AtomicBool = AtomicBool::new(false);
 static MODAL: AtomicBool = AtomicBool::new(false);
 
 #[derive(Serialize, Clone)]
@@ -319,6 +321,7 @@ fn drop_line_ex(deck: Deck, sticky: bool, focus: bool) {
             },
         );
         if !focus {
+            CATCHING.store(true, Ordering::Relaxed);
             let _ = app.emit("line:catch", ());
         }
     }
@@ -332,6 +335,7 @@ fn rollup() {
         }
         st.dropped = false;
     }
+    CATCHING.store(false, Ordering::Relaxed);
     if let Some(app) = APP.get() {
         let _ = app.emit("line:rollup", ());
     }
@@ -903,7 +907,10 @@ fn start_cursor_thread() {
                 }
             } else {
                 cand = None;
-                if !sticky && !MODAL.load(Ordering::Relaxed) {
+                // While a caught file drag is still in the air, stay down
+                // wherever the pointer wanders; the frontend decides.
+                let carrying = CATCHING.load(Ordering::Relaxed) && winx::left_drag_info().is_some();
+                if !sticky && !MODAL.load(Ordering::Relaxed) && !carrying {
                     let h = if deck == Deck::Notes { notes_h } else { clip_h };
                     if y > top + h + 12 {
                         rollup();
