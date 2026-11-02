@@ -1,12 +1,17 @@
 # Build ClipLine on GitHub's Windows runners and attach the binaries to a
 # DRAFT release. Trigger: push a tag like v1.1.0, or run manually from the
-# Actions tab. The draft is only visible to the repo owner until published.
+# Actions tab (Run workflow) — the tag is then created from the version. The draft is only visible to the repo owner until published.
 name: Release
 
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Create a draft release (tag = v + version in tauri.conf.json)"
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -44,6 +49,7 @@ jobs:
             Copy-Item $_.FullName "dist/$($_.Name)"
           }
           Get-ChildItem dist
+          "VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - uses: actions/upload-artifact@v4
         with:
@@ -51,14 +57,16 @@ jobs:
           path: dist/*.exe
 
       - name: Draft GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release
         uses: softprops/action-gh-release@v2
         with:
           draft: true
-          name: ClipLine ${{ github.ref_name }}
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          name: ClipLine v${{ env.VERSION }}
           files: dist/*.exe
           body: |
-            ClipLine ${{ github.ref_name }} for Windows 10/11 (x64).
+            ClipLine v${{ env.VERSION }} for Windows 10/11 (x64).
 
             - `ClipLine_*_portable_x64.exe` — 免安装便携版，双击即用
             - `ClipLine_*_x64-setup.exe` — 安装版
