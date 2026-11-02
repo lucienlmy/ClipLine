@@ -113,7 +113,7 @@ html, body {
 .c-file { position: relative; }
 .c-file .ico { font-size: 40px; }
 .c-file .fname { font-size: 12px; color: var(--ink-soft); text-align: center; word-break: break-all; max-height: 48px; overflow: hidden; }
-.c-file .fcount { position: absolute; top: 8px; right: 10px; background: var(--clay); color: #fff; font-size: 11px; min-width: 18px; height: 18px; line-height: 18px; text-align: center; border-radius: 999px; padding: 0 4px; }
+.c-file .fcount { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: var(--clay); color: #fff; font-size: 11px; min-width: 18px; height: 18px; line-height: 18px; text-align: center; border-radius: 999px; padding: 0 4px; }
 .card .card-body { -webkit-user-select: none; user-select: none; }
 
 /* corner buttons */
@@ -299,3 +299,31 @@ html, body {
 #stage.catching #catchZone { display: flex; }
 #stage.catch-over #catchZone { background: rgba(255,230,200,0.6); border-color: rgba(200,110,40,0.95); }
 #stage.catching #rope { filter: drop-shadow(0 0 6px rgba(255,180,90,0.9)); }
+
+/* multi-file card: looks like a small stack of cards */
+.card.stack::before, .card.stack::after { content: ""; position: absolute; left: 0; right: 0; height: 150px; border-radius: 12px;
+  background: var(--card-bg, #fff); box-shadow: 0 4px 10px rgba(50,40,30,0.14); pointer-events: none; }
+.card.stack::before { top: 18px; transform: translate(10px, 6px) rotate(4deg); opacity: 0.9; z-index: 0; background: #f6f1e7; }
+.card.stack::after { top: 16px; transform: translate(5px, 3px) rotate(2deg); opacity: 0.95; z-index: 0; background: #fbf8f2; }
+.card.stack .card-body { position: relative; z-index: 1; }
+.card.stack .peg { z-index: 2; }
+.c-file .fcount { cursor: pointer; }
+.c-file .fcount:hover { transform: translateX(-50%) scale(1.12); }
+
+/* stack popover */
+#stackPop { position: fixed; top: 8px; z-index: 260; width: 380px; max-height: calc(100vh - 60px); display: flex; flex-direction: column;
+  background: #fffdf8; border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,0.28); padding: 10px 12px; }
+#stackPop[hidden] { display: none; }
+.sp-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.sp-head span { flex: 1; }
+.sp-head button { border: none; border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; background: rgba(0,0,0,0.06); }
+#spClose { width: 24px; height: 24px; padding: 0; }
+.sp-hint { font-size: 11px; color: var(--ink-soft); margin: 4px 0 8px; }
+#spItems { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; overflow-y: auto; }
+.sp-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border-radius: 10px; cursor: grab;
+  -webkit-user-select: none; user-select: none; transition: background 0.15s; }
+.sp-item:hover { background: rgba(0,0,0,0.05); }
+.sp-item.copied { background: rgba(200,120,60,0.18); }
+.sp-ico { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; }
+.sp-ico img { max-width: 48px; max-height: 48px; border-radius: 6px; object-fit: cover; }
+.sp-name { font-size: 11px; color: var(--ink); text-align: center; word-break: break-all; max-height: 30px; overflow: hidden; line-height: 15px; }

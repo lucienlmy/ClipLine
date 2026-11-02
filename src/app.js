@@ -11,7 +11,7 @@ const DRAG_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADgAAAA4CAYAAAC
 
 /* Keep the line from auto-rolling-up while a menu / overlay is open. */
 function refreshModal() {
-  const open = !$("ctx").hidden || !$("preview").hidden || !$("editor").hidden || !$("settings").hidden;
+  const open = !$("ctx").hidden || !$("preview").hidden || !$("editor").hidden || !$("settings").hidden || !$("stackPop").hidden;
   invoke("set_modal", { on: open }).catch(() => {});
 }
 
@@ -19,7 +19,7 @@ function refreshModal() {
 const I18N = {
   zh: {
     all: "全部", text: "文字", link: "链接", color: "颜色", image: "图片", file: "文件",
-    search: "搜索…", copied: "已复制", editText: "编辑文字", already: "已在绳上，已移到最前", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
+    search: "搜索…", copied: "已复制", editText: "编辑文字", stackOpen: "展开这一叠", stackTitle: "这一叠共 {n} 个文件", stackSplit: "拆成单张", stackHint: "单击复制 · 拖出单个文件 · 双击打开", missing: "原文件已不在（被移动或删除了）", already: "已在绳上，已移到最前", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
     emptyClip: "绳上还空着 — 复制点什么试试",
     emptyNotes: "绳上还没有便签 — 点上方的 + 写一张",
     plus: "新建便签", gear: "设置", prev: "上一屏", next: "下一屏", pinOnly: "只看钉住的",
@@ -57,7 +57,7 @@ const I18N = {
   },
   en: {
     all: "All", text: "Text", link: "Link", color: "Color", image: "Image", file: "File",
-    search: "Search…", copied: "Copied", editText: "Edit text", already: "Already on the line — moved to front", pasteBack: "Paste into previous app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
+    search: "Search…", copied: "Copied", editText: "Edit text", stackOpen: "Open this stack", stackTitle: "{n} files in this stack", stackSplit: "Split into cards", stackHint: "Click to copy · drag one out · double-click to open", missing: "The original file is gone (moved or deleted)", already: "Already on the line — moved to front", pasteBack: "Paste into previous app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
     emptyClip: "The line is empty — copy something",
     emptyNotes: "No notes yet — click + above to write one",
     plus: "New note", gear: "Settings", prev: "Previous", next: "Next", pinOnly: "Pinned only",
@@ -340,7 +340,8 @@ function buildClipCard(item) {
     const files = item.files || [];
     const first = files[0] || "";
     const base = first.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || first;
-    const more = files.length > 1 ? `<div class="fcount">+${files.length - 1}</div>` : "";
+    const more = files.length > 1 ? `<div class="fcount" title="${t("stackOpen")}">+${files.length - 1}</div>` : "";
+    if (files.length > 1) card.classList.add("stack");
     if (files.length === 1 && isImagePath(first)) {
       const d = document.createElement("div"); d.className = "c-image";
       d.innerHTML = `<img alt="">${more}`;
@@ -357,11 +358,19 @@ function buildClipCard(item) {
   }
 
   addCorners(card, body, item, false);
-  body.addEventListener("click", (e) => { if (e.target.closest(".corner")) return; if (dragSuppressed()) return; copyClip(item, card); });
+  const isStack = item.vis === "file" && (item.files || []).length > 1;
+  if (isStack) {
+    const mag = body.querySelector(".corner.mag"); if (mag) { mag.textContent = "☰"; mag.title = t("stackOpen"); }
+  }
+  body.addEventListener("click", (e) => {
+    if (e.target.closest(".corner")) return; if (dragSuppressed()) return;
+    if (isStack && e.target.closest(".fcount")) { openStack(item, card); return; }
+    copyClip(item, card);
+  });
   body.addEventListener("dblclick", (e) => {
     if (e.target.closest(".corner")) return;
     if (item.vis === "image") { invoke("copy_image", { path: item.path }).catch(()=>{}); invoke("rollup_now"); }
-    else if (item.vis === "file") { if ((item.files || [])[0]) invoke("open_path", { path: item.files[0] }).catch(()=>{}); }
+    else if (item.vis === "file") { if (isStack) openStack(item, card); else if ((item.files || [])[0]) invoke("open_path", { path: item.files[0] }).catch(()=>{}); }
     else openClipEditor(item);
   });
   card.addEventListener("contextmenu", (e) => showCtx(e, item, false));
@@ -434,7 +443,12 @@ function addCorners(card, body, item, isNote) {
   body.appendChild(x);
   const mag = document.createElement("button");
   mag.className = "corner mag"; mag.textContent = isNote ? "✎" : "🔍"; mag.title = isNote ? t("edit") : t("preview");
-  mag.addEventListener("click", (e) => { e.stopPropagation(); if (isNote) openEditor(item); else openPreview(item); });
+  mag.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (isNote) openEditor(item);
+    else if (item.vis === "file" && (item.files || []).length > 1) openStack(item, card);
+    else openPreview(item);
+  });
   body.appendChild(mag);
 }
 
@@ -444,6 +458,62 @@ function copyClip(item, card) {
   else if (item.vis === "file") invoke("copy_files", { paths: item.files || [] }).catch((e) => toast("复制失败: " + e));
   else invoke("copy_text", { text: item.text || "" }).catch((e) => toast("复制失败: " + e));
   flash(card);
+}
+
+/* ---------- stack: pick single files out of a multi-file card ---------- */
+let stackItem = null;
+function baseName(p) { const q = String(p).replace(/[\\/]+$/, ""); return q.split(/[\\/]/).pop() || q; }
+function openStack(item, card) {
+  stackItem = item;
+  const files = item.files || [];
+  $("spTitle").textContent = t("stackTitle").replace("{n}", files.length);
+  $("spSplit").textContent = t("stackSplit");
+  $("spHint").textContent = t("stackHint");
+  const box = $("spItems"); box.innerHTML = "";
+  files.forEach((p) => {
+    const d = document.createElement("div"); d.className = "sp-item"; d.title = p;
+    d.innerHTML = `<div class="sp-ico">${FILE_SVG}</div><div class="sp-name">${escapeHtml(baseName(p))}</div>`;
+    if (isImagePath(p)) {
+      invoke("read_image_data", { path: p }).then((data) => {
+        if (data) d.querySelector(".sp-ico").innerHTML = `<img src="${data}" alt="">`;
+      }).catch(() => {});
+    }
+    // drag one file out
+    let sx = 0, sy = 0, armed = false;
+    d.addEventListener("pointerdown", (e) => { if (e.button !== 0) return; armed = true; sx = e.clientX; sy = e.clientY; });
+    d.addEventListener("pointermove", (e) => {
+      if (!armed || (Math.abs(e.clientX - sx) < 6 && Math.abs(e.clientY - sy) < 6)) return;
+      armed = false;
+      suppressClickUntil = Date.now() + 500;
+      selfDragUntil = Date.now() + 60000;
+      invoke("drag_files", { paths: [p], mov: e.shiftKey }).catch((err) => toast(t("dragFail") + err))
+        .finally(() => { selfDragUntil = Date.now() + 400; });
+    });
+    d.addEventListener("pointerup", () => { armed = false; });
+    d.addEventListener("click", () => {
+      if (dragSuppressed()) return;
+      invoke("copy_files", { paths: [p] }).catch((e) => toast("复制失败: " + e));
+      d.classList.add("copied"); setTimeout(() => d.classList.remove("copied"), 900);
+      toast(t("copied"));
+    });
+    d.addEventListener("dblclick", () => invoke("open_path", { path: p }).catch(() => {}));
+    box.appendChild(d);
+  });
+  const pop = $("stackPop");
+  pop.hidden = false;
+  const r = card.getBoundingClientRect();
+  const w = pop.offsetWidth;
+  pop.style.left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 8)) + "px";
+  refreshModal();
+}
+function closeStack() { stackItem = null; $("stackPop").hidden = true; refreshModal(); }
+function splitStack() {
+  const it = stackItem; if (!it) return;
+  const idx = state.clips.indexOf(it); if (idx < 0) { closeStack(); return; }
+  const now = Date.now();
+  const singles = (it.files || []).map((p, i) => ({ id: "f" + now + "-" + i + "-" + Math.floor(Math.random() * 1e6), kind: "file", vis: "file", files: [p], text: p, pinned: false, ts: now }));
+  state.clips.splice(idx, 1, ...singles.filter((x) => !state.clips.some((c) => c !== it && clipSig(c) === clipSig(x))));
+  save(); closeStack(); render();
 }
 
 /* ---------- drag out (card -> other apps / folders) ---------- */
@@ -474,7 +544,7 @@ function attachDragOut(card, item) {
     const mov = e.shiftKey; // Windows: Shift = move, default = copy
     suppressClickUntil = Date.now() + 500;
     selfDragUntil = Date.now() + 60000;
-    invoke("drag_files", { paths, mov }).catch((err) => toast(t("dragFail") + err))
+    invoke("drag_files", { paths, mov }).catch((err) => toast(String(err).includes("不存在") ? t("missing") : t("dragFail") + err))
       .finally(() => { selfDragUntil = Date.now() + 400; });
   });
   card.addEventListener("pointerup", () => { armed = false; });
@@ -1054,6 +1124,7 @@ function setDeck(deck) {
 }
 function onDrop(deck) { setDeck(deck); stage.classList.remove("up"); render(); }
 function onRollup() {
+  closeStack();
   stopCatch();
   hideCtx(); closePreview();
   if (!$("editor").hidden) closeEditor();
@@ -1072,6 +1143,7 @@ document.addEventListener("keydown", (e) => {
     if (!$("editor").hidden) { closeEditor(); return; }
     if (!$("preview").hidden) { closePreview(); return; }
     if (!$("ctx").hidden) { hideCtx(); return; }
+    if (!$("stackPop").hidden) { closeStack(); return; }
     invoke("rollup_now").catch(() => {});
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s" && !$("editor").hidden) { e.preventDefault(); closeEditor(); }
@@ -1091,9 +1163,14 @@ let pointerInCtx = false;
 document.addEventListener("pointerdown", (e) => {
   pointerInCtx = !!e.target.closest("#ctx");
   if (stage.classList.contains("up")) { pointerInsideLine = false; return; }
-  pointerInsideLine = !!(e.target.closest("#stage") || e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#ctx"));
+  pointerInsideLine = !!(e.target.closest("#stage") || e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#ctx") || e.target.closest("#stackPop"));
 }, true);
 $("preview").addEventListener("click", (e) => { if (e.target.id === "preview") closePreview(); });
+$("spClose").addEventListener("click", closeStack);
+$("spSplit").addEventListener("click", splitStack);
+document.addEventListener("pointerdown", (e) => {
+  if (!$("stackPop").hidden && !e.target.closest("#stackPop") && !e.target.closest(".card.stack")) closeStack();
+});
 $("settings").addEventListener("click", (e) => { if (e.target.id === "settings") closeSettings(); });
 $("setClose").addEventListener("click", closeSettings);
 $("editorClose").addEventListener("click", closeEditor);

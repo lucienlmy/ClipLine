@@ -425,6 +425,14 @@ mod imp {
     }
     pub fn reset_entered() {
         ENTERED.store(false, Relaxed);
+        if let Ok(mut v) = ENTER_PATHS.lock() {
+            v.clear();
+        }
+    }
+    static ENTER_PATHS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+    /// Files reported by the last drag-enter (if Windows got that far).
+    pub fn take_enter_paths() -> Vec<String> {
+        ENTER_PATHS.lock().map(|mut v| std::mem::take(&mut *v)).unwrap_or_default()
     }
 
     /// For diagnostics: "child-class / root-class" of the window under the cursor.
@@ -505,6 +513,9 @@ mod imp {
             unsafe { *eff = if ok { DROPEFFECT_COPY } else { DROPEFFECT_NONE } };
             if ok {
                 ENTERED.store(true, Relaxed);
+                if let Ok(mut v) = ENTER_PATHS.lock() {
+                    *v = paths.clone();
+                }
                 emit_drop("enter", paths);
             }
             Ok(())
@@ -759,6 +770,9 @@ mod imp {
         false
     }
     pub fn reset_entered() {}
+    pub fn take_enter_paths() -> Vec<String> {
+        Vec::new()
+    }
     pub fn window_under_cursor() -> String {
         String::new()
     }

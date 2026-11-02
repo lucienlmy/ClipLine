@@ -1023,7 +1023,13 @@ fn start_cursor_thread() {
                             if let Some((ox, oy, _)) = origin {
                                 winx::dlog("catch: released over the line without an OLE drop; asking Explorer");
                                 std::thread::spawn(move || {
-                                    let paths = winx::explorer_selection_at(ox, oy);
+                                    // Prefer the exact list Windows reported on drag-enter.
+                                    let mut paths = winx::take_enter_paths();
+                                    if paths.is_empty() {
+                                        paths = winx::explorer_selection_at(ox, oy);
+                                    } else {
+                                        winx::dlog(&format!("catch: using {} path(s) from drag-enter", paths.len()));
+                                    }
                                     if CATCHING.load(Ordering::Relaxed) && !paths.is_empty() {
                                         CATCHING.store(false, Ordering::Relaxed);
                                         emit_files("drop", paths);
