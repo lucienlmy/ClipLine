@@ -5,7 +5,7 @@ mod native;
 use once_cell::sync::{Lazy, OnceCell};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
@@ -490,6 +490,19 @@ fn delete_file(path: String) {
     let _ = std::fs::remove_file(path);
 }
 
+/// Move files/folders to the Recycle Bin (recoverable), for "取下（删除原文件）".
+#[tauri::command]
+async fn trash_files(paths: Vec<String>) -> Result<(), String> {
+    let existing: Vec<String> = paths
+        .into_iter()
+        .filter(|p| std::path::Path::new(p).exists())
+        .collect();
+    if existing.is_empty() {
+        return Ok(());
+    }
+    trash::delete_all(&existing).map_err(|e| e.to_string())
+}
+
 /// Read an image file and return it as a base64 data URL (so the webview can
 /// show it without relying on the asset protocol).
 #[tauri::command]
@@ -634,6 +647,7 @@ fn quit(app: AppHandle) {
     app.exit(0);
 }
 
+static WATCH_SEQ: AtomicU64 = AtomicU64::new(0);
 static WATCH_SEEN: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
 static WATCH_INIT: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
 
@@ -682,7 +696,7 @@ fn start_folder_watch() {
                 WATCH_SEEN.lock().unwrap().insert(ps.clone());
                 if let Some(app) = APP.get() {
                     let item = serde_json::json!({
-                        "id": format!("w{}", now_ms()),
+                        "id": format!("w{}-{}", now_ms(), WATCH_SEQ.fetch_add(1, Ordering::Relaxed)),
                         "kind": "file",
                         "text": ps,
                         "files": [ps],
@@ -892,6 +906,7 @@ fn main() {
             save_state,
             load_state,
             delete_file,
+            trash_files,
             read_image_data,
             rollup_done,
             set_modal,

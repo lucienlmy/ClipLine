@@ -20,6 +20,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 once_cell = "1"
 base64 = "0.22"
+trash = "5"
 
 # Windows-only native bits: real clipboard access (incl. images), cursor
 # polling for the top-edge "drop", and paste-into-the-previous-app.

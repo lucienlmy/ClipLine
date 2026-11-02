@@ -6,6 +6,7 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; }
   html, body { width: 100%; height: 100%; background: transparent; overflow: hidden; font-family: "Segoe UI","Microsoft YaHei",sans-serif; }
+  body { padding: 18px 6px 8px 6px; }
   #frame {
     position: relative; width: 100%; height: 100%;
     border-radius: 12px; overflow: hidden;
@@ -14,7 +15,8 @@
   }
   #img { width: 100%; height: 100%; object-fit: contain; display: block; background: #f3f1ec; }
   #err { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; text-align: center; font-size: 12px; color: #c0392b; word-break: break-all; }
-  #pin { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); width: 34px; height: 40px; z-index: 3; pointer-events: none; filter: drop-shadow(0 3px 3px rgba(0,0,0,0.35)); }
+  #pin { position: fixed; top: 0; left: 50%; transform: translateX(-50%); width: 36px; height: 44px; z-index: 5; pointer-events: none;
+    --pin-base: #e2604a; --pin-hi: #f6b3a6; --pin-dk: #a93b2a; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25)); }
   #close { position: absolute; top: 6px; right: 8px; z-index: 4; width: 22px; height: 22px; border: none; border-radius: 50%; background: rgba(0,0,0,0.42); color: #fff; font-size: 12px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity 0.12s; }
   #frame:hover #close { opacity: 1; }
   #close:hover { background: #e9573f; }
@@ -22,15 +24,30 @@
   #frame:hover #hint { opacity: 1; }
 </style>
 </head>
-<body>
+<body data-tauri-drag-region>
   <div id="frame" data-tauri-drag-region>
     <img id="img" alt="" draggable="false" data-tauri-drag-region />
     <div id="err"></div>
-    <svg id="pin" viewBox="0 0 34 40" xmlns="http://www.w3.org/2000/svg">
-      <rect x="15.2" y="18" width="3.6" height="20" rx="1.8" fill="#8a8f98"/>
-      <ellipse cx="17" cy="11" rx="12" ry="10" fill="#e9573f"/>
-      <ellipse cx="13" cy="7.5" rx="3.6" ry="2.6" fill="#ff9b86" opacity="0.9"/>
-      <ellipse cx="17" cy="18" rx="7" ry="2.4" fill="#c0392b"/>
+    <svg id="pin" viewBox="0 0 40 48" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="pg" x1="0" y1="0" x2="1" y2="0.8">
+          <stop offset="0" style="stop-color:var(--pin-hi)"/>
+          <stop offset="0.55" style="stop-color:var(--pin-base)"/>
+          <stop offset="1" style="stop-color:var(--pin-dk)"/>
+        </linearGradient>
+        <linearGradient id="ng" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#eef2f6"/><stop offset="1" stop-color="#76838f"/>
+        </linearGradient>
+      </defs>
+      <ellipse cx="22" cy="44.6" rx="7.5" ry="2.2" fill="rgba(20,24,30,0.22)"/>
+      <g transform="rotate(-12 20 34)">
+        <path d="M19.2,28 L19.75,43.4 Q20,45 20.25,43.4 L20.8,28 Z" fill="url(#ng)"/>
+        <ellipse cx="20" cy="27" rx="10.5" ry="3.8" fill="url(#pg)" style="stroke:var(--pin-dk)" stroke-width="0.6"/>
+        <path d="M14,11 C15.6,15 16,19.5 12.6,24.6 L27.4,24.6 C24,19.5 24.4,15 26,11 Z" fill="url(#pg)"/>
+        <ellipse cx="20" cy="10.5" rx="9.2" ry="4.4" fill="url(#pg)" style="stroke:var(--pin-dk)" stroke-width="0.6"/>
+        <path d="M13.5,9.2 Q16.5,7.3 20.5,7.7" stroke="#fff" stroke-opacity="0.75" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+        <path d="M12.6,25.8 Q16.5,24.2 20.6,24.7" stroke="#fff" stroke-opacity="0.55" stroke-width="1" fill="none" stroke-linecap="round"/>
+      </g>
     </svg>
     <button id="close" title="关闭 (Esc)">✕</button>
     <div id="hint">滚轮缩放 · 可拖动</div>
@@ -50,7 +67,7 @@
       const w = Math.max(160, Math.round(natW * scale));
       const h = Math.max(120, Math.round(natH * scale));
       const wnd = win();
-      if (wnd && LogicalSize) wnd.setSize(new LogicalSize(w, h));
+      if (wnd && LogicalSize) wnd.setSize(new LogicalSize(w + 12, h + 26));
     } catch (e) {}
   }
 
@@ -74,6 +91,22 @@
     } catch (e) {
       showErr("读取失败：" + (e && e.toString ? e.toString() : e) + "\n" + path);
     }
+  })();
+
+  const PIN_COLORS = {
+    soft: ["#e2604a", "#f6b3a6", "#a93b2a"],
+    silver: ["#8fa0b3", "#e3e9f0", "#5d6b7b"],
+    linen: ["#c99a5b", "#f0d9b4", "#8c6633"],
+    porcelain: ["#efece6", "#ffffff", "#b3aea5"],
+    graphite: ["#4b5059", "#9aa0aa", "#24272d"],
+  };
+  (async () => {
+    try {
+      const cfg = JSON.parse(await T.core.invoke("get_settings") || "{}");
+      const c = PIN_COLORS[cfg.theme] || PIN_COLORS.soft;
+      const pin = document.getElementById("pin");
+      pin.style.setProperty("--pin-base", c[0]); pin.style.setProperty("--pin-hi", c[1]); pin.style.setProperty("--pin-dk", c[2]);
+    } catch (e) {}
   })();
 
   function closeSelf() { const w = win(); if (w) { w.close(); } else { window.close(); } }

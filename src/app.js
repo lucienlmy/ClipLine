@@ -23,7 +23,7 @@ const I18N = {
     emptyClip: "绳上还空着 — 复制点什么试试",
     emptyNotes: "绳上还没有便签 — 点上方的 + 写一张",
     plus: "新建便签", gear: "设置", prev: "上一屏", next: "下一屏", pinOnly: "只看钉住的",
-    take: "取下", preview: "预览", edit: "编辑", confirmTake: "确认取下钉住的卡？",
+    take: "取下", preview: "预览", edit: "编辑", confirmTake: "确认取下钉住的卡？", dragSort: "按住夹子左右拖动排序", takeDelete: "取下（删除原文件）", confirmTrash: "将 {n} 个原文件移到回收站，并从绳上取下？", toTrash: "移到回收站", trashed: "已移到回收站", trashFail: "删除失败: ",
     copy: "复制", copyImg: "复制图片", copyPath: "复制文件地址",
     pin: "钉住", unpin: "取消钉住", reveal: "在资源管理器中显示", openIt: "打开",
     openLink: "在浏览器打开", saveDesktop: "保存到桌面", toNote: "转为便签",
@@ -61,7 +61,7 @@ const I18N = {
     emptyClip: "The line is empty — copy something",
     emptyNotes: "No notes yet — click + above to write one",
     plus: "New note", gear: "Settings", prev: "Previous", next: "Next", pinOnly: "Pinned only",
-    take: "Remove", preview: "Preview", edit: "Edit", confirmTake: "Remove pinned card?",
+    take: "Remove", preview: "Preview", edit: "Edit", confirmTake: "Remove pinned card?", dragSort: "Hold the clip and slide to reorder", takeDelete: "Remove & delete original", confirmTrash: "Move {n} original file(s) to the Recycle Bin and take the card down?", toTrash: "Move to Recycle Bin", trashed: "Moved to Recycle Bin", trashFail: "Delete failed: ",
     copy: "Copy", copyImg: "Copy image", copyPath: "Copy file path",
     pin: "Pin", unpin: "Unpin", reveal: "Show in Explorer", openIt: "Open",
     openLink: "Open in browser", saveDesktop: "Save to Desktop", toNote: "Turn into note",
@@ -111,7 +111,7 @@ const TINTS = [
 const tintOf = (k) => TINTS.find((x) => x.key === k) || TINTS[0];
 
 /* ---------- state ---------- */
-let state = { clips: [], notes: [] };
+let state = { clips: [], notes: [], ordered: true };
 let cfg = { hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"] };
 const FONTS = {
   default: '-apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif',
@@ -162,6 +162,7 @@ async function load() {
       const d = JSON.parse(raw);
       state.clips = Array.isArray(d.clips) ? d.clips : [];
       state.notes = Array.isArray(d.notes) ? d.notes : [];
+      state.ordered = !!d.ordered;
     }
   } catch (e) {}
   try {
@@ -169,6 +170,16 @@ async function load() {
     if (s) cfg = Object.assign(cfg, JSON.parse(s));
   } catch (e) {}
   LANG = cfg.lang === "en" ? "en" : "zh";
+  // Every card needs a stable id (used for reordering / removal).
+  state.clips.forEach((c, i) => { if (!c.id) c.id = "c" + Date.now() + "-" + i; });
+  state.notes.forEach((n, i) => { if (!n.id) n.id = "n" + Date.now() + "-" + i; });
+  // One-time migration: order used to be by time; keep that look, then the
+  // array order becomes the user's manual order.
+  if (!state.ordered) {
+    const byTs = (a, b) => (b.ts || 0) - (a.ts || 0);
+    state.clips.sort(byTs); state.notes.sort(byTs);
+    state.ordered = true; save();
+  }
   cleanup();
 }
 
@@ -225,7 +236,7 @@ function visibleList() {
     let arr = state.notes.slice();
     if (ui.pinnedOnly) arr = arr.filter((n) => n.pinned);
     if (ui.search) { const q = ui.search.toLowerCase(); arr = arr.filter((n) => (n.body || "").toLowerCase().includes(q)); }
-    return arr.sort((a, b) => (b.pinned - a.pinned) || (b.ts - a.ts));
+    return arr.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
   }
   let arr = state.clips.slice();
   if (ui.filter !== "all") {
@@ -234,7 +245,7 @@ function visibleList() {
   }
   if (ui.pinnedOnly) arr = arr.filter((c) => c.pinned);
   if (ui.search) { const q = ui.search.toLowerCase(); arr = arr.filter((c) => (c.text || "").toLowerCase().includes(q)); }
-  return arr.sort((a, b) => (b.pinned - a.pinned) || (b.ts - a.ts));
+  return arr.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 }
 
 /* ---------- render ---------- */
@@ -254,6 +265,9 @@ function render() {
   const slice = list.slice(ui.page * perPage, ui.page * perPage + perPage);
   const count = slice.length;
   const marginX = Math.max(70, (W - count * pitch) / 2);
+  ui.layout = { marginX, pitch, cardW: isNotes ? 220 : 170, slice, start: ui.page * perPage, isNotes };
+  cardsEl.classList.toggle("no-anim", !!ui.noAnim);
+  ui.noAnim = false;
 
   if (list.length === 0) {
     const e = document.createElement("div");
@@ -269,7 +283,9 @@ function render() {
     el.style.left = `${x - cardW / 2}px`;
     el.style.top = `${ropeY(x)}px`;
     el.style.setProperty("--swing", `${(i % 2 ? 1 : -1) * (5 + (i % 3) * 2)}deg`);
+    el.dataset.id = item.id;
     cardsEl.appendChild(el);
+    attachReorder(el, item, isNotes);
   });
 
   const total = list.length;
@@ -431,7 +447,7 @@ let suppressClickUntil = 0;
 function dragSuppressed() { return Date.now() < suppressClickUntil; }
 function attachDragOut(card, item) {
   let sx = 0, sy = 0, armed = false, started = false;
-  card.addEventListener("pointerdown", (e) => { if (e.button !== 0) return; if (e.target.closest(".corner")) return; armed = true; started = false; sx = e.clientX; sy = e.clientY; });
+  card.addEventListener("pointerdown", (e) => { if (e.button !== 0) return; if (e.target.closest(".corner") || e.target.closest(".peg")) return; armed = true; started = false; sx = e.clientX; sy = e.clientY; });
   card.addEventListener("pointermove", (e) => {
     if (!armed || started) return;
     if (Math.abs(e.clientX - sx) < 6 && Math.abs(e.clientY - sy) < 6) return;
@@ -450,6 +466,84 @@ function attachDragOut(card, item) {
   });
   card.addEventListener("pointerup", () => { armed = false; });
   card.addEventListener("pointercancel", () => { armed = false; });
+}
+
+/* ---------- reorder: hold an unpinned card's clip and slide it ---------- */
+function attachReorder(card, item, isNote) {
+  const peg = card.querySelector(".peg");
+  if (!peg || item.pinned) return;
+  peg.classList.add("grab");
+  peg.title = t("dragSort");
+  peg.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.stopPropagation(); e.preventDefault();
+    const L = ui.layout; if (!L) return;
+    const cards = Array.from($("cards").querySelectorAll(".card"));
+    const fromIdx = cards.indexOf(card);
+    if (fromIdx < 0) return;
+    const pinnedCount = L.slice.filter((x) => x.pinned).length;
+    const startLeft = parseFloat(card.style.left) || 0;
+    const sx = e.clientX;
+    let target = fromIdx;
+    const slotLeft = (i) => L.marginX + (i + 0.5) * L.pitch - L.cardW / 2;
+    const slotTop = (i) => ropeY(L.marginX + (i + 0.5) * L.pitch);
+    try { peg.setPointerCapture(e.pointerId); } catch (x) {}
+    card.classList.add("dragging");
+    cards.forEach((c) => { if (c !== card) c.classList.add("reflow"); });
+    invoke("set_modal", { on: true }).catch(() => {});
+
+    const move = (ev) => {
+      const left = startLeft + (ev.clientX - sx);
+      const cx = left + L.cardW / 2;
+      card.style.left = left + "px";
+      card.style.top = ropeY(Math.max(0, Math.min(window.innerWidth, cx))) + "px";
+      let tIdx = Math.round((cx - L.marginX) / L.pitch - 0.5);
+      tIdx = Math.max(pinnedCount, Math.min(cards.length - 1, tIdx));
+      if (tIdx === target) return;
+      target = tIdx;
+      let slot = 0;
+      cards.forEach((c) => {
+        if (c === card) return;
+        if (slot === target) slot++;
+        c.style.left = slotLeft(slot) + "px";
+        c.style.top = slotTop(slot) + "px";
+        slot++;
+      });
+    };
+    const up = () => {
+      peg.removeEventListener("pointermove", move);
+      peg.removeEventListener("pointerup", up);
+      peg.removeEventListener("pointercancel", up);
+      card.classList.remove("dragging");
+      refreshModal();
+      if (target !== fromIdx) applyReorder(L.start + fromIdx, L.start + target);
+      ui.noAnim = true;
+      render();
+    };
+    peg.addEventListener("pointermove", move);
+    peg.addEventListener("pointerup", up);
+    peg.addEventListener("pointercancel", up);
+  });
+}
+
+// Move one visible card from position `from` to `to` (indices into
+// visibleList()). Only the visible, unpinned cards change places; hidden
+// (filtered-out) cards keep their slots in the underlying array.
+function applyReorder(from, to) {
+  const arr = ui.deck === "notes" ? state.notes : state.clips;
+  const vis = visibleList();
+  const moved = vis[from];
+  if (!moved || moved.pinned) return;
+  const next = vis.slice();
+  next.splice(from, 1);
+  next.splice(to, 0, moved);
+  const visU = vis.filter((x) => !x.pinned);
+  const newU = next.filter((x) => !x.pinned);
+  const ids = new Set(visU.map((x) => x.id));
+  const slots = [];
+  arr.forEach((x, i) => { if (ids.has(x.id)) slots.push(i); });
+  slots.forEach((pos, k) => { arr[pos] = newU[k]; });
+  save();
 }
 
 /* ---------- drag in (files dropped onto the line) ---------- */
@@ -474,6 +568,29 @@ function confirmRemove(e, item, isNote) {
   ctx.hidden = false; refreshModal();
   ctx.style.left = Math.min(e.clientX, window.innerWidth - 150) + "px";
   ctx.style.top = Math.min(e.clientY, window.innerHeight - 60) + "px";
+}
+// "取下（删除原文件）": confirm, move the original files to the Recycle Bin,
+// then take the card down.
+function confirmTrash(e, item) {
+  const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind");
+  const n = (item.files || []).length;
+  const tip = document.createElement("div");
+  tip.textContent = t("confirmTrash").replace("{n}", n);
+  tip.style.cssText = "padding:8px 12px 4px;font-size:12px;color:#6b6862;max-width:240px;";
+  ctx.appendChild(tip);
+  const b = document.createElement("button");
+  b.textContent = t("toTrash"); b.style.color = "#c0392b";
+  b.onclick = () => {
+    hideCtx();
+    invoke("trash_files", { paths: item.files || [] })
+      .then(() => { state.clips = state.clips.filter((c) => c.id !== item.id); save(); render(); toast(t("trashed")); })
+      .catch((err) => toast(t("trashFail") + err));
+  };
+  ctx.appendChild(b);
+  ctx.hidden = false; refreshModal();
+  const h = ctx.offsetHeight || 80;
+  ctx.style.left = Math.min(e.clientX, window.innerWidth - 250) + "px";
+  ctx.style.top = Math.max(8, Math.min(e.clientY, window.innerHeight - h - 8)) + "px";
 }
 function removeItem(item, isNote) {
   if (isNote) state.notes = state.notes.filter((n) => n.id !== item.id);
@@ -511,6 +628,10 @@ function showCtx(e, item, isNote) {
   add(item.pinned ? t("unpin") : t("pin"), () => { item.pinned = !item.pinned; save(); render(); });
   sep();
   add(t("take"), () => removeItem(item, isNote));
+  if (!isNote && item.vis === "file" && (item.files || []).length) {
+    add(t("takeDelete"), () => confirmTrash(e, item));
+    ctx.lastChild.style.color = "#c0392b";
+  }
 
   ctx.hidden = false; refreshModal();
   const w = 170, h = ctx.offsetHeight || 160;
@@ -917,7 +1038,7 @@ document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s" && !$("editor").hidden) { e.preventDefault(); closeEditor(); }
 });
 document.addEventListener("click", (e) => {
-  if (!$("ctx").hidden && !e.target.closest("#ctx")) hideCtx();
+  if (!$("ctx").hidden && !pointerInCtx && !e.target.closest("#ctx")) hideCtx();
   if (pointerInsideLine) return;
   if (e.target.closest(".card") || e.target.closest("#pill") || e.target.closest("#plus") ||
       e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#ctx") || e.target.closest("#settings")) return;
@@ -927,7 +1048,9 @@ document.addEventListener("click", (e) => {
 // interaction began inside the line/overlays. The click handler uses this
 // instead of inspecting the click target, which may already be detached.
 let pointerInsideLine = false;
+let pointerInCtx = false;
 document.addEventListener("pointerdown", (e) => {
+  pointerInCtx = !!e.target.closest("#ctx");
   if (stage.classList.contains("up")) { pointerInsideLine = false; return; }
   pointerInsideLine = !!(e.target.closest("#stage") || e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#ctx"));
 }, true);
@@ -938,7 +1061,7 @@ $("editorClose").addEventListener("click", closeEditor);
 $("editorSave").addEventListener("click", closeEditor);
 $("plus").addEventListener("click", newNote);
 $("gear").addEventListener("click", () => { invoke("rollup_now").catch(() => {}); invoke("open_settings").catch(() => {}); });
-$("bell").addEventListener("click", (e) => { if (editing) showReminderPanel(e, editing, () => { $("bellText").textContent = editing.remindAt ? fmtWhen(editing.remindAt) : t("remind"); }); });
+$("bell").addEventListener("click", (e) => { e.stopPropagation(); if (editing) showReminderPanel(e, editing, () => { $("bellText").textContent = editing.remindAt ? fmtWhen(editing.remindAt) : t("remind"); }); });
 $("prev").addEventListener("click", () => { ui.page--; render(); });
 $("next").addEventListener("click", () => { ui.page++; render(); });
 $("pinOnly").addEventListener("click", () => { ui.pinnedOnly = !ui.pinnedOnly; $("pinOnly").classList.toggle("on", ui.pinnedOnly); ui.page = 0; render(); });
