@@ -4,7 +4,7 @@ mod native;
 
 use once_cell::sync::{Lazy, OnceCell};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
@@ -447,15 +447,18 @@ fn get_settings() -> String {
 #[tauri::command]
 fn update_settings(app: AppHandle, data: String) -> Result<String, String> {
     let s: Settings = serde_json::from_str(&data).map_err(|e| e.to_string())?;
-    apply_hotkeys(&app, &s.hotkey_clip, &s.hotkey_notes)?;
+    // Persist FIRST so a hotkey/autostart hiccup can never lose the user's
+    // settings (theme, watched folders, etc.).
+    save_settings(&app, &s)?;
+    *SETTINGS.lock().unwrap() = s.clone();
+    apply_settings_to_state(&s);
+    // Side effects are best-effort and must not fail the save.
+    let _ = apply_hotkeys(&app, &s.hotkey_clip, &s.hotkey_notes);
     let _ = if s.autostart {
         app.autolaunch().enable()
     } else {
         app.autolaunch().disable()
     };
-    apply_settings_to_state(&s);
-    save_settings(&app, &s)?;
-    *SETTINGS.lock().unwrap() = s.clone();
     serde_json::to_string(&s).map_err(|e| e.to_string())
 }
 
@@ -531,24 +534,29 @@ fn set_sticky(on: bool) {
     }
 }
 
-fn percent_encode(s: &str) -> String {
-    s.bytes()
-        .map(|b| {
-            if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
-                (b as char).to_string()
-            } else {
-                format!("%{:02X}", b)
-            }
-        })
-        .collect()
+static PIN_PATHS: Lazy<Mutex<HashMap<String, String>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+
+#[tauri::command]
+fn get_pin_path(label: String) -> String {
+    PIN_PATHS
+        .lock()
+        .unwrap()
+        .get(&label)
+        .cloned()
+        .unwrap_or_default()
 }
 
 /// Open a floating, draggable, always-on-top window showing one image —
-/// "pinned to the desktop".
+/// "pinned to the desktop". The image path is handed over by window label
+/// (via get_pin_path), never through the URL, so long/Unicode paths are safe.
 #[tauri::command]
 fn pin_image(app: AppHandle, path: String, w: Option<u32>, h: Option<u32>) -> Result<(), String> {
     let label = format!("pin{}", now_ms());
-    let url = format!("pin.html?path={}", percent_encode(&path));
+    PIN_PATHS
+        .lock()
+        .unwrap()
+        .insert(label.clone(), path.clone());
+    let url = "pin.html".to_string();
 
     let mut iw = w.unwrap_or(480) as f64;
     let mut ih = h.unwrap_or(360) as f64;
@@ -639,18 +647,36 @@ fn start_folder_watch() {
                     continue;
                 }
                 let ps = path.to_string_lossy().to_string();
-                let is_new = WATCH_SEEN.lock().unwrap().insert(ps.clone());
-                if is_new && !first_time {
-                    if let Some(app) = APP.get() {
-                        let item = serde_json::json!({
-                            "id": format!("w{}", now_ms()),
-                            "kind": "file",
-                            "text": ps,
-                            "files": [ps],
-                            "ts": now_ms() as i64,
-                        });
-                        let _ = app.emit("clip:add", item);
-                    }
+                if WATCH_SEEN.lock().unwrap().contains(&ps) {
+                    continue;
+                }
+                if first_time {
+                    // Seed everything already present without hanging it.
+                    WATCH_SEEN.lock().unwrap().insert(ps);
+                    continue;
+                }
+                // Only hang a file once it has settled (≥2s since last write),
+                // so a file still being downloaded/written isn't caught early.
+                let stable = entry
+                    .metadata()
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|mt| mt.elapsed().ok())
+                    .map(|e| e.as_secs() >= 2)
+                    .unwrap_or(true);
+                if !stable {
+                    continue; // re-check next cycle
+                }
+                WATCH_SEEN.lock().unwrap().insert(ps.clone());
+                if let Some(app) = APP.get() {
+                    let item = serde_json::json!({
+                        "id": format!("w{}", now_ms()),
+                        "kind": "file",
+                        "text": ps,
+                        "files": [ps],
+                        "ts": now_ms() as i64,
+                    });
+                    let _ = app.emit("clip:add", item);
                 }
             }
             WATCH_INIT.lock().unwrap().insert(folder);
@@ -856,6 +882,7 @@ fn main() {
             set_modal,
             set_sticky,
             pin_image,
+            get_pin_path,
             pick_folder,
             open_settings,
             quit

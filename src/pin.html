@@ -37,9 +37,6 @@
   </div>
 <script>
   const T = window.__TAURI__;
-  const params = new URLSearchParams(location.search);
-  // URLSearchParams already percent-decodes, so do NOT decode again.
-  const path = params.get("path") || "";
   const img = document.getElementById("img");
   const errBox = document.getElementById("err");
   const showErr = (m) => { errBox.textContent = m; errBox.style.display = "flex"; };
@@ -66,10 +63,14 @@
   img.onerror = () => showErr("图片无法显示：" + path);
 
   (async () => {
+    let path = "";
+    try {
+      const label = win() ? win().label : "";
+      path = await T.core.invoke("get_pin_path", { label });
+    } catch (e) { showErr("无法获取路径：" + e); return; }
     if (!path) { showErr("未提供图片路径"); return; }
     try {
-      const data = await T.core.invoke("read_image_data", { path });
-      img.src = data;
+      img.src = await T.core.invoke("read_image_data", { path });
     } catch (e) {
       showErr("读取失败：" + (e && e.toString ? e.toString() : e) + "\n" + path);
     }

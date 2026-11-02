@@ -163,17 +163,20 @@ function classify(text) {
 }
 
 /* ---------- add from clipboard ---------- */
+function clipSig(it) {
+  if (it.vis === "image" || it.kind === "image") return "img:" + (it.thumb || it.path || "");
+  if (it.vis === "file" || it.kind === "file") return "file:" + ((it.files || []).join("|"));
+  return "txt:" + (it.text || "");
+}
 function addClip(item) {
-  if (item.kind === "text") {
-    item.vis = classify(item.text || "");
-    const prev = state.clips[0];
-    if (prev && prev.kind === "text" && prev.text === item.text) return;
-  } else if (item.kind === "image") {
-    item.vis = "image";
-  } else if (item.kind === "file") {
-    item.vis = "file";
-  }
-  item.pinned = false;
+  if (item.kind === "text") item.vis = classify(item.text || "");
+  else if (item.kind === "image") item.vis = "image";
+  else if (item.kind === "file") item.vis = "file";
+  // Same content already on the line → drop the old one and re-hang at front.
+  const sig = clipSig(item);
+  const idx = state.clips.findIndex((c) => clipSig(c) === sig);
+  if (idx >= 0) { item.pinned = state.clips[idx].pinned || false; state.clips.splice(idx, 1); }
+  else { item.pinned = false; }
   state.clips.unshift(item);
   cleanup(); save();
   if (ui.deck === "clipboard" && !stage.classList.contains("up")) render();
@@ -618,8 +621,9 @@ function showReminderPanel(e, note, after) {
   ctx.appendChild(btn(t("rclr"), () => { note.remindAt = null; note.fired = false; note.acked = false; note.repeat = "none"; hideCtx(); commit(); }));
 
   ctx.hidden = false; refreshModal();
-  ctx.style.left = Math.min(e.clientX, window.innerWidth - 230) + "px";
-  ctx.style.top = Math.min(e.clientY, window.innerHeight - 320) + "px";
+  const h = ctx.offsetHeight || 300;
+  ctx.style.left = Math.min(e.clientX, window.innerWidth - 240) + "px";
+  ctx.style.top = Math.max(8, Math.min(e.clientY, window.innerHeight - h - 8)) + "px";
 }
 
 setInterval(() => {
