@@ -19,7 +19,7 @@ function refreshModal() {
 const I18N = {
   zh: {
     all: "全部", text: "文字", link: "链接", color: "颜色", image: "图片", file: "文件",
-    search: "搜索…", copied: "已复制", editText: "编辑文字", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手即挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
+    search: "搜索…", copied: "已复制", editText: "编辑文字", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
     emptyClip: "绳上还空着 — 复制点什么试试",
     emptyNotes: "绳上还没有便签 — 点上方的 + 写一张",
     plus: "新建便签", gear: "设置", prev: "上一屏", next: "下一屏", pinOnly: "只看钉住的",
@@ -1035,7 +1035,7 @@ function setDeck(deck) {
 }
 function onDrop(deck) { setDeck(deck); stage.classList.remove("up"); render(); }
 function onRollup() {
-  catching = false; clearTimeout(catchTimer); stage.classList.remove("catching", "catch-over");
+  stopCatch();
   hideCtx(); closePreview();
   if (!$("editor").hidden) closeEditor();
   if (!$("settings").hidden) closeSettings();
@@ -1094,24 +1094,17 @@ window.addEventListener("wheel", (e) => {
 }, { passive: true });
 window.addEventListener("resize", () => { if (!stage.classList.contains("up")) render(); });
 
-/* ---------- drag files to the top edge: the line comes down to catch them ---------- */
-let catching = false, catchTimer = 0, dragInside = false;
+/* ---------- drag files to the top edge: the line comes down to catch them ----------
+   Rust decides when to go back up (button released without a drop). */
+let catching = false;
 function startCatch() {
   catching = true;
+  $("catchZone").textContent = t("catchHint");
   stage.classList.add("catching");
-  toast(t("catchHint"));
-  clearTimeout(catchTimer);
-  // The file drag may already be over us (its drag-enter can arrive before
-  // this event). Only if none shows up is it not for us — e.g. a window being
-  // snapped to the top, or a text selection — and we go back up.
-  if (dragInside) stage.classList.add("catch-over");
-  else catchTimer = setTimeout(() => { if (!dragInside) endCatch(); }, 900);
 }
-function endCatch() {
-  if (!catching) return;
+function stopCatch() {
   catching = false;
   stage.classList.remove("catching", "catch-over");
-  invoke("rollup_now").catch(() => {});
 }
 
 /* ---------- events from Rust ---------- */
@@ -1127,30 +1120,13 @@ async function wire() {
     applyLang(); applyTheme(cfg.theme); applyFont(cfg); cleanup(); render();
   });
   await listen("line:catch", () => startCatch());
-  const dbg = (m) => invoke("dbg_log", { msg: m }).catch(() => {});
-  let lastOver = 0;
-  await listen("tauri://drag-enter", (ev) => dbg("drag-enter " + JSON.stringify(ev.payload).slice(0, 200)));
-  await listen("tauri://drag-leave", () => dbg("drag-leave"));
-  await listen("tauri://drag-over", () => { if (Date.now() - lastOver > 500) { lastOver = Date.now(); dbg("drag-over"); } });
-  await listen("tauri://drag-drop", (ev) => dbg("drag-drop " + JSON.stringify(ev.payload).slice(0, 300)));
-  await listen("line:catch", () => dbg("line:catch received, dragInside=" + dragInside));
-  const onEnterOver = () => {
-    dragInside = true;
-    if (catching) { clearTimeout(catchTimer); stage.classList.add("catch-over"); }
-  };
-  await listen("tauri://drag-enter", onEnterOver);
-  await listen("tauri://drag-over", onEnterOver);
-  await listen("tauri://drag-leave", () => {
-    dragInside = false;
-    stage.classList.remove("catch-over");
-    if (catching) { clearTimeout(catchTimer); catchTimer = setTimeout(() => { if (!dragInside) endCatch(); }, 1500); }
-  });
-  await listen("tauri://drag-drop", (ev) => {
-    dragInside = false;
-    if (catching) { catching = false; clearTimeout(catchTimer); stage.classList.remove("catching", "catch-over"); }
-    const p = ev.payload || {};
-    const paths = p.paths || (Array.isArray(p) ? p : []);
-    if (paths && paths.length) addDroppedFiles(paths);
+  await listen("files:enter", () => stage.classList.add("catch-over"));
+  await listen("files:over", () => stage.classList.add("catch-over"));
+  await listen("files:leave", () => stage.classList.remove("catch-over"));
+  await listen("files:drop", (ev) => {
+    stopCatch();
+    const paths = Array.isArray(ev.payload) ? ev.payload : [];
+    if (paths.length) addDroppedFiles(paths);
   });
 }
 

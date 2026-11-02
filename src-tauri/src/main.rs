@@ -311,6 +311,12 @@ fn drop_line_ex(deck: Deck, sticky: bool, focus: bool) {
         if focus {
             let _ = w.set_focus();
         }
+        // Fresh drop target every time (the webview's own one goes stale
+        // once the window has been hidden).
+        #[cfg(target_os = "windows")]
+        if let Ok(h) = w.hwnd() {
+            winx::install_drop_target(h.0 as isize);
+        }
     });
     if let Some(app) = APP.get() {
         let _ = app.emit(
@@ -329,6 +335,12 @@ fn drop_line_ex(deck: Deck, sticky: bool, focus: bool) {
 }
 
 fn rollup() {
+    rollup_ex(true);
+}
+
+/// `restore = false` after dropping something into another app: that app
+/// should keep the focus.
+fn rollup_ex(restore: bool) {
     winx::dlog("rollup");
     {
         let mut st = STATE.lock().unwrap();
@@ -341,7 +353,9 @@ fn rollup() {
     if let Some(app) = APP.get() {
         let _ = app.emit("line:rollup", ());
     }
-    native::restore_foreground();
+    if restore {
+        native::restore_foreground();
+    }
 }
 
 fn toggle_deck(deck: Deck) {
@@ -435,7 +449,7 @@ async fn drag_text(app: AppHandle, text: String) -> Result<bool, String> {
     })
     .map_err(|e| e.to_string())?;
     let r = rx.recv().map_err(|e| e.to_string())?;
-    rollup();
+    rollup_ex(false);
     r
 }
 
@@ -849,6 +863,8 @@ fn start_cursor_thread() {
     std::thread::spawn(|| {
         let mut cand: Option<(Deck, std::time::Instant)> = None;
         let mut catch_since: Option<std::time::Instant> = None;
+        let mut origin: Option<(i32, i32, bool)> = None;
+        let mut released_at: Option<std::time::Instant> = None;
         loop {
             std::thread::sleep(std::time::Duration::from_millis(40));
             let Some((x, y)) = native::cursor_pos() else {
@@ -877,7 +893,16 @@ fn start_cursor_thread() {
             if !dropped && hang && x >= left && x < left + width && y <= top + 2 {
                 if let Some((dx, dy, age)) = winx::left_drag_info() {
                     let travelled = (dx - x).abs() + (dy - y).abs();
-                    if dy > top + 60 && travelled > 40 && age > 150 {
+                    // Only drags that began in Explorer / on the desktop.
+                    let from_explorer = match origin {
+                        Some((ox, oy, v)) if ox == dx && oy == dy => v,
+                        _ => {
+                            let v = winx::point_is_explorer_xy(dx, dy);
+                            origin = Some((dx, dy, v));
+                            v
+                        }
+                    };
+                    if from_explorer && dy > top + 60 && travelled > 40 && age > 150 {
                         match catch_since {
                             Some(t) if t.elapsed().as_millis() >= 120 => {
                                 catch_since = None;
@@ -915,10 +940,24 @@ fn start_cursor_thread() {
                 }
             } else {
                 cand = None;
-                // While a caught file drag is still in the air, stay down
-                // wherever the pointer wanders; the frontend decides.
-                let carrying = CATCHING.load(Ordering::Relaxed) && winx::left_drag_info().is_some();
-                if !sticky && !MODAL.load(Ordering::Relaxed) && !carrying {
+                // Caught a drag: stay down while it is in the air. Once the
+                // button is released without a drop landing on us (a drop
+                // clears CATCHING), go back up shortly after.
+                if CATCHING.load(Ordering::Relaxed) {
+                    if winx::left_drag_info().is_some() {
+                        released_at = None;
+                    } else {
+                        let t = *released_at.get_or_insert_with(std::time::Instant::now);
+                        if t.elapsed().as_millis() > 1200 {
+                            released_at = None;
+                            winx::dlog("catch: released without a drop");
+                            rollup();
+                        }
+                    }
+                    continue;
+                }
+                released_at = None;
+                if !sticky && !MODAL.load(Ordering::Relaxed) {
                     let h = if deck == Deck::Notes { notes_h } else { clip_h };
                     if y > top + h + 12 {
                         rollup();
@@ -1072,6 +1111,15 @@ fn main() {
             }
 
             native::start_clipboard_watch(handle.clone());
+            {
+                let h = handle.clone();
+                winx::set_drop_callback(Box::new(move |kind, paths| {
+                    if kind == "drop" {
+                        CATCHING.store(false, Ordering::Relaxed);
+                    }
+                    let _ = h.emit(&format!("files:{kind}"), paths);
+                }));
+            }
             winx::start_mouse_hook();
             start_cursor_thread();
             start_folder_watch();

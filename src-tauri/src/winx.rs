@@ -56,9 +56,15 @@ mod imp {
     use windows::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
     use windows::Win32::System::Ole::{
-        DoDragDrop, IDropSource, IDropSource_Impl, OleInitialize, CF_UNICODETEXT, DROPEFFECT,
-        DROPEFFECT_COPY, DROPEFFECT_MOVE,
+        DoDragDrop, IDropSource, IDropSource_Impl, IDropTarget, IDropTarget_Impl, OleInitialize,
+        RegisterDragDrop, ReleaseStgMedium, RevokeDragDrop, CF_HDROP, CF_UNICODETEXT, DROPEFFECT,
+        DROPEFFECT_COPY, DROPEFFECT_MOVE, DROPEFFECT_NONE,
     };
+    use windows::Win32::Foundation::{BOOL as WBOOL, POINTL};
+    use windows::Win32::UI::Shell::{DragQueryFileW, HDROP};
+    use windows::Win32::UI::WindowsAndMessaging::EnumChildWindows;
+    use std::cell::{Cell, RefCell};
+    use std::sync::OnceLock;
     use windows::Win32::Foundation::CloseHandle;
     use windows::Win32::System::Threading::{
         OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
@@ -155,13 +161,35 @@ mod imp {
         });
     }
 
-    /// Is the window under the cursor Explorer (a folder window or the desktop)?
+    static DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
+    static LAST_EXPLORER: AtomicBool = AtomicBool::new(false);
+
+    /// Is the drop target Explorer? Live while our drag runs; afterwards the
+    /// last answer is frozen, because Explorer copies on a background thread
+    /// and reads the data *after* the drop, when the cursor may be elsewhere.
     fn cursor_over_explorer() -> bool {
-        unsafe {
+        if !DRAG_ACTIVE.load(Relaxed) {
+            return LAST_EXPLORER.load(Relaxed);
+        }
+        let v = unsafe {
             let mut p = POINT::default();
             if GetCursorPos(&mut p).is_err() {
-                return false;
+                false
+            } else {
+                point_is_explorer(p)
             }
+        };
+        LAST_EXPLORER.store(v, Relaxed);
+        v
+    }
+
+    /// Does the window at screen point `p` belong to Explorer / the desktop?
+    pub fn point_is_explorer_xy(x: i32, y: i32) -> bool {
+        unsafe { point_is_explorer(POINT { x, y }) }
+    }
+
+    unsafe fn point_is_explorer(p: POINT) -> bool {
+        {
             let h = WindowFromPoint(p);
             if h.0.is_null() {
                 return false;
@@ -173,9 +201,6 @@ mod imp {
                 return false;
             }
             let cls = String::from_utf16_lossy(&buf[..n as usize]);
-            let mut cb = [0u16; 64];
-            let cn = GetClassNameW(h, &mut cb);
-            dlog(&format!("  under cursor ({},{}): {} / root {}", p.x, p.y, String::from_utf16_lossy(&cb[..cn.max(0) as usize]), cls));
             if matches!(
                 cls.as_str(),
                 "CabinetWClass" | "ExploreWClass" | "Progman" | "WorkerW"
@@ -371,6 +396,142 @@ mod imp {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Our own drop target for the line window (wry registers one only once,
+    // at creation; it goes stale after the window is hidden and shown).
+    // ------------------------------------------------------------------
+
+    type DropCb = Box<dyn Fn(&'static str, Vec<String>) + Send + Sync>;
+    static DROP_CB: OnceLock<DropCb> = OnceLock::new();
+
+    pub fn set_drop_callback(f: DropCb) {
+        let _ = DROP_CB.set(f);
+    }
+
+    fn emit_drop(kind: &'static str, paths: Vec<String>) {
+        if let Some(cb) = DROP_CB.get() {
+            cb(kind, paths);
+        }
+    }
+
+    unsafe fn read_hdrop(obj: &IDataObject) -> Vec<String> {
+        let fmt = FORMATETC {
+            cfFormat: CF_HDROP.0,
+            ptd: std::ptr::null_mut(),
+            dwAspect: DVASPECT_CONTENT.0,
+            lindex: -1,
+            tymed: TYMED_HGLOBAL.0 as u32,
+        };
+        let Ok(mut med) = obj.GetData(&fmt) else {
+            return Vec::new();
+        };
+        let h = HDROP(med.u.hGlobal.0);
+        let n = DragQueryFileW(h, 0xFFFF_FFFF, None);
+        let mut out = Vec::new();
+        for i in 0..n {
+            let len = DragQueryFileW(h, i, None) as usize;
+            let mut buf = vec![0u16; len + 1];
+            let got = DragQueryFileW(h, i, Some(&mut buf)) as usize;
+            out.push(String::from_utf16_lossy(&buf[..got.min(len)]));
+        }
+        ReleaseStgMedium(&mut med);
+        out
+    }
+
+    #[implement(IDropTarget)]
+    struct FileDrop {
+        ok: Cell<bool>,
+    }
+
+    impl IDropTarget_Impl for FileDrop_Impl {
+        fn DragEnter(
+            &self,
+            obj: Option<&IDataObject>,
+            _k: MODIFIERKEYS_FLAGS,
+            _pt: &POINTL,
+            eff: *mut DROPEFFECT,
+        ) -> Result<()> {
+            let paths = obj.map(|o| unsafe { read_hdrop(o) }).unwrap_or_default();
+            let ok = !paths.is_empty();
+            self.ok.set(ok);
+            dlog(&format!("droptarget enter files={}", paths.len()));
+            unsafe { *eff = if ok { DROPEFFECT_COPY } else { DROPEFFECT_NONE } };
+            if ok {
+                emit_drop("enter", paths);
+            }
+            Ok(())
+        }
+        fn DragOver(&self, _k: MODIFIERKEYS_FLAGS, _pt: &POINTL, eff: *mut DROPEFFECT) -> Result<()> {
+            unsafe { *eff = if self.ok.get() { DROPEFFECT_COPY } else { DROPEFFECT_NONE } };
+            if self.ok.get() {
+                emit_drop("over", Vec::new());
+            }
+            Ok(())
+        }
+        fn DragLeave(&self) -> Result<()> {
+            if self.ok.get() {
+                emit_drop("leave", Vec::new());
+            }
+            self.ok.set(false);
+            Ok(())
+        }
+        fn Drop(
+            &self,
+            obj: Option<&IDataObject>,
+            _k: MODIFIERKEYS_FLAGS,
+            _pt: &POINTL,
+            eff: *mut DROPEFFECT,
+        ) -> Result<()> {
+            let paths = obj.map(|o| unsafe { read_hdrop(o) }).unwrap_or_default();
+            dlog(&format!("droptarget drop files={}", paths.len()));
+            self.ok.set(false);
+            unsafe { *eff = if paths.is_empty() { DROPEFFECT_NONE } else { DROPEFFECT_COPY } };
+            if !paths.is_empty() {
+                emit_drop("drop", paths);
+            }
+            Ok(())
+        }
+    }
+
+    thread_local! {
+        static TARGETS: RefCell<Vec<IDropTarget>> = RefCell::new(Vec::new());
+    }
+
+    unsafe extern "system" fn collect_child(h: HWND, l: LPARAM) -> WBOOL {
+        let v = &mut *(l.0 as *mut Vec<HWND>);
+        v.push(h);
+        WBOOL(1)
+    }
+
+    /// (Re)register our drop target on the window and all its children.
+    /// Must run on the window's (main) thread.
+    pub fn install_drop_target(parent: isize) {
+        init_ole();
+        unsafe {
+            let parent = HWND(parent as *mut core::ffi::c_void);
+            let mut hwnds: Vec<HWND> = vec![parent];
+            let _ = EnumChildWindows(
+                parent,
+                Some(collect_child),
+                LPARAM(&mut hwnds as *mut Vec<HWND> as isize),
+            );
+            let mut n = 0;
+            TARGETS.with(|t| {
+                let mut t = t.borrow_mut();
+                t.clear();
+                for h in hwnds {
+                    let target: IDropTarget = FileDrop { ok: Cell::new(false) }.into();
+                    let _ = RevokeDragDrop(h);
+                    if RegisterDragDrop(h, &target).is_ok() {
+                        n += 1;
+                        t.push(target);
+                    }
+                }
+            });
+            dlog(&format!("drop target installed on {n} window(s)"));
+        }
+    }
+
     /// Run a modal OLE drag of `text`, backed by `file` for Explorer drops.
     /// Must be called on the UI (main) thread. Returns true if dropped.
     pub fn drag_text(text: &str, file: &PathBuf) -> std::result::Result<bool, String> {
@@ -380,11 +541,14 @@ mod imp {
         let wfile: Vec<u16> = file.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
         unsafe {
             dlog(&format!("drag_text start, file={}", file.display()));
+            LAST_EXPLORER.store(false, Relaxed);
+            DRAG_ACTIVE.store(true, Relaxed);
             let file = shell_file_object(&wfile).map_err(|e| { dlog(&format!("shell_file_object failed: {e}")); e.to_string() })?;
             let data: IDataObject = TextData { text: wtext, file }.into();
             let src: IDropSource = DropSource.into();
             let mut eff = DROPEFFECT::default();
             let hr = DoDragDrop(&data, &src, DROPEFFECT_COPY | DROPEFFECT_MOVE, &mut eff);
+            DRAG_ACTIVE.store(false, Relaxed);
             dlog(&format!("DoDragDrop -> {:#x}, effect={}", hr.0, eff.0));
             Ok(hr == DRAGDROP_S_DROP)
         }
@@ -401,6 +565,11 @@ mod imp {
     pub fn drag_text(_text: &str, _file: &PathBuf) -> Result<bool, String> {
         Err("text drag is only available on Windows".into())
     }
+    pub fn point_is_explorer_xy(_x: i32, _y: i32) -> bool {
+        false
+    }
+    pub fn set_drop_callback(_f: Box<dyn Fn(&'static str, Vec<String>) + Send + Sync>) {}
+    pub fn install_drop_target(_parent: isize) {}
 }
 
 pub use imp::*;
