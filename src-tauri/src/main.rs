@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod native;
+mod winx;
 
 use once_cell::sync::{Lazy, OnceCell};
 use serde::{Deserialize, Serialize};
@@ -52,6 +53,8 @@ struct Settings {
     font_family: String,          // default | yahei | dengxian | simsun | kaiti | fangsong | source
     font_size: String,            // small | medium | large
     reminder_presets: Vec<String>, // ids shown in the reminder popover
+    drop_to_hang: bool,            // dragging files to the top edge drops the line
+    text_drag_ext: String,         // txt | md — file type when a text card is dragged to Explorer
 }
 
 impl Default for Settings {
@@ -70,6 +73,8 @@ impl Default for Settings {
             font_family: "default".into(),
             font_size: "medium".into(),
             reminder_presets: vec!["m15".into(), "h1".into(), "tomorrow".into()],
+            drop_to_hang: true,
+            text_drag_ext: "txt".into(),
         }
     }
 }
@@ -86,6 +91,7 @@ struct LineState {
     hover_enabled: bool,
     dwell_ms: u64,
     flip_mod: String,
+    drop_to_hang: bool,
 }
 
 impl Default for LineState {
@@ -102,6 +108,7 @@ impl Default for LineState {
             hover_enabled: true,
             dwell_ms: 250,
             flip_mod: "shift".into(),
+            drop_to_hang: true,
         }
     }
 }
@@ -262,6 +269,7 @@ fn apply_settings_to_state(s: &Settings) {
     let mut st = STATE.lock().unwrap();
     st.hover_enabled = s.hover_enabled;
     st.dwell_ms = s.dwell_ms;
+    st.drop_to_hang = s.drop_to_hang;
     st.flip_mod = s.flip_mod.clone();
 }
 
@@ -282,6 +290,12 @@ fn with_window<F: FnOnce(tauri::WebviewWindow) + Send + 'static>(f: F) {
 }
 
 fn drop_line(deck: Deck, sticky: bool) {
+    drop_line_ex(deck, sticky, true);
+}
+
+/// `focus = false` is used when a file drag reaches the top edge: taking
+/// focus in the middle of someone else's drag is unnecessary and jarring.
+fn drop_line_ex(deck: Deck, sticky: bool, focus: bool) {
     native::remember_foreground();
     {
         let mut st = STATE.lock().unwrap();
@@ -289,10 +303,12 @@ fn drop_line(deck: Deck, sticky: bool) {
         st.deck = deck;
         st.sticky = sticky;
     }
-    with_window(|w| {
+    with_window(move |w| {
         let _ = w.set_ignore_cursor_events(false);
         let _ = w.show();
-        let _ = w.set_focus();
+        if focus {
+            let _ = w.set_focus();
+        }
     });
     if let Some(app) = APP.get() {
         let _ = app.emit(
@@ -302,6 +318,9 @@ fn drop_line(deck: Deck, sticky: bool) {
                 sticky,
             },
         );
+        if !focus {
+            let _ = app.emit("line:catch", ());
+        }
     }
 }
 
@@ -387,6 +406,72 @@ fn paste_text(text: String) {
     std::thread::spawn(move || {
         native::paste_text(&text);
     });
+}
+
+/// Drag a text card out. Explorer / the desktop receive a .txt/.md file,
+/// every other drop target receives the text itself.
+#[tauri::command]
+async fn drag_text(app: AppHandle, text: String) -> Result<bool, String> {
+    let ext = {
+        let s = SETTINGS.lock().unwrap();
+        if s.text_drag_ext == "md" { "md" } else { "txt" }
+    };
+    let file = write_drag_temp(&text, ext)?;
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(winx::drag_text(&text, &file));
+    })
+    .map_err(|e| e.to_string())?;
+    let r = rx.recv().map_err(|e| e.to_string())?;
+    rollup();
+    r
+}
+
+/// %TEMP%\ClipLine\drag\<stamp>\<first line>.<ext>
+fn write_drag_temp(text: &str, ext: &str) -> Result<std::path::PathBuf, String> {
+    let base = std::env::temp_dir().join("ClipLine").join("drag");
+    // Housekeeping: forget drag files older than a day.
+    if let Ok(rd) = std::fs::read_dir(&base) {
+        for e in rd.flatten() {
+            let old = e
+                .metadata()
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.elapsed().ok())
+                .map(|d| d.as_secs() > 86_400)
+                .unwrap_or(false);
+            if old {
+                let _ = std::fs::remove_dir_all(e.path());
+            }
+        }
+    }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let dir = base.join(stamp.to_string());
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let name = drag_file_stem(text);
+    let path = dir.join(format!("{name}.{ext}"));
+    // UTF-8 with BOM so old Notepad builds pick the right encoding.
+    let mut bytes = vec![0xEF, 0xBB, 0xBF];
+    bytes.extend_from_slice(text.replace("\r\n", "\n").replace('\n', "\r\n").as_bytes());
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path)
+}
+
+fn drag_file_stem(text: &str) -> String {
+    let first = text.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");
+    let mut out: String = first
+        .chars()
+        .map(|c| if "\\/:*?\"<>|".contains(c) || c.is_control() { '_' } else { c })
+        .take(40)
+        .collect();
+    out = out.trim().trim_end_matches('.').to_string();
+    if out.is_empty() {
+        out = "ClipLine 文本".into();
+    }
+    out
 }
 
 #[tauri::command]
@@ -751,13 +836,14 @@ fn flip_active(flip_mod: &str) -> bool {
 fn start_cursor_thread() {
     std::thread::spawn(|| {
         let mut cand: Option<(Deck, std::time::Instant)> = None;
+        let mut catch_since: Option<std::time::Instant> = None;
         loop {
             std::thread::sleep(std::time::Duration::from_millis(40));
             let Some((x, y)) = native::cursor_pos() else {
                 std::thread::sleep(std::time::Duration::from_millis(400));
                 continue;
             };
-            let (dropped, sticky, deck, top, left, width, clip_h, notes_h, hover, dwell, flip) = {
+            let (dropped, sticky, deck, top, left, width, clip_h, notes_h, hover, dwell, flip, hang) = {
                 let st = STATE.lock().unwrap();
                 (
                     st.dropped,
@@ -771,8 +857,30 @@ fn start_cursor_thread() {
                     st.hover_enabled,
                     st.dwell_ms,
                     st.flip_mod.clone(),
+                    st.drop_to_hang,
                 )
             };
+            // A drag (left button held, started well below the top edge and
+            // travelled) that reaches the top band: drop the line to catch it.
+            if !dropped && hang && x >= left && x < left + width && y <= top + 2 {
+                if let Some((dx, dy, age)) = winx::left_drag_info() {
+                    let travelled = (dx - x).abs() + (dy - y).abs();
+                    if dy > top + 60 && travelled > 40 && age > 150 {
+                        match catch_since {
+                            Some(t) if t.elapsed().as_millis() >= 120 => {
+                                catch_since = None;
+                                cand = None;
+                                drop_line_ex(Deck::Clipboard, false, false);
+                                continue;
+                            }
+                            Some(_) => {}
+                            None => catch_since = Some(std::time::Instant::now()),
+                        }
+                        continue; // don't let the hover-dwell logic fire meanwhile
+                    }
+                }
+            }
+            catch_since = None;
             if !dropped {
                 if hover && y <= top + 1 && x >= left && x < left + width {
                     let left_half = x < left + width / 2;
@@ -889,6 +997,7 @@ fn main() {
         )
         .invoke_handler(tauri::generate_handler![
             set_passthrough,
+            drag_text,
             rollup_now,
             toggle,
             copy_text,
@@ -942,6 +1051,7 @@ fn main() {
             }
 
             native::start_clipboard_watch(handle.clone());
+            winx::start_mouse_hook();
             start_cursor_thread();
             start_folder_watch();
 

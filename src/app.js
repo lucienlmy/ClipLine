@@ -19,7 +19,7 @@ function refreshModal() {
 const I18N = {
   zh: {
     all: "全部", text: "文字", link: "链接", color: "颜色", image: "图片", file: "文件",
-    search: "搜索…", copied: "已复制", savedTo: "已保存到桌面", hung: "已挂上绳",
+    search: "搜索…", copied: "已复制", editText: "编辑文字", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手即挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
     emptyClip: "绳上还空着 — 复制点什么试试",
     emptyNotes: "绳上还没有便签 — 点上方的 + 写一张",
     plus: "新建便签", gear: "设置", prev: "上一屏", next: "下一屏", pinOnly: "只看钉住的",
@@ -57,7 +57,7 @@ const I18N = {
   },
   en: {
     all: "All", text: "Text", link: "Link", color: "Color", image: "Image", file: "File",
-    search: "Search…", copied: "Copied", savedTo: "Saved to Desktop", hung: "Hung on the line",
+    search: "Search…", copied: "Copied", editText: "Edit text", pasteBack: "Paste into previous app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
     emptyClip: "The line is empty — copy something",
     emptyNotes: "No notes yet — click + above to write one",
     plus: "New note", gear: "Settings", prev: "Previous", next: "Next", pinOnly: "Pinned only",
@@ -358,10 +358,10 @@ function buildClipCard(item) {
     if (e.target.closest(".corner")) return;
     if (item.vis === "image") { invoke("copy_image", { path: item.path }).catch(()=>{}); invoke("rollup_now"); }
     else if (item.vis === "file") { if ((item.files || [])[0]) invoke("open_path", { path: item.files[0] }).catch(()=>{}); }
-    else invoke("paste_text", { text: item.text || "" }).catch(()=>{});
+    else openClipEditor(item);
   });
   card.addEventListener("contextmenu", (e) => showCtx(e, item, false));
-  if (item.vis === "image" || item.vis === "file") attachDragOut(card, item);
+  attachDragOut(card, item);
   return card;
 }
 
@@ -452,6 +452,13 @@ function attachDragOut(card, item) {
     if (!armed || started) return;
     if (Math.abs(e.clientX - sx) < 6 && Math.abs(e.clientY - sy) < 6) return;
     started = true; armed = false;
+    if (item.vis !== "image" && item.vis !== "file") {
+      // Text: Explorer gets a .txt/.md file, any other app gets the text.
+      if (!(item.text || "").length) return;
+      suppressClickUntil = Date.now() + 500;
+      invoke("drag_text", { text: item.text }).catch((err) => toast(t("dragFail") + err));
+      return;
+    }
     const paths = item.vis === "image" ? (item.path ? [item.path] : []) : (item.files || []);
     if (!paths.length) return;
     const icon = item.vis === "image" ? (item.thumb || DRAG_ICON) : DRAG_ICON;
@@ -557,7 +564,8 @@ function addDroppedFiles(paths) {
 }
 function flash(card) {
   const f = document.createElement("div"); f.className = "copied-flash"; f.textContent = t("copied");
-  card.querySelector(".card-body").appendChild(f); setTimeout(() => f.remove(), 900);
+  card.querySelectorAll(".copied-flash").forEach((x) => x.remove());
+  card.appendChild(f); setTimeout(() => f.remove(), 1100);
 }
 function confirmRemove(e, item, isNote) {
   const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind");
@@ -620,6 +628,8 @@ function showCtx(e, item, isNote) {
       add(t("copyPath"), () => { invoke("copy_text", { text: (item.files || []).join("\n") }).catch(()=>{}); toast(t("copied")); });
     } else {
       add(t("copy"), () => invoke("copy_text", { text: item.text || "" }).catch(()=>{}));
+      add(t("editText"), () => openClipEditor(item));
+      add(t("pasteBack"), () => invoke("paste_text", { text: item.text || "" }).catch(()=>{}));
       if (item.vis === "link") add(t("openLink"), () => invoke("open_url", { url: normUrl(item.text) }).catch(()=>{}));
       add(t("toNote"), () => convertToNote(item));
       add(t("saveDesktop"), () => saveDesktop(item));
@@ -682,11 +692,14 @@ function newNote() {
   openEditorFor(editing);
 }
 function openEditor(note) { editing = note; openEditorFor(note); }
+/* Text clip cards open the same sheet in a larger, plain "clip" mode. */
+function openClipEditor(item) { editing = { _clip: item, body: item.text || "", tint: null }; openEditorFor(editing); }
 function openEditorFor(note) {
   const tt = tintOf(note.tint);
   const sheet = document.querySelector(".editor-sheet");
+  sheet.classList.toggle("clip-mode", !!note._clip);
   sheet.style.setProperty("--editor-bg", tt.bg); sheet.style.setProperty("--editor-ink", tt.ink);
-  const ta = $("editorBody"); ta.value = note.body || ""; ta.placeholder = t("editorPh");
+  const ta = $("editorBody"); ta.value = note.body || ""; ta.placeholder = note._clip ? t("editorPhClip") : t("editorPh");
   $("bellText").textContent = note.remindAt ? fmtWhen(note.remindAt) : t("remind");
   const tc = $("tints"); tc.innerHTML = "";
   TINTS.forEach((x) => {
@@ -701,6 +714,12 @@ function openEditorFor(note) {
 }
 function closeEditor() {
   if (!editing) { $("editor").hidden = true; return; }
+  if (editing._clip) {
+    const it = editing._clip, v = $("editorBody").value;
+    if (v.trim() && v !== it.text) { it.text = v; it.vis = classify(v); toast(t("savedEdit")); }
+    editing = null; $("editor").hidden = true; refreshModal(); save(); render();
+    return;
+  }
   editing.body = $("editorBody").value; editing.ts = Date.now();
   const has = editing.body.trim().length > 0;
   if (editing._new) { delete editing._new; if (has) state.notes.unshift(editing); }
@@ -1074,6 +1093,24 @@ window.addEventListener("wheel", (e) => {
 }, { passive: true });
 window.addEventListener("resize", () => { if (!stage.classList.contains("up")) render(); });
 
+/* ---------- drag files to the top edge: the line comes down to catch them ---------- */
+let catching = false, catchTimer = 0;
+function startCatch() {
+  catching = true;
+  stage.classList.add("catching");
+  toast(t("catchHint"));
+  // No file drag arrives (e.g. a window being snapped to the top, or a
+  // text selection) — not for us, go back up.
+  clearTimeout(catchTimer);
+  catchTimer = setTimeout(endCatch, 700);
+}
+function endCatch() {
+  if (!catching) return;
+  catching = false;
+  stage.classList.remove("catching", "catch-over");
+  invoke("rollup_now").catch(() => {});
+}
+
 /* ---------- events from Rust ---------- */
 async function wire() {
   await listen("clip:add", (ev) => addClip(ev.payload));
@@ -1086,7 +1123,14 @@ async function wire() {
     LANG = cfg.lang === "en" ? "en" : "zh";
     applyLang(); applyTheme(cfg.theme); applyFont(cfg); cleanup(); render();
   });
+  await listen("line:catch", () => startCatch());
+  await listen("tauri://drag-enter", () => { if (catching) { clearTimeout(catchTimer); stage.classList.add("catch-over"); } });
+  await listen("tauri://drag-leave", () => {
+    stage.classList.remove("catch-over");
+    if (catching) { clearTimeout(catchTimer); catchTimer = setTimeout(endCatch, 1500); }
+  });
   await listen("tauri://drag-drop", (ev) => {
+    if (catching) { catching = false; clearTimeout(catchTimer); stage.classList.remove("catching", "catch-over"); }
     const p = ev.payload || {};
     const paths = p.paths || (Array.isArray(p) ? p : []);
     if (paths && paths.length) addDroppedFiles(paths);

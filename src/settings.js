@@ -8,7 +8,7 @@ const I = {
   zh: {
     title: "设置", secHotkeys: "快捷键", hkClip: "剪贴板绳", hkNotes: "便签绳",
     hkHint: "点击后按下组合键录制", restoreDefault: "恢复默认",
-    secInvoke: "呼出方式", hoverOn: "顶边悬停呼出", dwell: "停顿时长", flip: "左右翻转修饰键",
+    secInvoke: "呼出方式", hoverOn: "顶边悬停呼出", dwell: "停顿时长", flip: "左右翻转修饰键", hangOn: "拖文件到屏幕顶部自动放绳", textExt: "文字卡片拖到文件夹时保存为",
     flipNone: "关闭", mShift: "Shift", mCtrl: "Ctrl", mAlt: "Alt",
     secClean: "自动清理", retention: "保留天数", days: "天",
     secGeneral: "常规", language: "语言", autostart: "开机自启动",
@@ -21,9 +21,9 @@ const I = {
     secHelp: "使用说明", secAbout: "关于", save: "保存", cancel: "取消",
     help: [
       ["呼出", "鼠标顶到屏幕最上沿：左半剪贴板绳、右半便签绳；按住翻转键左右对调。或用快捷键。"],
-      ["单击/双击", "单击复制；双击把文字粘回刚才的应用（图片为复制）。"],
+      ["单击/双击", "单击复制（卡上浮现「已复制」）；文字卡双击放大编辑，图片双击复制，文件双击打开。"],
       ["钉住", "右键「钉住」的卡不参与自动清理（图钉标记）。"],
-      ["文件/拖拽", "复制文件自动上绳；按住卡片外拖=复制，Shift 拖=移动。"],
+      ["文件/拖拽", "复制文件自动上绳；按住卡片外拖=复制，Shift 拖=移动。文字卡拖到文件夹成 .txt/.md，拖到输入框即插入文字。把文件拖到屏幕最顶端，绳子会滑下来接住。"],
       ["截图", "PrintScreen 或 Win+Shift+S 截图进剪贴板，自动上绳。"],
     ],
     about: "ClipLine · 晾衣绳主题剪贴板 / 便签。灵感来自 Tendedero (MIT) 与 Clothespeg (Apache-2.0)；独立重写，名称与图标均为原创。",
@@ -31,7 +31,7 @@ const I = {
   en: {
     title: "Settings", secHotkeys: "Hotkeys", hkClip: "Clipboard line", hkNotes: "Notes line",
     hkHint: "Click, then press a key combo", restoreDefault: "Restore defaults",
-    secInvoke: "Invoke", hoverOn: "Drop on top-edge hover", dwell: "Dwell", flip: "Flip modifier",
+    secInvoke: "Invoke", hoverOn: "Drop on top-edge hover", dwell: "Dwell", flip: "Flip modifier", hangOn: "Drag files to top edge to drop the line", textExt: "Text card dragged to a folder becomes",
     flipNone: "Off", mShift: "Shift", mCtrl: "Ctrl", mAlt: "Alt",
     secClean: "Auto cleanup", retention: "Keep for", days: "days",
     secGeneral: "General", language: "Language", autostart: "Launch at startup",
@@ -142,6 +142,8 @@ function render() {
   s2.appendChild(row(t("hoverOn"), switchEl(draft.hover_enabled, (v) => draft.hover_enabled = v)));
   s2.appendChild(row(t("dwell"), seg(draft.dwell_ms, [[150, "0.15s"], [250, "0.25s"], [400, "0.4s"]], (v) => draft.dwell_ms = parseInt(v, 10))));
   s2.appendChild(row(t("flip"), seg(draft.flip_mod, [["none", t("flipNone")], ["shift", t("mShift")], ["ctrl", t("mCtrl")], ["alt", t("mAlt")]], (v) => draft.flip_mod = v)));
+  s2.appendChild(row(t("hangOn"), switchEl(draft.drop_to_hang, (v) => draft.drop_to_hang = v)));
+  s2.appendChild(row(t("textExt"), seg(draft.text_drag_ext, [["txt", ".txt"], ["md", ".md"]], (v) => draft.text_drag_ext = v)));
   body.appendChild(s2);
 
   // Cleanup
@@ -264,7 +266,7 @@ window.addEventListener("error", (e) => { const el = document.getElementById("se
 window.addEventListener("unhandledrejection", (e) => { const el = document.getElementById("setErr"); if (el) { const r = e.reason; el.textContent = "错误: " + (r && r.toString ? r.toString() : r); } });
 (async function boot() {
   try { const s = await invoke("get_settings"); if (s) cfg = JSON.parse(s); } catch (e) {}
-  draft = Object.assign({ hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"] }, cfg);
+  draft = Object.assign({ hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"], drop_to_hang: true, text_drag_ext: "txt" }, cfg);
   previewFont(draft.font_family);
   LANG = draft.lang === "en" ? "en" : "zh";
   render();
