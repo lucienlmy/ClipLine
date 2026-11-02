@@ -476,6 +476,19 @@ async fn drag_text(app: AppHandle, text: String) -> Result<bool, String> {
     r
 }
 
+/// Drag file / image cards out (copy, or move with Shift).
+#[tauri::command]
+async fn drag_files(app: AppHandle, paths: Vec<String>, mov: bool) -> Result<bool, String> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(winx::drag_files(&paths, mov));
+    })
+    .map_err(|e| e.to_string())?;
+    let r = rx.recv().map_err(|e| e.to_string())?;
+    rollup_ex(false);
+    r
+}
+
 /// %TEMP%\ClipLine\drag\<stamp>\<first line>.<ext>
 fn write_drag_temp(text: &str, ext: &str) -> Result<std::path::PathBuf, String> {
     let base = std::env::temp_dir().join("ClipLine").join("drag");
@@ -888,6 +901,7 @@ fn start_cursor_thread() {
         let mut catch_since: Option<std::time::Instant> = None;
         let mut origin: Option<(i32, i32, bool)> = None;
         let mut released_at: Option<std::time::Instant> = None;
+        let mut last_miss: Option<std::time::Instant> = None;
         let mut last_inside = false;
         let mut hover_on = false;
         let mut fallback_done = false;
@@ -948,6 +962,20 @@ fn start_cursor_thread() {
                 }
             }
             catch_since = None;
+            // Diagnostics: the pointer is pressed against the top edge but no
+            // catch happened — say why (at most once a second).
+            if !dropped && hang && x >= left && x < left + width && y <= top + 2
+                && last_miss.map(|t| t.elapsed().as_millis() > 1000).unwrap_or(true)
+            {
+                last_miss = Some(std::time::Instant::now());
+                match winx::left_drag_info() {
+                    None => winx::dlog(&format!("top edge at ({x},{y}): left button not seen as held")),
+                    Some((dx, dy, age)) => winx::dlog(&format!(
+                        "top edge at ({x},{y}): no catch yet — drag from ({dx},{dy}) explorer={} age={age}ms",
+                        winx::point_is_explorer_xy(dx, dy)
+                    )),
+                }
+            }
             if !dropped {
                 if hover && y <= top + 1 && x >= left && x < left + width {
                     let left_half = x < left + width / 2;
@@ -1115,6 +1143,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             set_passthrough,
             drag_text,
+            drag_files,
             dbg_log,
             rollup_now,
             toggle,

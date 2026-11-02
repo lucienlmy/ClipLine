@@ -672,6 +672,51 @@ mod imp {
         .unwrap_or_default()
     }
 
+    /// Drag real files out (file / image cards): the shell's own data object,
+    /// exactly what Explorer produces. `mov` = offer move only (Shift).
+    pub fn drag_files(paths: &[String], mov: bool) -> std::result::Result<bool, String> {
+        init_ole();
+        unsafe {
+            let wide: Vec<Vec<u16>> = paths
+                .iter()
+                .map(|p| p.encode_utf16().chain(std::iter::once(0)).collect())
+                .collect();
+            let pidls: Vec<*mut windows::Win32::UI::Shell::Common::ITEMIDLIST> = wide
+                .iter()
+                .map(|w| ILCreateFromPathW(PCWSTR(w.as_ptr())))
+                .filter(|p| !p.is_null())
+                .collect();
+            if pidls.is_empty() {
+                dlog("drag_files: no valid paths");
+                return Err("文件不存在".into());
+            }
+            let list: Vec<*const _> = pidls.iter().map(|p| *p as *const _).collect();
+            let obj = SHCreateShellItemArrayFromIDLists(&list)
+                .and_then(|a| a.BindToHandler::<_, IDataObject>(None, &BHID_DataObject));
+            for p in &pidls {
+                ILFree(Some(*p as *const _));
+            }
+            let obj = obj.map_err(|e| {
+                dlog(&format!("drag_files: data object failed {e}"));
+                e.to_string()
+            })?;
+            let src: IDropSource = DropSource.into();
+            let mut eff = DROPEFFECT::default();
+            let allowed = if mov { DROPEFFECT_MOVE } else { DROPEFFECT_COPY };
+            dlog(&format!("drag_files start n={} move={mov}", paths.len()));
+            let hr = DoDragDrop(&obj, &src, allowed, &mut eff);
+            let mut p = POINT::default();
+            let _ = GetCursorPos(&mut p);
+            dlog(&format!(
+                "drag_files -> {:#x}, effect={}, released over explorer={}",
+                hr.0,
+                eff.0,
+                point_is_explorer(p)
+            ));
+            Ok(hr == DRAGDROP_S_DROP)
+        }
+    }
+
     /// Run a modal OLE drag of `text`, backed by `file` for Explorer drops.
     /// Must be called on the UI (main) thread. Returns true if dropped.
     pub fn drag_text(text: &str, file: &PathBuf) -> std::result::Result<bool, String> {
@@ -719,6 +764,9 @@ mod imp {
     }
     pub fn explorer_selection_at(_x: i32, _y: i32) -> Vec<String> {
         Vec::new()
+    }
+    pub fn drag_files(_paths: &[String], _mov: bool) -> Result<bool, String> {
+        Err("file drag is only available on Windows".into())
     }
 }
 

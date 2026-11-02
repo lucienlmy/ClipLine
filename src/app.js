@@ -471,17 +471,11 @@ function attachDragOut(card, item) {
     }
     const paths = item.vis === "image" ? (item.path ? [item.path] : []) : (item.files || []);
     if (!paths.length) return;
-    const icon = item.vis === "image" ? (item.thumb || DRAG_ICON) : DRAG_ICON;
-    const mode = e.shiftKey ? "move" : "copy"; // Windows: Shift = move, default = copy
+    const mov = e.shiftKey; // Windows: Shift = move, default = copy
     suppressClickUntil = Date.now() + 500;
     selfDragUntil = Date.now() + 60000;
-    try {
-      window.__TAURI__.drag.startDrag({ item: paths, icon, mode }, () => {
-        selfDragUntil = Date.now() + 400;
-        // Drag finished (dropped or cancelled) — get the line out of the way.
-        invoke("rollup_now").catch(() => {});
-      });
-    } catch (err) { selfDragUntil = 0; }
+    invoke("drag_files", { paths, mov }).catch((err) => toast(t("dragFail") + err))
+      .finally(() => { selfDragUntil = Date.now() + 400; });
   });
   card.addEventListener("pointerup", () => { armed = false; });
   card.addEventListener("pointercancel", () => { armed = false; });
