@@ -22,10 +22,10 @@ const I18N = {
     search: "搜索…", copied: "已复制", editText: "编辑文字", stackOpen: "展开这一叠", stackTitle: "这一叠共 {n} 个文件", stackSplit: "拆成单张", stackHint: "单击复制 · 拖出单个文件 · 双击打开", missing: "原文件已不在（被移动或删除了）", already: "已在绳上，已移到最前", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
     emptyClip: "绳上还空着 — 复制点什么试试",
     emptyNotes: "绳上还没有便签 — 点上方的 + 写一张",
-    plus: "新建便签", gear: "设置", prev: "上一屏", next: "下一屏", pinOnly: "只看钉住的",
+    plus: "新建便签", gear: "设置", prev: "上一屏", next: "下一屏", pinOnly: "只看收藏（钉住）的卡片",
     take: "取下", preview: "预览", edit: "编辑", confirmTake: "确认取下钉住的卡？", dragSort: "按住夹子左右拖动排序", takeDelete: "取下（删除原文件）", confirmTrash: "将 {n} 个原文件移到回收站，并从绳上取下？", toTrash: "移到回收站", trashed: "已移到回收站", trashFail: "删除失败: ",
     copy: "复制", copyImg: "复制图片", copyPath: "复制文件地址",
-    pin: "钉住", unpin: "取消钉住", reveal: "在资源管理器中显示", openIt: "打开",
+    pin: "收藏（钉住）", unpin: "取消收藏", favOn: "已收藏，不会被自动清理", favOff: "已取消收藏", noFav: "还没有收藏：鼠标移到卡片上，点右下角 ☆", reveal: "在资源管理器中显示", openIt: "打开",
     openLink: "在浏览器打开", saveDesktop: "保存到桌面", toNote: "转为便签",
     editorPh: "写点什么…\n第一行是标题\n用 [] 开头的行会变成勾选项",
     editorHint: "Ctrl+S 保存 · Esc 关闭", save: "保存", remind: "提醒",
@@ -60,10 +60,10 @@ const I18N = {
     search: "Search…", copied: "Copied", editText: "Edit text", stackOpen: "Open this stack", stackTitle: "{n} files in this stack", stackSplit: "Split into cards", stackHint: "Click to copy · drag one out · double-click to open", missing: "The original file is gone (moved or deleted)", already: "Already on the line — moved to front", pasteBack: "Paste into previous app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
     emptyClip: "The line is empty — copy something",
     emptyNotes: "No notes yet — click + above to write one",
-    plus: "New note", gear: "Settings", prev: "Previous", next: "Next", pinOnly: "Pinned only",
+    plus: "New note", gear: "Settings", prev: "Previous", next: "Next", pinOnly: "Favourites (pinned) only",
     take: "Remove", preview: "Preview", edit: "Edit", confirmTake: "Remove pinned card?", dragSort: "Hold the clip and slide to reorder", takeDelete: "Remove & delete original", confirmTrash: "Move {n} original file(s) to the Recycle Bin and take the card down?", toTrash: "Move to Recycle Bin", trashed: "Moved to Recycle Bin", trashFail: "Delete failed: ",
     copy: "Copy", copyImg: "Copy image", copyPath: "Copy file path",
-    pin: "Pin", unpin: "Unpin", reveal: "Show in Explorer", openIt: "Open",
+    pin: "Favourite (pin)", unpin: "Remove favourite", favOn: "Favourited — kept from auto-cleanup", favOff: "Removed from favourites", noFav: "No favourites yet: hover a card and click ☆ at the bottom right", reveal: "Show in Explorer", openIt: "Open",
     openLink: "Open in browser", saveDesktop: "Save to Desktop", toNote: "Turn into note",
     editorPh: "Write something…\nFirst line is the title\nLines starting with [] become checkboxes",
     editorHint: "Ctrl+S save · Esc close", save: "Save", remind: "Remind",
@@ -144,6 +144,7 @@ const PRESETS = {
   nextweek: () => Date.now() + 7 * 24 * 3600000,
 };
 function applyTheme(name) { stage.dataset.theme = name || "soft"; }
+function applyAccent(name) { document.documentElement.dataset.accent = name || "terra"; }
 const ui = { deck: "clipboard", filter: "all", search: "", pinnedOnly: false, page: 0 };
 
 const $ = (id) => document.getElementById(id);
@@ -450,6 +451,10 @@ function addCorners(card, body, item, isNote) {
     else openPreview(item);
   });
   body.appendChild(mag);
+  const fav = document.createElement("button");
+  fav.className = "corner fav"; fav.textContent = item.pinned ? "★" : "☆"; fav.title = item.pinned ? t("unpin") : t("pin");
+  fav.addEventListener("click", (e) => { e.stopPropagation(); item.pinned = !item.pinned; save(); render(); toast(item.pinned ? t("favOn") : t("favOff")); });
+  body.appendChild(fav);
 }
 
 /* ---------- copy / remove ---------- */
@@ -1180,7 +1185,11 @@ $("gear").addEventListener("click", () => { invoke("rollup_now").catch(() => {})
 $("bell").addEventListener("click", (e) => { e.stopPropagation(); if (editing) showReminderPanel(e, editing, () => { $("bellText").textContent = editing.remindAt ? fmtWhen(editing.remindAt) : t("remind"); }); });
 $("prev").addEventListener("click", () => { ui.page--; render(); });
 $("next").addEventListener("click", () => { ui.page++; render(); });
-$("pinOnly").addEventListener("click", () => { ui.pinnedOnly = !ui.pinnedOnly; $("pinOnly").classList.toggle("on", ui.pinnedOnly); ui.page = 0; render(); });
+$("pinOnly").addEventListener("click", () => {
+  ui.pinnedOnly = !ui.pinnedOnly; $("pinOnly").classList.toggle("on", ui.pinnedOnly); ui.page = 0; render();
+  const list = ui.deck === "notes" ? state.notes : state.clips;
+  if (ui.pinnedOnly && !list.some((x) => x.pinned)) toast(t("noFav"));
+});
 $("searchInput").addEventListener("input", (e) => { ui.search = e.target.value; ui.page = 0; render(); });
 window.addEventListener("wheel", (e) => {
   if (stage.classList.contains("up")) return;
@@ -1210,10 +1219,11 @@ async function wire() {
   await listen("line:rollup", () => onRollup());
   await listen("ui:newnote", () => { setDeck("notes"); stage.classList.remove("up"); render(); newNote(); });
   await listen("theme:preview", (ev) => applyTheme(ev.payload || "soft"));
+  await listen("accent:preview", (ev) => applyAccent(ev.payload || "terra"));
   await listen("settings:changed", async () => {
     try { const s = await invoke("get_settings"); if (s) cfg = Object.assign(cfg, JSON.parse(s)); } catch (e) {}
     LANG = cfg.lang === "en" ? "en" : "zh";
-    applyLang(); applyTheme(cfg.theme); applyFont(cfg); cleanup(); render();
+    applyLang(); applyTheme(cfg.theme); applyAccent(cfg.accent); applyFont(cfg); cleanup(); render();
   });
   await listen("line:catch", () => startCatch());
   await listen("files:enter", () => stage.classList.add("catch-over"));
@@ -1235,6 +1245,7 @@ async function wire() {
   await load();
   applyLang();
   applyTheme(cfg.theme);
+  applyAccent(cfg.accent);
   applyFont(cfg);
   await wire();
   render();

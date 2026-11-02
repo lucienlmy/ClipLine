@@ -55,6 +55,7 @@ struct Settings {
     reminder_presets: Vec<String>, // ids shown in the reminder popover
     drop_to_hang: bool,            // dragging files to the top edge drops the line
     text_drag_ext: String,         // txt | md — file type when a text card is dragged to Explorer
+    accent: String,                // terra | mint | sky | navy
 }
 
 impl Default for Settings {
@@ -75,6 +76,7 @@ impl Default for Settings {
             reminder_presets: vec!["m15".into(), "h1".into(), "tomorrow".into()],
             drop_to_hang: true,
             text_drag_ext: "txt".into(),
+            accent: "terra".into(),
         }
     }
 }
