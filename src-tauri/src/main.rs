@@ -313,9 +313,16 @@ fn drop_line_ex(deck: Deck, sticky: bool, focus: bool) {
         }
         // Fresh drop target every time (the webview's own one goes stale
         // once the window has been hidden).
-        #[cfg(target_os = "windows")]
-        if let Ok(h) = w.hwnd() {
-            winx::install_drop_target(h.0 as isize);
+        install_drop_target_now(&w);
+    });
+    // WebView2 may (re)create its child windows a moment after showing;
+    // register again shortly after so none of them is missed.
+    std::thread::spawn(|| {
+        for ms in [200u64, 700] {
+            std::thread::sleep(std::time::Duration::from_millis(ms));
+            if STATE.lock().unwrap().dropped {
+                with_window(|w| install_drop_target_now(&w));
+            }
         }
     });
     if let Some(app) = APP.get() {
@@ -327,11 +334,21 @@ fn drop_line_ex(deck: Deck, sticky: bool, focus: bool) {
             },
         );
         if !focus {
-            winx::dlog("catch: line dropped for a file drag");
+            winx::reset_entered();
+            winx::dlog(&format!("catch: line dropped; cursor {}", winx::window_under_cursor()));
             CATCHING.store(true, Ordering::Relaxed);
             let _ = app.emit("line:catch", ());
         }
     }
+}
+
+fn install_drop_target_now(w: &tauri::WebviewWindow) {
+    #[cfg(target_os = "windows")]
+    if let Ok(h) = w.hwnd() {
+        winx::install_drop_target(h.0 as isize);
+    }
+    #[cfg(not(target_os = "windows"))]
+    let _ = w;
 }
 
 fn rollup() {
@@ -865,6 +882,7 @@ fn start_cursor_thread() {
         let mut catch_since: Option<std::time::Instant> = None;
         let mut origin: Option<(i32, i32, bool)> = None;
         let mut released_at: Option<std::time::Instant> = None;
+        let mut last_fix: Option<std::time::Instant> = None;
         loop {
             std::thread::sleep(std::time::Duration::from_millis(40));
             let Some((x, y)) = native::cursor_pos() else {
@@ -946,6 +964,15 @@ fn start_cursor_thread() {
                 if CATCHING.load(Ordering::Relaxed) {
                     if winx::left_drag_info().is_some() {
                         released_at = None;
+                        // Nothing has reached our drop target yet: refresh it
+                        // and note what is under the cursor.
+                        if !winx::drop_entered()
+                            && last_fix.map(|t| t.elapsed().as_millis() > 300).unwrap_or(true)
+                        {
+                            last_fix = Some(std::time::Instant::now());
+                            winx::dlog(&format!("catch: waiting, under cursor {}", winx::window_under_cursor()));
+                            with_window(|w| install_drop_target_now(&w));
+                        }
                     } else {
                         let t = *released_at.get_or_insert_with(std::time::Instant::now);
                         if t.elapsed().as_millis() > 1200 {

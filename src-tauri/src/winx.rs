@@ -371,18 +371,33 @@ mod imp {
         }
 
         fn EnumFormatEtc(&self, dir: u32) -> Result<IEnumFORMATETC> {
+            // OLE asks this ONCE when the drag starts (cursor still over us)
+            // and caches the list for every other process. So always list
+            // everything — the file formats AND text — and filter in GetData.
             dlog(&format!("EnumFormatEtc dir={dir}"));
-            if cursor_over_explorer() {
-                return unsafe { self.file.EnumFormatEtc(dir) };
+            let mut all: Vec<FORMATETC> = Vec::new();
+            unsafe {
+                if let Ok(e) = self.file.EnumFormatEtc(dir) {
+                    loop {
+                        let mut one = [FORMATETC::default()];
+                        let mut got = 0u32;
+                        if e.Next(&mut one, Some(&mut got)) != S_OK || got == 0 {
+                            break;
+                        }
+                        one[0].ptd = std::ptr::null_mut();
+                        all.push(one[0]);
+                    }
+                }
+                all.push(FORMATETC {
+                    cfFormat: CF_UNICODETEXT.0,
+                    ptd: std::ptr::null_mut(),
+                    dwAspect: DVASPECT_CONTENT.0,
+                    lindex: -1,
+                    tymed: TYMED_HGLOBAL.0 as u32,
+                });
+                dlog(&format!("  advertised {} formats", all.len()));
+                SHCreateStdEnumFmtEtc(&all)
             }
-            let fmt = FORMATETC {
-                cfFormat: CF_UNICODETEXT.0,
-                ptd: std::ptr::null_mut(),
-                dwAspect: DVASPECT_CONTENT.0,
-                lindex: -1,
-                tymed: TYMED_HGLOBAL.0 as u32,
-            };
-            unsafe { SHCreateStdEnumFmtEtc(&[fmt]) }
         }
 
         fn DAdvise(&self, _f: *const FORMATETC, _a: u32, _s: Option<&IAdviseSink>) -> Result<u32> {
@@ -400,6 +415,35 @@ mod imp {
     // Our own drop target for the line window (wry registers one only once,
     // at creation; it goes stale after the window is hidden and shown).
     // ------------------------------------------------------------------
+
+    static ENTERED: AtomicBool = AtomicBool::new(false);
+    pub fn drop_entered() -> bool {
+        ENTERED.load(Relaxed)
+    }
+    pub fn reset_entered() {
+        ENTERED.store(false, Relaxed);
+    }
+
+    /// For diagnostics: "child-class / root-class" of the window under the cursor.
+    pub fn window_under_cursor() -> String {
+        unsafe {
+            let mut p = POINT::default();
+            let _ = GetCursorPos(&mut p);
+            let h = WindowFromPoint(p);
+            let root = GetAncestor(h, GA_ROOT);
+            let mut a = [0u16; 64];
+            let mut b = [0u16; 64];
+            let na = GetClassNameW(h, &mut a).max(0) as usize;
+            let nb = GetClassNameW(root, &mut b).max(0) as usize;
+            format!(
+                "({},{}) {} / {}",
+                p.x,
+                p.y,
+                String::from_utf16_lossy(&a[..na]),
+                String::from_utf16_lossy(&b[..nb])
+            )
+        }
+    }
 
     type DropCb = Box<dyn Fn(&'static str, Vec<String>) + Send + Sync>;
     static DROP_CB: OnceLock<DropCb> = OnceLock::new();
@@ -457,6 +501,7 @@ mod imp {
             dlog(&format!("droptarget enter files={}", paths.len()));
             unsafe { *eff = if ok { DROPEFFECT_COPY } else { DROPEFFECT_NONE } };
             if ok {
+                ENTERED.store(true, Relaxed);
                 emit_drop("enter", paths);
             }
             Ok(())
@@ -570,6 +615,13 @@ mod imp {
     }
     pub fn set_drop_callback(_f: Box<dyn Fn(&'static str, Vec<String>) + Send + Sync>) {}
     pub fn install_drop_target(_parent: isize) {}
+    pub fn drop_entered() -> bool {
+        false
+    }
+    pub fn reset_entered() {}
+    pub fn window_under_cursor() -> String {
+        String::new()
+    }
 }
 
 pub use imp::*;
