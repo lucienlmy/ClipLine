@@ -10,23 +10,26 @@
 //!
 //! On other platforms everything here is a no-op stub.
 
-/// Diagnostic log: %TEMP%\\ClipLine\\debug.log (kept small).
+/// Diagnostic log, OFF by default. To turn it on, create an empty file
+/// named `clipline-debug.log` next to the exe (or set CLIPLINE_DEBUG=1);
+/// entries are then appended to it.
 pub fn dlog(msg: &str) {
     use std::io::Write;
-    // Next to the exe (so it is easy to find); fall back to %TEMP%\\ClipLine.
-    let p = std::env::current_exe()
-        .ok()
-        .and_then(|e| e.parent().map(|d| d.join("clipline-debug.log")))
-        .filter(|p| std::fs::OpenOptions::new().create(true).append(true).open(p).is_ok())
-        .unwrap_or_else(|| {
-            let dir = std::env::temp_dir().join("ClipLine");
-            let _ = std::fs::create_dir_all(&dir);
-            dir.join("clipline-debug.log")
-        });
-    if std::fs::metadata(&p).map(|m| m.len() > 512 * 1024).unwrap_or(false) {
-        let _ = std::fs::remove_file(&p);
+    use std::sync::OnceLock;
+    static PATH: OnceLock<Option<std::path::PathBuf>> = OnceLock::new();
+    let path = PATH.get_or_init(|| {
+        let p = std::env::current_exe().ok()?.parent()?.join("clipline-debug.log");
+        if p.exists() || std::env::var_os("CLIPLINE_DEBUG").is_some() {
+            Some(p)
+        } else {
+            None
+        }
+    });
+    let Some(p) = path else { return };
+    if std::fs::metadata(p).map(|m| m.len() > 512 * 1024).unwrap_or(false) {
+        let _ = std::fs::write(p, b"");
     }
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&p) {
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(p) {
         let t = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() % 1_000_000)
