@@ -321,6 +321,7 @@ fn drop_line_ex(deck: Deck, sticky: bool, focus: bool) {
             },
         );
         if !focus {
+            winx::dlog("catch: line dropped for a file drag");
             CATCHING.store(true, Ordering::Relaxed);
             let _ = app.emit("line:catch", ());
         }
@@ -328,6 +329,7 @@ fn drop_line_ex(deck: Deck, sticky: bool, focus: bool) {
 }
 
 fn rollup() {
+    winx::dlog("rollup");
     {
         let mut st = STATE.lock().unwrap();
         if !st.dropped {
@@ -381,7 +383,13 @@ fn set_passthrough(on: bool) {
 
 #[tauri::command]
 fn rollup_now() {
+    winx::dlog("rollup_now (frontend)");
     rollup();
+}
+
+#[tauri::command]
+fn dbg_log(msg: String) {
+    winx::dlog(&format!("[ui] {msg}"));
 }
 
 #[tauri::command]
@@ -980,6 +988,11 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 
 fn main() {
     tauri::Builder::default()
+        .on_window_event(|w, e| {
+            if let tauri::WindowEvent::DragDrop(d) = e {
+                winx::dlog(&format!("[rust] window {} drag event: {:?}", w.label(), d));
+            }
+        })
         .plugin(tauri_plugin_drag::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -1005,6 +1018,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             set_passthrough,
             drag_text,
+            dbg_log,
             rollup_now,
             toggle,
             copy_text,

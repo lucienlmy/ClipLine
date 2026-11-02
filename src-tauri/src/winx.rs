@@ -10,8 +10,27 @@
 //!
 //! On other platforms everything here is a no-op stub.
 
+/// Diagnostic log: %TEMP%\\ClipLine\\debug.log (kept small).
+pub fn dlog(msg: &str) {
+    use std::io::Write;
+    let dir = std::env::temp_dir().join("ClipLine");
+    let _ = std::fs::create_dir_all(&dir);
+    let p = dir.join("debug.log");
+    if std::fs::metadata(&p).map(|m| m.len() > 512 * 1024).unwrap_or(false) {
+        let _ = std::fs::remove_file(&p);
+    }
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&p) {
+        let t = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() % 1_000_000)
+            .unwrap_or(0);
+        let _ = writeln!(f, "{t:>6} {msg}");
+    }
+}
+
 #[cfg(target_os = "windows")]
 mod imp {
+    use super::dlog;
     use std::os::windows::ffi::OsStrExt;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering::Relaxed};
@@ -147,6 +166,9 @@ mod imp {
                 return false;
             }
             let cls = String::from_utf16_lossy(&buf[..n as usize]);
+            let mut cb = [0u16; 64];
+            let cn = GetClassNameW(h, &mut cb);
+            dlog(&format!("  under cursor ({},{}): {} / root {}", p.x, p.y, String::from_utf16_lossy(&cb[..cn.max(0) as usize]), cls));
             if matches!(
                 cls.as_str(),
                 "CabinetWClass" | "ExploreWClass" | "Progman" | "WorkerW"
@@ -224,6 +246,13 @@ mod imp {
         file: IDataObject,  // shell data object for the temp .txt/.md
     }
 
+    fn fcf(f: *const FORMATETC) -> u16 {
+        unsafe { f.as_ref().map(|f| f.cfFormat).unwrap_or(0) }
+    }
+    fn ftymed(f: *const FORMATETC) -> u32 {
+        unsafe { f.as_ref().map(|f| f.tymed).unwrap_or(0) }
+    }
+
     fn is_text(f: *const FORMATETC) -> bool {
         match unsafe { f.as_ref() } {
             Some(f) => {
@@ -264,6 +293,7 @@ mod imp {
 
     impl IDataObject_Impl for TextData_Impl {
         fn GetData(&self, f: *const FORMATETC) -> Result<STGMEDIUM> {
+            dlog(&format!("GetData cf={} tymed={}", fcf(f), ftymed(f)));
             if cursor_over_explorer() {
                 return unsafe { self.file.GetData(f) };
             }
@@ -281,14 +311,16 @@ mod imp {
         }
 
         fn QueryGetData(&self, f: *const FORMATETC) -> windows::core::HRESULT {
-            if cursor_over_explorer() {
-                return unsafe { self.file.QueryGetData(f) };
-            }
-            if is_text(f) {
+            let ex = cursor_over_explorer();
+            let r = if ex {
+                unsafe { self.file.QueryGetData(f) }
+            } else if is_text(f) {
                 S_OK
             } else {
                 DV_E_FORMATETC
-            }
+            };
+            dlog(&format!("QueryGetData cf={} tymed={} explorer={} -> {:#x}", fcf(f), ftymed(f), ex, r.0));
+            r
         }
 
         fn GetCanonicalFormatEtc(
@@ -307,6 +339,7 @@ mod imp {
         }
 
         fn EnumFormatEtc(&self, dir: u32) -> Result<IEnumFORMATETC> {
+            dlog(&format!("EnumFormatEtc dir={dir}"));
             if cursor_over_explorer() {
                 return unsafe { self.file.EnumFormatEtc(dir) };
             }
@@ -339,11 +372,13 @@ mod imp {
         wtext.push(0);
         let wfile: Vec<u16> = file.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
         unsafe {
-            let file = shell_file_object(&wfile).map_err(|e| e.to_string())?;
+            dlog(&format!("drag_text start, file={}", file.display()));
+            let file = shell_file_object(&wfile).map_err(|e| { dlog(&format!("shell_file_object failed: {e}")); e.to_string() })?;
             let data: IDataObject = TextData { text: wtext, file }.into();
             let src: IDropSource = DropSource.into();
             let mut eff = DROPEFFECT::default();
             let hr = DoDragDrop(&data, &src, DROPEFFECT_COPY | DROPEFFECT_MOVE, &mut eff);
+            dlog(&format!("DoDragDrop -> {:#x}, effect={}", hr.0, eff.0));
             Ok(hr == DRAGDROP_S_DROP)
         }
     }

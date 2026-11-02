@@ -1127,6 +1127,13 @@ async function wire() {
     applyLang(); applyTheme(cfg.theme); applyFont(cfg); cleanup(); render();
   });
   await listen("line:catch", () => startCatch());
+  const dbg = (m) => invoke("dbg_log", { msg: m }).catch(() => {});
+  let lastOver = 0;
+  await listen("tauri://drag-enter", (ev) => dbg("drag-enter " + JSON.stringify(ev.payload).slice(0, 200)));
+  await listen("tauri://drag-leave", () => dbg("drag-leave"));
+  await listen("tauri://drag-over", () => { if (Date.now() - lastOver > 500) { lastOver = Date.now(); dbg("drag-over"); } });
+  await listen("tauri://drag-drop", (ev) => dbg("drag-drop " + JSON.stringify(ev.payload).slice(0, 300)));
+  await listen("line:catch", () => dbg("line:catch received, dragInside=" + dragInside));
   const onEnterOver = () => {
     dragInside = true;
     if (catching) { clearTimeout(catchTimer); stage.classList.add("catch-over"); }
