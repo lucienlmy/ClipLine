@@ -342,6 +342,12 @@ fn drop_line_ex(deck: Deck, sticky: bool, focus: bool) {
     }
 }
 
+fn emit_files(kind: &str, paths: Vec<String>) {
+    if let Some(app) = APP.get() {
+        let _ = app.emit(&format!("files:{kind}"), paths);
+    }
+}
+
 fn install_drop_target_now(w: &tauri::WebviewWindow) {
     #[cfg(target_os = "windows")]
     if let Ok(h) = w.hwnd() {
@@ -882,7 +888,9 @@ fn start_cursor_thread() {
         let mut catch_since: Option<std::time::Instant> = None;
         let mut origin: Option<(i32, i32, bool)> = None;
         let mut released_at: Option<std::time::Instant> = None;
-        let mut last_fix: Option<std::time::Instant> = None;
+        let mut last_inside = false;
+        let mut hover_on = false;
+        let mut fallback_done = false;
         loop {
             std::thread::sleep(std::time::Duration::from_millis(40));
             let Some((x, y)) = native::cursor_pos() else {
@@ -925,6 +933,10 @@ fn start_cursor_thread() {
                             Some(t) if t.elapsed().as_millis() >= 120 => {
                                 catch_since = None;
                                 cand = None;
+                                fallback_done = false;
+                                hover_on = false;
+                                last_inside = false;
+                                released_at = None;
                                 drop_line_ex(Deck::Clipboard, false, false);
                                 continue;
                             }
@@ -962,20 +974,36 @@ fn start_cursor_thread() {
                 // button is released without a drop landing on us (a drop
                 // clears CATCHING), go back up shortly after.
                 if CATCHING.load(Ordering::Relaxed) {
+                    let h = if deck == Deck::Notes { notes_h } else { clip_h };
+                    let inside = x >= left && x < left + width && y >= top && y < top + notes_h.max(h);
                     if winx::left_drag_info().is_some() {
                         released_at = None;
-                        // Nothing has reached our drop target yet: refresh it
-                        // and note what is under the cursor.
-                        if !winx::drop_entered()
-                            && last_fix.map(|t| t.elapsed().as_millis() > 300).unwrap_or(true)
-                        {
-                            last_fix = Some(std::time::Instant::now());
-                            winx::dlog(&format!("catch: waiting, under cursor {}", winx::window_under_cursor()));
-                            with_window(|w| install_drop_target_now(&w));
+                        last_inside = inside;
+                        // Highlight the zone from the cursor position, in case
+                        // the OLE drop target is not being fed.
+                        if inside != hover_on {
+                            hover_on = inside;
+                            emit_files(if inside { "over" } else { "leave" }, Vec::new());
                         }
                     } else {
                         let t = *released_at.get_or_insert_with(std::time::Instant::now);
-                        if t.elapsed().as_millis() > 1200 {
+                        let ms = t.elapsed().as_millis();
+                        // Released over the line but no OLE drop arrived:
+                        // fetch the dragged (= selected) items from Explorer.
+                        if ms >= 150 && last_inside && !fallback_done {
+                            fallback_done = true;
+                            if let Some((ox, oy, _)) = origin {
+                                winx::dlog("catch: released over the line without an OLE drop; asking Explorer");
+                                std::thread::spawn(move || {
+                                    let paths = winx::explorer_selection_at(ox, oy);
+                                    if CATCHING.load(Ordering::Relaxed) && !paths.is_empty() {
+                                        CATCHING.store(false, Ordering::Relaxed);
+                                        emit_files("drop", paths);
+                                    }
+                                });
+                            }
+                        }
+                        if ms > 1500 {
                             released_at = None;
                             winx::dlog("catch: released without a drop");
                             rollup();
@@ -983,6 +1011,9 @@ fn start_cursor_thread() {
                     }
                     continue;
                 }
+                fallback_done = false;
+                hover_on = false;
+                last_inside = false;
                 released_at = None;
                 if !sticky && !MODAL.load(Ordering::Relaxed) {
                     let h = if deck == Deck::Notes { notes_h } else { clip_h };

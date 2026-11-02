@@ -577,6 +577,98 @@ mod imp {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Fallback for the top-edge catch: when a drag from Explorer is released
+    // over the line but Windows never delivered it to our drop target, ask
+    // Explorer which items are selected in the window the drag began in —
+    // dragged items are always the selected ones.
+    // ------------------------------------------------------------------
+
+    pub fn explorer_selection_at(x: i32, y: i32) -> Vec<String> {
+        use windows::core::{Interface, VARIANT};
+        use windows::Win32::System::Com::{
+            CoCreateInstance, CoInitializeEx, CoTaskMemFree, IServiceProvider, CLSCTX_ALL,
+            COINIT_APARTMENTTHREADED,
+        };
+        use windows::Win32::UI::Shell::{
+            IFolderView2, IShellBrowser, IShellWindows, IWebBrowserApp, ShellWindows,
+            SIGDN_FILESYSPATH, SID_STopLevelBrowser, SWC_DESKTOP, SWFO_NEEDDISPATCH,
+        };
+        use windows::Win32::UI::WindowsAndMessaging::IsWindowVisible;
+
+        unsafe fn selection_of(disp: &windows::Win32::System::Com::IDispatch) -> Option<(HWND, Vec<String>)> {
+            let sp: IServiceProvider = disp.cast().ok()?;
+            let sb: IShellBrowser = sp.QueryService(&SID_STopLevelBrowser).ok()?;
+            let view = sb.QueryActiveShellView().ok()?;
+            let view_hwnd = view.GetWindow().unwrap_or_default();
+            let fv: IFolderView2 = view.cast().ok()?;
+            let arr = fv.GetSelection(false).ok()?;
+            let n = arr.GetCount().ok()?;
+            let mut out = Vec::new();
+            for i in 0..n {
+                if let Ok(item) = arr.GetItemAt(i) {
+                    if let Ok(p) = item.GetDisplayName(SIGDN_FILESYSPATH) {
+                        out.push(p.to_string().unwrap_or_default());
+                        CoTaskMemFree(Some(p.0 as *const _));
+                    }
+                }
+            }
+            out.retain(|s| !s.is_empty());
+            Some((view_hwnd, out))
+        }
+
+        // Run on a fresh STA thread so COM state never leaks into other threads.
+        std::thread::spawn(move || unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+            let h = WindowFromPoint(POINT { x, y });
+            let root = GetAncestor(h, GA_ROOT);
+            let mut buf = [0u16; 64];
+            let n = GetClassNameW(root, &mut buf).max(0) as usize;
+            let cls = String::from_utf16_lossy(&buf[..n]);
+            let Ok(sw) = CoCreateInstance::<_, IShellWindows>(&ShellWindows, None, CLSCTX_ALL) else {
+                dlog("selection: no ShellWindows");
+                return Vec::new();
+            };
+            if cls == "Progman" || cls == "WorkerW" {
+                let loc = VARIANT::from(0i32); // CSIDL_DESKTOP
+                let root_v = VARIANT::default();
+                let mut hw = 0i32;
+                if let Ok(d) = sw.FindWindowSW(&loc, &root_v, SWC_DESKTOP, &mut hw, SWFO_NEEDDISPATCH) {
+                    if let Some((_, v)) = selection_of(&d) {
+                        dlog(&format!("selection: desktop -> {} item(s)", v.len()));
+                        return v;
+                    }
+                }
+                return Vec::new();
+            }
+            // A folder window; with tabs several entries share the HWND —
+            // take the one whose view is visible.
+            let count = sw.Count().unwrap_or(0);
+            let mut fallback = Vec::new();
+            for i in 0..count {
+                let Ok(d) = sw.Item(&VARIANT::from(i)) else { continue };
+                let Ok(wb) = d.cast::<IWebBrowserApp>() else { continue };
+                let Ok(wh) = wb.HWND() else { continue };
+                if wh.0 as isize != root.0 as isize {
+                    continue;
+                }
+                if let Some((vh, v)) = selection_of(&d) {
+                    if IsWindowVisible(vh).as_bool() {
+                        dlog(&format!("selection: folder window -> {} item(s)", v.len()));
+                        return v;
+                    }
+                    if fallback.is_empty() {
+                        fallback = v;
+                    }
+                }
+            }
+            dlog(&format!("selection: fallback {} item(s) (class {cls})", fallback.len()));
+            fallback
+        })
+        .join()
+        .unwrap_or_default()
+    }
+
     /// Run a modal OLE drag of `text`, backed by `file` for Explorer drops.
     /// Must be called on the UI (main) thread. Returns true if dropped.
     pub fn drag_text(text: &str, file: &PathBuf) -> std::result::Result<bool, String> {
@@ -621,6 +713,9 @@ mod imp {
     pub fn reset_entered() {}
     pub fn window_under_cursor() -> String {
         String::new()
+    }
+    pub fn explorer_selection_at(_x: i32, _y: i32) -> Vec<String> {
+        Vec::new()
     }
 }
 
