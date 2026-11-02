@@ -10,8 +10,37 @@
 //!
 //! On other platforms everything here is a no-op stub.
 
+/// Diagnostic log, OFF by default. To turn it on, create an empty file
+/// named `clipline-debug.log` next to the exe (or set CLIPLINE_DEBUG=1);
+/// entries are then appended to it.
+pub fn dlog(msg: &str) {
+    use std::io::Write;
+    use std::sync::OnceLock;
+    static PATH: OnceLock<Option<std::path::PathBuf>> = OnceLock::new();
+    let path = PATH.get_or_init(|| {
+        let p = std::env::current_exe().ok()?.parent()?.join("clipline-debug.log");
+        if p.exists() || std::env::var_os("CLIPLINE_DEBUG").is_some() {
+            Some(p)
+        } else {
+            None
+        }
+    });
+    let Some(p) = path else { return };
+    if std::fs::metadata(p).map(|m| m.len() > 512 * 1024).unwrap_or(false) {
+        let _ = std::fs::write(p, b"");
+    }
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(p) {
+        let t = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() % 1_000_000)
+            .unwrap_or(0);
+        let _ = writeln!(f, "{t:>6} {msg}");
+    }
+}
+
 #[cfg(target_os = "windows")]
 mod imp {
+    use super::dlog;
     use std::os::windows::ffi::OsStrExt;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering::Relaxed};
@@ -30,9 +59,15 @@ mod imp {
     use windows::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
     use windows::Win32::System::Ole::{
-        DoDragDrop, IDropSource, IDropSource_Impl, OleInitialize, CF_UNICODETEXT, DROPEFFECT,
-        DROPEFFECT_COPY, DROPEFFECT_MOVE,
+        DoDragDrop, IDropSource, IDropSource_Impl, IDropTarget, IDropTarget_Impl, OleInitialize,
+        RegisterDragDrop, ReleaseStgMedium, RevokeDragDrop, CF_HDROP, CF_UNICODETEXT, DROPEFFECT,
+        DROPEFFECT_COPY, DROPEFFECT_MOVE, DROPEFFECT_NONE,
     };
+    use windows::Win32::Foundation::{BOOL as WBOOL, POINTL};
+    use windows::Win32::UI::Shell::{DragQueryFileW, HDROP};
+    use windows::Win32::UI::WindowsAndMessaging::EnumChildWindows;
+    use std::cell::{Cell, RefCell};
+    use std::sync::OnceLock;
     use windows::Win32::Foundation::CloseHandle;
     use windows::Win32::System::Threading::{
         OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
@@ -129,13 +164,35 @@ mod imp {
         });
     }
 
-    /// Is the window under the cursor Explorer (a folder window or the desktop)?
+    static DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
+    static LAST_EXPLORER: AtomicBool = AtomicBool::new(false);
+
+    /// Is the drop target Explorer? Live while our drag runs; afterwards the
+    /// last answer is frozen, because Explorer copies on a background thread
+    /// and reads the data *after* the drop, when the cursor may be elsewhere.
     fn cursor_over_explorer() -> bool {
-        unsafe {
+        if !DRAG_ACTIVE.load(Relaxed) {
+            return LAST_EXPLORER.load(Relaxed);
+        }
+        let v = unsafe {
             let mut p = POINT::default();
             if GetCursorPos(&mut p).is_err() {
-                return false;
+                false
+            } else {
+                point_is_explorer(p)
             }
+        };
+        LAST_EXPLORER.store(v, Relaxed);
+        v
+    }
+
+    /// Does the window at screen point `p` belong to Explorer / the desktop?
+    pub fn point_is_explorer_xy(x: i32, y: i32) -> bool {
+        unsafe { point_is_explorer(POINT { x, y }) }
+    }
+
+    unsafe fn point_is_explorer(p: POINT) -> bool {
+        {
             let h = WindowFromPoint(p);
             if h.0.is_null() {
                 return false;
@@ -224,6 +281,13 @@ mod imp {
         file: IDataObject,  // shell data object for the temp .txt/.md
     }
 
+    fn fcf(f: *const FORMATETC) -> u16 {
+        unsafe { f.as_ref().map(|f| f.cfFormat).unwrap_or(0) }
+    }
+    fn ftymed(f: *const FORMATETC) -> u32 {
+        unsafe { f.as_ref().map(|f| f.tymed).unwrap_or(0) }
+    }
+
     fn is_text(f: *const FORMATETC) -> bool {
         match unsafe { f.as_ref() } {
             Some(f) => {
@@ -264,6 +328,7 @@ mod imp {
 
     impl IDataObject_Impl for TextData_Impl {
         fn GetData(&self, f: *const FORMATETC) -> Result<STGMEDIUM> {
+            dlog(&format!("GetData cf={} tymed={}", fcf(f), ftymed(f)));
             if cursor_over_explorer() {
                 return unsafe { self.file.GetData(f) };
             }
@@ -281,14 +346,16 @@ mod imp {
         }
 
         fn QueryGetData(&self, f: *const FORMATETC) -> windows::core::HRESULT {
-            if cursor_over_explorer() {
-                return unsafe { self.file.QueryGetData(f) };
-            }
-            if is_text(f) {
+            let ex = cursor_over_explorer();
+            let r = if ex {
+                unsafe { self.file.QueryGetData(f) }
+            } else if is_text(f) {
                 S_OK
             } else {
                 DV_E_FORMATETC
-            }
+            };
+            dlog(&format!("QueryGetData cf={} tymed={} explorer={} -> {:#x}", fcf(f), ftymed(f), ex, r.0));
+            r
         }
 
         fn GetCanonicalFormatEtc(
@@ -307,17 +374,33 @@ mod imp {
         }
 
         fn EnumFormatEtc(&self, dir: u32) -> Result<IEnumFORMATETC> {
-            if cursor_over_explorer() {
-                return unsafe { self.file.EnumFormatEtc(dir) };
+            // OLE asks this ONCE when the drag starts (cursor still over us)
+            // and caches the list for every other process. So always list
+            // everything — the file formats AND text — and filter in GetData.
+            dlog(&format!("EnumFormatEtc dir={dir}"));
+            let mut all: Vec<FORMATETC> = Vec::new();
+            unsafe {
+                if let Ok(e) = self.file.EnumFormatEtc(dir) {
+                    loop {
+                        let mut one = [FORMATETC::default()];
+                        let mut got = 0u32;
+                        if e.Next(&mut one, Some(&mut got)) != S_OK || got == 0 {
+                            break;
+                        }
+                        one[0].ptd = std::ptr::null_mut();
+                        all.push(one[0]);
+                    }
+                }
+                all.push(FORMATETC {
+                    cfFormat: CF_UNICODETEXT.0,
+                    ptd: std::ptr::null_mut(),
+                    dwAspect: DVASPECT_CONTENT.0,
+                    lindex: -1,
+                    tymed: TYMED_HGLOBAL.0 as u32,
+                });
+                dlog(&format!("  advertised {} formats", all.len()));
+                SHCreateStdEnumFmtEtc(&all)
             }
-            let fmt = FORMATETC {
-                cfFormat: CF_UNICODETEXT.0,
-                ptd: std::ptr::null_mut(),
-                dwAspect: DVASPECT_CONTENT.0,
-                lindex: -1,
-                tymed: TYMED_HGLOBAL.0 as u32,
-            };
-            unsafe { SHCreateStdEnumFmtEtc(&[fmt]) }
         }
 
         fn DAdvise(&self, _f: *const FORMATETC, _a: u32, _s: Option<&IAdviseSink>) -> Result<u32> {
@@ -331,6 +414,264 @@ mod imp {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Our own drop target for the line window (wry registers one only once,
+    // at creation; it goes stale after the window is hidden and shown).
+    // ------------------------------------------------------------------
+
+    static ENTERED: AtomicBool = AtomicBool::new(false);
+    pub fn drop_entered() -> bool {
+        ENTERED.load(Relaxed)
+    }
+    pub fn reset_entered() {
+        ENTERED.store(false, Relaxed);
+    }
+
+    /// For diagnostics: "child-class / root-class" of the window under the cursor.
+    pub fn window_under_cursor() -> String {
+        unsafe {
+            let mut p = POINT::default();
+            let _ = GetCursorPos(&mut p);
+            let h = WindowFromPoint(p);
+            let root = GetAncestor(h, GA_ROOT);
+            let mut a = [0u16; 64];
+            let mut b = [0u16; 64];
+            let na = GetClassNameW(h, &mut a).max(0) as usize;
+            let nb = GetClassNameW(root, &mut b).max(0) as usize;
+            format!(
+                "({},{}) {} / {}",
+                p.x,
+                p.y,
+                String::from_utf16_lossy(&a[..na]),
+                String::from_utf16_lossy(&b[..nb])
+            )
+        }
+    }
+
+    type DropCb = Box<dyn Fn(&'static str, Vec<String>) + Send + Sync>;
+    static DROP_CB: OnceLock<DropCb> = OnceLock::new();
+
+    pub fn set_drop_callback(f: DropCb) {
+        let _ = DROP_CB.set(f);
+    }
+
+    fn emit_drop(kind: &'static str, paths: Vec<String>) {
+        if let Some(cb) = DROP_CB.get() {
+            cb(kind, paths);
+        }
+    }
+
+    unsafe fn read_hdrop(obj: &IDataObject) -> Vec<String> {
+        let fmt = FORMATETC {
+            cfFormat: CF_HDROP.0,
+            ptd: std::ptr::null_mut(),
+            dwAspect: DVASPECT_CONTENT.0,
+            lindex: -1,
+            tymed: TYMED_HGLOBAL.0 as u32,
+        };
+        let Ok(mut med) = obj.GetData(&fmt) else {
+            return Vec::new();
+        };
+        let h = HDROP(med.u.hGlobal.0);
+        let n = DragQueryFileW(h, 0xFFFF_FFFF, None);
+        let mut out = Vec::new();
+        for i in 0..n {
+            let len = DragQueryFileW(h, i, None) as usize;
+            let mut buf = vec![0u16; len + 1];
+            let got = DragQueryFileW(h, i, Some(&mut buf)) as usize;
+            out.push(String::from_utf16_lossy(&buf[..got.min(len)]));
+        }
+        ReleaseStgMedium(&mut med);
+        out
+    }
+
+    #[implement(IDropTarget)]
+    struct FileDrop {
+        ok: Cell<bool>,
+    }
+
+    impl IDropTarget_Impl for FileDrop_Impl {
+        fn DragEnter(
+            &self,
+            obj: Option<&IDataObject>,
+            _k: MODIFIERKEYS_FLAGS,
+            _pt: &POINTL,
+            eff: *mut DROPEFFECT,
+        ) -> Result<()> {
+            let paths = obj.map(|o| unsafe { read_hdrop(o) }).unwrap_or_default();
+            let ok = !paths.is_empty();
+            self.ok.set(ok);
+            dlog(&format!("droptarget enter files={}", paths.len()));
+            unsafe { *eff = if ok { DROPEFFECT_COPY } else { DROPEFFECT_NONE } };
+            if ok {
+                ENTERED.store(true, Relaxed);
+                emit_drop("enter", paths);
+            }
+            Ok(())
+        }
+        fn DragOver(&self, _k: MODIFIERKEYS_FLAGS, _pt: &POINTL, eff: *mut DROPEFFECT) -> Result<()> {
+            unsafe { *eff = if self.ok.get() { DROPEFFECT_COPY } else { DROPEFFECT_NONE } };
+            if self.ok.get() {
+                emit_drop("over", Vec::new());
+            }
+            Ok(())
+        }
+        fn DragLeave(&self) -> Result<()> {
+            if self.ok.get() {
+                emit_drop("leave", Vec::new());
+            }
+            self.ok.set(false);
+            Ok(())
+        }
+        fn Drop(
+            &self,
+            obj: Option<&IDataObject>,
+            _k: MODIFIERKEYS_FLAGS,
+            _pt: &POINTL,
+            eff: *mut DROPEFFECT,
+        ) -> Result<()> {
+            let paths = obj.map(|o| unsafe { read_hdrop(o) }).unwrap_or_default();
+            dlog(&format!("droptarget drop files={}", paths.len()));
+            self.ok.set(false);
+            unsafe { *eff = if paths.is_empty() { DROPEFFECT_NONE } else { DROPEFFECT_COPY } };
+            if !paths.is_empty() {
+                emit_drop("drop", paths);
+            }
+            Ok(())
+        }
+    }
+
+    thread_local! {
+        static TARGETS: RefCell<Vec<IDropTarget>> = RefCell::new(Vec::new());
+    }
+
+    unsafe extern "system" fn collect_child(h: HWND, l: LPARAM) -> WBOOL {
+        let v = &mut *(l.0 as *mut Vec<HWND>);
+        v.push(h);
+        WBOOL(1)
+    }
+
+    /// (Re)register our drop target on the window and all its children.
+    /// Must run on the window's (main) thread.
+    pub fn install_drop_target(parent: isize) {
+        init_ole();
+        unsafe {
+            let parent = HWND(parent as *mut core::ffi::c_void);
+            let mut hwnds: Vec<HWND> = vec![parent];
+            let _ = EnumChildWindows(
+                parent,
+                Some(collect_child),
+                LPARAM(&mut hwnds as *mut Vec<HWND> as isize),
+            );
+            let mut n = 0;
+            TARGETS.with(|t| {
+                let mut t = t.borrow_mut();
+                t.clear();
+                for h in hwnds {
+                    let target: IDropTarget = FileDrop { ok: Cell::new(false) }.into();
+                    let _ = RevokeDragDrop(h);
+                    if RegisterDragDrop(h, &target).is_ok() {
+                        n += 1;
+                        t.push(target);
+                    }
+                }
+            });
+            dlog(&format!("drop target installed on {n} window(s)"));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Fallback for the top-edge catch: when a drag from Explorer is released
+    // over the line but Windows never delivered it to our drop target, ask
+    // Explorer which items are selected in the window the drag began in —
+    // dragged items are always the selected ones.
+    // ------------------------------------------------------------------
+
+    pub fn explorer_selection_at(x: i32, y: i32) -> Vec<String> {
+        use windows::core::{Interface, VARIANT};
+        use windows::Win32::System::Com::{
+            CoCreateInstance, CoInitializeEx, CoTaskMemFree, IServiceProvider, CLSCTX_ALL,
+            COINIT_APARTMENTTHREADED,
+        };
+        use windows::Win32::UI::Shell::{
+            IFolderView2, IShellBrowser, IShellWindows, IWebBrowserApp, ShellWindows,
+            SIGDN_FILESYSPATH, SID_STopLevelBrowser, SWC_DESKTOP, SWFO_NEEDDISPATCH,
+        };
+        use windows::Win32::UI::WindowsAndMessaging::IsWindowVisible;
+
+        unsafe fn selection_of(disp: &windows::Win32::System::Com::IDispatch) -> Option<(HWND, Vec<String>)> {
+            let sp: IServiceProvider = disp.cast().ok()?;
+            let sb: IShellBrowser = sp.QueryService(&SID_STopLevelBrowser).ok()?;
+            let view = sb.QueryActiveShellView().ok()?;
+            let view_hwnd = view.GetWindow().unwrap_or_default();
+            let fv: IFolderView2 = view.cast().ok()?;
+            let arr = fv.GetSelection(false).ok()?;
+            let n = arr.GetCount().ok()?;
+            let mut out = Vec::new();
+            for i in 0..n {
+                if let Ok(item) = arr.GetItemAt(i) {
+                    if let Ok(p) = item.GetDisplayName(SIGDN_FILESYSPATH) {
+                        out.push(p.to_string().unwrap_or_default());
+                        CoTaskMemFree(Some(p.0 as *const _));
+                    }
+                }
+            }
+            out.retain(|s| !s.is_empty());
+            Some((view_hwnd, out))
+        }
+
+        // Run on a fresh STA thread so COM state never leaks into other threads.
+        std::thread::spawn(move || unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+            let h = WindowFromPoint(POINT { x, y });
+            let root = GetAncestor(h, GA_ROOT);
+            let mut buf = [0u16; 64];
+            let n = GetClassNameW(root, &mut buf).max(0) as usize;
+            let cls = String::from_utf16_lossy(&buf[..n]);
+            let Ok(sw) = CoCreateInstance::<_, IShellWindows>(&ShellWindows, None, CLSCTX_ALL) else {
+                dlog("selection: no ShellWindows");
+                return Vec::new();
+            };
+            if cls == "Progman" || cls == "WorkerW" {
+                let loc = VARIANT::from(0i32); // CSIDL_DESKTOP
+                let root_v = VARIANT::default();
+                let mut hw = 0i32;
+                if let Ok(d) = sw.FindWindowSW(&loc, &root_v, SWC_DESKTOP, &mut hw, SWFO_NEEDDISPATCH) {
+                    if let Some((_, v)) = selection_of(&d) {
+                        dlog(&format!("selection: desktop -> {} item(s)", v.len()));
+                        return v;
+                    }
+                }
+                return Vec::new();
+            }
+            // A folder window; with tabs several entries share the HWND —
+            // take the one whose view is visible.
+            let count = sw.Count().unwrap_or(0);
+            let mut fallback = Vec::new();
+            for i in 0..count {
+                let Ok(d) = sw.Item(&VARIANT::from(i)) else { continue };
+                let Ok(wb) = d.cast::<IWebBrowserApp>() else { continue };
+                let Ok(wh) = wb.HWND() else { continue };
+                if wh.0 as isize != root.0 as isize {
+                    continue;
+                }
+                if let Some((vh, v)) = selection_of(&d) {
+                    if IsWindowVisible(vh).as_bool() {
+                        dlog(&format!("selection: folder window -> {} item(s)", v.len()));
+                        return v;
+                    }
+                    if fallback.is_empty() {
+                        fallback = v;
+                    }
+                }
+            }
+            dlog(&format!("selection: fallback {} item(s) (class {cls})", fallback.len()));
+            fallback
+        })
+        .join()
+        .unwrap_or_default()
+    }
+
     /// Run a modal OLE drag of `text`, backed by `file` for Explorer drops.
     /// Must be called on the UI (main) thread. Returns true if dropped.
     pub fn drag_text(text: &str, file: &PathBuf) -> std::result::Result<bool, String> {
@@ -339,11 +680,16 @@ mod imp {
         wtext.push(0);
         let wfile: Vec<u16> = file.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
         unsafe {
-            let file = shell_file_object(&wfile).map_err(|e| e.to_string())?;
+            dlog(&format!("drag_text start, file={}", file.display()));
+            LAST_EXPLORER.store(false, Relaxed);
+            DRAG_ACTIVE.store(true, Relaxed);
+            let file = shell_file_object(&wfile).map_err(|e| { dlog(&format!("shell_file_object failed: {e}")); e.to_string() })?;
             let data: IDataObject = TextData { text: wtext, file }.into();
             let src: IDropSource = DropSource.into();
             let mut eff = DROPEFFECT::default();
             let hr = DoDragDrop(&data, &src, DROPEFFECT_COPY | DROPEFFECT_MOVE, &mut eff);
+            DRAG_ACTIVE.store(false, Relaxed);
+            dlog(&format!("DoDragDrop -> {:#x}, effect={}", hr.0, eff.0));
             Ok(hr == DRAGDROP_S_DROP)
         }
     }
@@ -358,6 +704,21 @@ mod imp {
     }
     pub fn drag_text(_text: &str, _file: &PathBuf) -> Result<bool, String> {
         Err("text drag is only available on Windows".into())
+    }
+    pub fn point_is_explorer_xy(_x: i32, _y: i32) -> bool {
+        false
+    }
+    pub fn set_drop_callback(_f: Box<dyn Fn(&'static str, Vec<String>) + Send + Sync>) {}
+    pub fn install_drop_target(_parent: isize) {}
+    pub fn drop_entered() -> bool {
+        false
+    }
+    pub fn reset_entered() {}
+    pub fn window_under_cursor() -> String {
+        String::new()
+    }
+    pub fn explorer_selection_at(_x: i32, _y: i32) -> Vec<String> {
+        Vec::new()
     }
 }
 

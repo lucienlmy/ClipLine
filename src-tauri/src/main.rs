@@ -311,6 +311,19 @@ fn drop_line_ex(deck: Deck, sticky: bool, focus: bool) {
         if focus {
             let _ = w.set_focus();
         }
+        // Fresh drop target every time (the webview's own one goes stale
+        // once the window has been hidden).
+        install_drop_target_now(&w);
+    });
+    // WebView2 may (re)create its child windows a moment after showing;
+    // register again shortly after so none of them is missed.
+    std::thread::spawn(|| {
+        for ms in [200u64, 700] {
+            std::thread::sleep(std::time::Duration::from_millis(ms));
+            if STATE.lock().unwrap().dropped {
+                with_window(|w| install_drop_target_now(&w));
+            }
+        }
     });
     if let Some(app) = APP.get() {
         let _ = app.emit(
@@ -321,13 +334,37 @@ fn drop_line_ex(deck: Deck, sticky: bool, focus: bool) {
             },
         );
         if !focus {
+            winx::reset_entered();
+            winx::dlog(&format!("catch: line dropped; cursor {}", winx::window_under_cursor()));
             CATCHING.store(true, Ordering::Relaxed);
             let _ = app.emit("line:catch", ());
         }
     }
 }
 
+fn emit_files(kind: &str, paths: Vec<String>) {
+    if let Some(app) = APP.get() {
+        let _ = app.emit(&format!("files:{kind}"), paths);
+    }
+}
+
+fn install_drop_target_now(w: &tauri::WebviewWindow) {
+    #[cfg(target_os = "windows")]
+    if let Ok(h) = w.hwnd() {
+        winx::install_drop_target(h.0 as isize);
+    }
+    #[cfg(not(target_os = "windows"))]
+    let _ = w;
+}
+
 fn rollup() {
+    rollup_ex(true);
+}
+
+/// `restore = false` after dropping something into another app: that app
+/// should keep the focus.
+fn rollup_ex(restore: bool) {
+    winx::dlog("rollup");
     {
         let mut st = STATE.lock().unwrap();
         if !st.dropped {
@@ -339,7 +376,9 @@ fn rollup() {
     if let Some(app) = APP.get() {
         let _ = app.emit("line:rollup", ());
     }
-    native::restore_foreground();
+    if restore {
+        native::restore_foreground();
+    }
 }
 
 fn toggle_deck(deck: Deck) {
@@ -381,7 +420,13 @@ fn set_passthrough(on: bool) {
 
 #[tauri::command]
 fn rollup_now() {
+    winx::dlog("rollup_now (frontend)");
     rollup();
+}
+
+#[tauri::command]
+fn dbg_log(msg: String) {
+    winx::dlog(&format!("[ui] {msg}"));
 }
 
 #[tauri::command]
@@ -427,7 +472,7 @@ async fn drag_text(app: AppHandle, text: String) -> Result<bool, String> {
     })
     .map_err(|e| e.to_string())?;
     let r = rx.recv().map_err(|e| e.to_string())?;
-    rollup();
+    rollup_ex(false);
     r
 }
 
@@ -841,6 +886,11 @@ fn start_cursor_thread() {
     std::thread::spawn(|| {
         let mut cand: Option<(Deck, std::time::Instant)> = None;
         let mut catch_since: Option<std::time::Instant> = None;
+        let mut origin: Option<(i32, i32, bool)> = None;
+        let mut released_at: Option<std::time::Instant> = None;
+        let mut last_inside = false;
+        let mut hover_on = false;
+        let mut fallback_done = false;
         loop {
             std::thread::sleep(std::time::Duration::from_millis(40));
             let Some((x, y)) = native::cursor_pos() else {
@@ -869,11 +919,24 @@ fn start_cursor_thread() {
             if !dropped && hang && x >= left && x < left + width && y <= top + 2 {
                 if let Some((dx, dy, age)) = winx::left_drag_info() {
                     let travelled = (dx - x).abs() + (dy - y).abs();
-                    if dy > top + 60 && travelled > 40 && age > 150 {
+                    // Only drags that began in Explorer / on the desktop.
+                    let from_explorer = match origin {
+                        Some((ox, oy, v)) if ox == dx && oy == dy => v,
+                        _ => {
+                            let v = winx::point_is_explorer_xy(dx, dy);
+                            origin = Some((dx, dy, v));
+                            v
+                        }
+                    };
+                    if from_explorer && dy > top + 60 && travelled > 40 && age > 150 {
                         match catch_since {
                             Some(t) if t.elapsed().as_millis() >= 120 => {
                                 catch_since = None;
                                 cand = None;
+                                fallback_done = false;
+                                hover_on = false;
+                                last_inside = false;
+                                released_at = None;
                                 drop_line_ex(Deck::Clipboard, false, false);
                                 continue;
                             }
@@ -907,10 +970,52 @@ fn start_cursor_thread() {
                 }
             } else {
                 cand = None;
-                // While a caught file drag is still in the air, stay down
-                // wherever the pointer wanders; the frontend decides.
-                let carrying = CATCHING.load(Ordering::Relaxed) && winx::left_drag_info().is_some();
-                if !sticky && !MODAL.load(Ordering::Relaxed) && !carrying {
+                // Caught a drag: stay down while it is in the air. Once the
+                // button is released without a drop landing on us (a drop
+                // clears CATCHING), go back up shortly after.
+                if CATCHING.load(Ordering::Relaxed) {
+                    let h = if deck == Deck::Notes { notes_h } else { clip_h };
+                    let inside = x >= left && x < left + width && y >= top && y < top + notes_h.max(h);
+                    if winx::left_drag_info().is_some() {
+                        released_at = None;
+                        last_inside = inside;
+                        // Highlight the zone from the cursor position, in case
+                        // the OLE drop target is not being fed.
+                        if inside != hover_on {
+                            hover_on = inside;
+                            emit_files(if inside { "over" } else { "leave" }, Vec::new());
+                        }
+                    } else {
+                        let t = *released_at.get_or_insert_with(std::time::Instant::now);
+                        let ms = t.elapsed().as_millis();
+                        // Released over the line but no OLE drop arrived:
+                        // fetch the dragged (= selected) items from Explorer.
+                        if ms >= 150 && last_inside && !fallback_done {
+                            fallback_done = true;
+                            if let Some((ox, oy, _)) = origin {
+                                winx::dlog("catch: released over the line without an OLE drop; asking Explorer");
+                                std::thread::spawn(move || {
+                                    let paths = winx::explorer_selection_at(ox, oy);
+                                    if CATCHING.load(Ordering::Relaxed) && !paths.is_empty() {
+                                        CATCHING.store(false, Ordering::Relaxed);
+                                        emit_files("drop", paths);
+                                    }
+                                });
+                            }
+                        }
+                        if ms > 1500 {
+                            released_at = None;
+                            winx::dlog("catch: released without a drop");
+                            rollup();
+                        }
+                    }
+                    continue;
+                }
+                fallback_done = false;
+                hover_on = false;
+                last_inside = false;
+                released_at = None;
+                if !sticky && !MODAL.load(Ordering::Relaxed) {
                     let h = if deck == Deck::Notes { notes_h } else { clip_h };
                     if y > top + h + 12 {
                         rollup();
@@ -980,6 +1085,11 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 
 fn main() {
     tauri::Builder::default()
+        .on_window_event(|w, e| {
+            if let tauri::WindowEvent::DragDrop(d) = e {
+                winx::dlog(&format!("[rust] window {} drag event: {:?}", w.label(), d));
+            }
+        })
         .plugin(tauri_plugin_drag::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -1005,6 +1115,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             set_passthrough,
             drag_text,
+            dbg_log,
             rollup_now,
             toggle,
             copy_text,
@@ -1058,6 +1169,15 @@ fn main() {
             }
 
             native::start_clipboard_watch(handle.clone());
+            {
+                let h = handle.clone();
+                winx::set_drop_callback(Box::new(move |kind, paths| {
+                    if kind == "drop" {
+                        CATCHING.store(false, Ordering::Relaxed);
+                    }
+                    let _ = h.emit(&format!("files:{kind}"), paths);
+                }));
+            }
             winx::start_mouse_hook();
             start_cursor_thread();
             start_folder_watch();
