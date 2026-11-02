@@ -19,7 +19,7 @@ function refreshModal() {
 const I18N = {
   zh: {
     all: "全部", text: "文字", link: "链接", color: "颜色", image: "图片", file: "文件",
-    search: "搜索…", copied: "已复制", editText: "编辑文字", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
+    search: "搜索…", copied: "已复制", editText: "编辑文字", already: "已在绳上，已移到最前", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
     emptyClip: "绳上还空着 — 复制点什么试试",
     emptyNotes: "绳上还没有便签 — 点上方的 + 写一张",
     plus: "新建便签", gear: "设置", prev: "上一屏", next: "下一屏", pinOnly: "只看钉住的",
@@ -57,7 +57,7 @@ const I18N = {
   },
   en: {
     all: "All", text: "Text", link: "Link", color: "Color", image: "Image", file: "File",
-    search: "Search…", copied: "Copied", editText: "Edit text", pasteBack: "Paste into previous app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
+    search: "Search…", copied: "Copied", editText: "Edit text", already: "Already on the line — moved to front", pasteBack: "Paste into previous app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
     emptyClip: "The line is empty — copy something",
     emptyNotes: "No notes yet — click + above to write one",
     plus: "New note", gear: "Settings", prev: "Previous", next: "Next", pinOnly: "Pinned only",
@@ -208,8 +208,12 @@ function classify(text) {
 /* ---------- add from clipboard ---------- */
 function clipSig(it) {
   if (it.vis === "image" || it.kind === "image") return "img:" + (it.thumb || it.path || "");
-  if (it.vis === "file" || it.kind === "file") return "file:" + ((it.files || []).join("|"));
+  if (it.vis === "file" || it.kind === "file") return "file:" + normPaths(it.files);
   return "txt:" + (it.text || "");
+}
+/* Same file set regardless of order, letter case or trailing slashes. */
+function normPaths(list) {
+  return (list || []).map((p) => String(p).trim().replace(/[\\/]+$/, "").replace(/\//g, "\\").toLowerCase()).sort().join("|");
 }
 function addClip(item) {
   if (item.kind === "text") item.vis = classify(item.text || "");
@@ -444,6 +448,10 @@ function copyClip(item, card) {
 
 /* ---------- drag out (card -> other apps / folders) ---------- */
 let suppressClickUntil = 0;
+/* While one of our own cards is being dragged out, a drop that lands back on
+   the line is our own drag — never hang it again. */
+let selfDragUntil = 0;
+function selfDragging() { return Date.now() < selfDragUntil; }
 function dragSuppressed() { return Date.now() < suppressClickUntil; }
 function attachDragOut(card, item) {
   let sx = 0, sy = 0, armed = false, started = false;
@@ -456,7 +464,9 @@ function attachDragOut(card, item) {
       // Text: Explorer gets a .txt/.md file, any other app gets the text.
       if (!(item.text || "").length) return;
       suppressClickUntil = Date.now() + 500;
-      invoke("drag_text", { text: item.text }).catch((err) => toast(t("dragFail") + err));
+      selfDragUntil = Date.now() + 60000;
+      invoke("drag_text", { text: item.text }).catch((err) => toast(t("dragFail") + err))
+        .finally(() => { selfDragUntil = Date.now() + 400; });
       return;
     }
     const paths = item.vis === "image" ? (item.path ? [item.path] : []) : (item.files || []);
@@ -464,12 +474,14 @@ function attachDragOut(card, item) {
     const icon = item.vis === "image" ? (item.thumb || DRAG_ICON) : DRAG_ICON;
     const mode = e.shiftKey ? "move" : "copy"; // Windows: Shift = move, default = copy
     suppressClickUntil = Date.now() + 500;
+    selfDragUntil = Date.now() + 60000;
     try {
       window.__TAURI__.drag.startDrag({ item: paths, icon, mode }, () => {
+        selfDragUntil = Date.now() + 400;
         // Drag finished (dropped or cancelled) — get the line out of the way.
         invoke("rollup_now").catch(() => {});
       });
-    } catch (err) {}
+    } catch (err) { selfDragUntil = 0; }
   });
   card.addEventListener("pointerup", () => { armed = false; });
   card.addEventListener("pointercancel", () => { armed = false; });
@@ -556,6 +568,19 @@ function applyReorder(from, to) {
 /* ---------- drag in (files dropped onto the line) ---------- */
 function addDroppedFiles(paths) {
   if (!paths || !paths.length) return;
+  // Already on the line (same files) → don't hang a second copy; bring the
+  // existing card to the front instead.
+  const sig = "file:" + normPaths(paths);
+  const idx = state.clips.findIndex((c) => clipSig(c) === sig);
+  if (idx >= 0) {
+    const old = state.clips.splice(idx, 1)[0];
+    old.ts = Date.now();
+    state.clips.unshift(old); save();
+    if (ui.deck !== "clipboard") setDeck("clipboard");
+    if (!stage.classList.contains("up")) render();
+    toast(t("already"));
+    return;
+  }
   const item = { id: "f" + Date.now() + "-" + Math.floor(Math.random() * 1e6), kind: "file", vis: "file", files: paths.slice(), text: paths.join("\n"), pinned: false, ts: Date.now() };
   state.clips.unshift(item); cleanup(); save();
   if (ui.deck !== "clipboard") setDeck("clipboard");
@@ -1125,6 +1150,7 @@ async function wire() {
   await listen("files:leave", () => stage.classList.remove("catch-over"));
   await listen("files:drop", (ev) => {
     stopCatch();
+    if (selfDragging()) return; // our own card dropped back on the line
     const paths = Array.isArray(ev.payload) ? ev.payload : [];
     if (paths.length) addDroppedFiles(paths);
   });
