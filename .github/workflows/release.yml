@@ -12,6 +12,10 @@ on:
         description: "Create a draft release (tag = v + version in tauri.conf.json)"
         type: boolean
         default: true
+      publish:
+        description: "Publish it right away (otherwise it stays a draft)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -56,11 +60,18 @@ jobs:
           name: ClipLine-windows
           path: dist/*.exe
 
+      - name: Tag this commit
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release
+        shell: bash
+        run: |
+          git tag -f "v${VERSION}" "${GITHUB_SHA}"
+          git push -f origin "refs/tags/v${VERSION}"
+
       - name: Draft GitHub release
         if: startsWith(github.ref, 'refs/tags/') || inputs.release
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          draft: ${{ !inputs.publish }}
           tag_name: v${{ env.VERSION }}
           target_commitish: ${{ github.sha }}
           name: ClipLine v${{ env.VERSION }}
