@@ -13,9 +13,16 @@
 /// Diagnostic log: %TEMP%\\ClipLine\\debug.log (kept small).
 pub fn dlog(msg: &str) {
     use std::io::Write;
-    let dir = std::env::temp_dir().join("ClipLine");
-    let _ = std::fs::create_dir_all(&dir);
-    let p = dir.join("debug.log");
+    // Next to the exe (so it is easy to find); fall back to %TEMP%\\ClipLine.
+    let p = std::env::current_exe()
+        .ok()
+        .and_then(|e| e.parent().map(|d| d.join("clipline-debug.log")))
+        .filter(|p| std::fs::OpenOptions::new().create(true).append(true).open(p).is_ok())
+        .unwrap_or_else(|| {
+            let dir = std::env::temp_dir().join("ClipLine");
+            let _ = std::fs::create_dir_all(&dir);
+            dir.join("clipline-debug.log")
+        });
     if std::fs::metadata(&p).map(|m| m.len() > 512 * 1024).unwrap_or(false) {
         let _ = std::fs::remove_file(&p);
     }
