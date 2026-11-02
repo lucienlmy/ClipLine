@@ -17,17 +17,17 @@
 }
 
 /* ---------- themes ---------- */
-#stage[data-theme="silver"] { --rope: #9aa0a8; --peg-grad: linear-gradient(#f2f3f5, #b4b9c0); --pin-grad: radial-gradient(circle at 50% 35%, #eef0f3, #9aa0a8); --wood-grad: linear-gradient(#e8eaee, #aeb4bc); }
-#stage[data-theme="linen"] { --rope: #b8a07a; --peg-grad: linear-gradient(#ead8b2, #c3a570); --pin-grad: radial-gradient(circle at 50% 35%, #efe0bf, #b08d52); --wood-grad: linear-gradient(#e2cfa4, #b89a6e); }
-#stage[data-theme="porcelain"] { --rope: #d7d7db; --peg-grad: linear-gradient(#ffffff, #e4e4e8); --pin-grad: radial-gradient(circle at 50% 35%, #ffffff, #cfcfd6); --wood-grad: linear-gradient(#f6f6f8, #dcdce1); }
-#stage[data-theme="graphite"] { --rope: #4a4e56; --peg-grad: linear-gradient(#5c616a, #2e323a); --pin-grad: radial-gradient(circle at 50% 35%, #6b7079, #23262c); --wood-grad: linear-gradient(#53575f, #2b2e34); }
+#stage[data-theme="silver"], .theme-thumb[data-theme="silver"] { --rope: #9aa0a8; --peg-grad: linear-gradient(#f2f3f5, #b4b9c0); --pin-grad: radial-gradient(circle at 50% 35%, #eef0f3, #9aa0a8); --wood-grad: linear-gradient(#e8eaee, #aeb4bc); }
+#stage[data-theme="linen"], .theme-thumb[data-theme="linen"] { --rope: #b8a07a; --peg-grad: linear-gradient(#ead8b2, #c3a570); --pin-grad: radial-gradient(circle at 50% 35%, #efe0bf, #b08d52); --wood-grad: linear-gradient(#e2cfa4, #b89a6e); }
+#stage[data-theme="porcelain"], .theme-thumb[data-theme="porcelain"] { --rope: #d7d7db; --peg-grad: linear-gradient(#ffffff, #e4e4e8); --pin-grad: radial-gradient(circle at 50% 35%, #ffffff, #cfcfd6); --wood-grad: linear-gradient(#f6f6f8, #dcdce1); }
+#stage[data-theme="graphite"], .theme-thumb[data-theme="graphite"] { --rope: #4a4e56; --peg-grad: linear-gradient(#5c616a, #2e323a); --pin-grad: radial-gradient(circle at 50% 35%, #6b7079, #23262c); --wood-grad: linear-gradient(#53575f, #2b2e34); }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
 html, body {
   width: 100%; height: 100%;
   background: transparent;
   overflow: hidden;
-  font-family: -apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  font-family: var(--app-font, -apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif);
   color: var(--ink);
   cursor: default;
 }
@@ -98,10 +98,10 @@ html, body {
 .card:hover .card-body { transform: translateY(-3px); box-shadow: 0 12px 24px rgba(50,40,30,0.22); }
 
 /* card content */
-.c-text { padding: 12px 13px; height: 150px; font-size: 13px; line-height: 1.5; color: var(--ink);
+.c-text { padding: 12px 13px; height: 150px; font-size: calc(13px * var(--fs, 1)); line-height: 1.5; color: var(--ink);
   overflow: hidden; white-space: pre-wrap; word-break: break-word; }
 .c-text.code { font-family: "Cascadia Code", "Consolas", monospace; font-size: 12px; background: #f3f1ec; }
-.c-link { padding: 12px 13px; height: 150px; font-size: 13px; overflow: hidden; }
+.c-link { padding: 12px 13px; height: 150px; font-size: calc(13px * var(--fs, 1)); overflow: hidden; }
 .c-link .u { color: var(--clay); text-decoration: underline; word-break: break-all; }
 .c-link .host { margin-top: 8px; font-size: 11px; color: var(--ink-soft); }
 .c-color { height: 162px; display: flex; flex-direction: column; }
@@ -138,8 +138,8 @@ html, body {
 .card.note { width: var(--note-w); }
 .card.note .card-body { background: var(--note-bg, #fff); }
 .note-inner { padding: 12px 14px; height: 300px; display: flex; flex-direction: column; }
-.note-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; color: var(--note-ink, var(--ink)); word-break: break-word; }
-.note-lines { flex: 1; overflow: hidden; font-size: 12.5px; line-height: 1.6; color: var(--note-ink, var(--ink)); }
+.note-title { font-size: calc(14px * var(--fs, 1)); font-weight: 600; margin-bottom: 6px; color: var(--note-ink, var(--ink)); word-break: break-word; }
+.note-lines { flex: 1; overflow: hidden; font-size: calc(12.5px * var(--fs, 1)); line-height: 1.6; color: var(--note-ink, var(--ink)); }
 .note-line { display: flex; gap: 6px; align-items: flex-start; }
 .note-line .box { width: 14px; height: 14px; border: 1.5px solid currentColor; border-radius: 4px; flex: none; margin-top: 2px; cursor: pointer; opacity: 0.7; font-size: 10px; text-align: center; line-height: 12px; }
 .note-line.done { opacity: 0.5; text-decoration: line-through; }
@@ -194,7 +194,7 @@ html, body {
 .tint { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid rgba(0,0,0,0.12); }
 .tint.on { border-color: var(--ink); transform: scale(1.12); }
 .editor-close { border: none; background: rgba(0,0,0,0.06); width: 26px; height: 26px; border-radius: 50%; cursor: pointer; font-size: 12px; }
-#editorBody { border: none; outline: none; background: transparent; resize: none; height: 230px; padding: 4px 16px 12px; font-size: 14px; line-height: 1.6; color: var(--editor-ink, var(--ink)); -webkit-user-select: text; user-select: text; }
+#editorBody { border: none; outline: none; background: transparent; resize: none; height: 230px; padding: 4px 16px 12px; font-size: calc(14px * var(--fs, 1)); line-height: 1.6; color: var(--editor-ink, var(--ink)); -webkit-user-select: text; user-select: text; }
 .editor-foot { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-top: 1px solid rgba(0,0,0,0.07); }
 .editor-foot .hint { font-size: 11px; color: var(--ink-soft); flex: 1; }
 .editor-foot button { border: none; border-radius: 999px; padding: 6px 14px; font-size: 12px; cursor: pointer; background: rgba(0,0,0,0.06); }
@@ -213,7 +213,7 @@ html, body {
 /* ---------- context menu ---------- */
 #ctx { position: fixed; z-index: 300; background: #fff; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); padding: 5px; min-width: 150px; max-height: calc(100vh - 16px); overflow-y: auto; }
 #ctx[hidden] { display: none; }
-#ctx button { display: block; width: 100%; text-align: left; border: none; background: transparent; padding: 7px 12px; font-size: 13px; border-radius: 6px; cursor: pointer; color: var(--ink); }
+#ctx button { display: block; width: 100%; text-align: left; border: none; background: transparent; padding: 7px 12px; font-size: calc(13px * var(--fs, 1)); white-space: nowrap; border-radius: 6px; cursor: pointer; color: var(--ink); }
 #ctx button:hover { background: rgba(0,0,0,0.07); }
 #ctx .sep { height: 1px; background: rgba(0,0,0,0.08); margin: 4px 6px; }
 
@@ -238,7 +238,7 @@ html, body {
 .hk-input { font-family: monospace; font-size: 13px; border: 1.5px solid rgba(0,0,0,0.14); border-radius: 8px; padding: 6px 12px; min-width: 150px; text-align: center; background: #fff; cursor: pointer; color: var(--ink); }
 .hk-input.capturing { border-color: var(--clay); background: #fff4ef; color: var(--clay); }
 .seg { display: inline-flex; background: rgba(0,0,0,0.05); border-radius: 999px; padding: 3px; gap: 2px; }
-.seg button { border: none; background: transparent; font-size: 12px; padding: 4px 11px; border-radius: 999px; cursor: pointer; color: var(--ink-soft); }
+.seg button { border: none; background: transparent; font-size: 12px; padding: 4px 11px; border-radius: 999px; cursor: pointer; color: var(--ink-soft); white-space: nowrap; }
 .seg button.on { background: var(--clay); color: #fff; }
 .set-select { border: 1px solid rgba(0,0,0,0.14); border-radius: 8px; padding: 5px 10px; font-size: 13px; background: #fff; color: var(--ink); }
 .switch { position: relative; width: 42px; height: 24px; border-radius: 999px; background: rgba(0,0,0,0.18); cursor: pointer; transition: background 0.15s; flex: none; }
@@ -256,3 +256,23 @@ html, body {
 .set-foot button.primary { background: var(--clay); color: #fff; }
 .btn-mini { border: none; background: rgba(0,0,0,0.06); border-radius: 8px; padding: 5px 10px; font-size: 12px; cursor: pointer; color: var(--ink); }
 .btn-mini:hover { background: rgba(0,0,0,0.11); }
+
+/* ---------- reminder popover ---------- */
+#ctx.remind { min-width: 268px; }
+#ctx.remind .seg { flex-wrap: nowrap; }
+#ctx.remind .seg button { padding: 4px 9px; }
+
+/* ---------- theme thumbnails (settings) ---------- */
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.theme-thumb { position: relative; height: 96px; border-radius: 12px; cursor: pointer; overflow: hidden;
+  background: linear-gradient(160deg, #3b6fd8 0%, #1e3f9a 55%, #0d1f52 100%);
+  border: 2px solid transparent; box-shadow: 0 2px 8px rgba(0,0,0,0.12); transition: transform .12s, border-color .12s; }
+.theme-thumb:hover { transform: translateY(-2px); }
+.theme-thumb.on { border-color: var(--clay); box-shadow: 0 0 0 3px rgba(217,119,87,0.25); }
+.theme-thumb svg { position: absolute; left: 0; top: 0; width: 100%; height: 40px; }
+.theme-thumb .tt-card { position: absolute; width: 30px; height: 24px; background: #fff; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+.theme-thumb .tt-card::after { content: ""; position: absolute; left: 5px; right: 5px; top: 8px; height: 3px; border-radius: 2px; background: #c9c4ba; box-shadow: 0 6px 0 #ddd8ce; }
+.theme-thumb .tt-peg { position: absolute; top: -7px; left: 50%; transform: translateX(-50%); width: 6px; height: 12px; border-radius: 2px; background: var(--peg-grad); box-shadow: 0 1px 2px rgba(0,0,0,0.35); }
+.theme-thumb .tt-name { position: absolute; left: 0; right: 0; bottom: 0; padding: 4px 0; text-align: center; font-size: 11.5px; color: #fff; background: rgba(0,0,0,0.32); }
+.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px 10px; }
+.check-grid label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; cursor: pointer; }

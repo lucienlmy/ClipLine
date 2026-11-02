@@ -49,6 +49,9 @@ struct Settings {
     autostart: bool,
     theme: String, // soft | silver | linen | porcelain | graphite
     watch_folders: Vec<String>,
+    font_family: String,          // default | yahei | dengxian | simsun | kaiti | fangsong | source
+    font_size: String,            // small | medium | large
+    reminder_presets: Vec<String>, // ids shown in the reminder popover
 }
 
 impl Default for Settings {
@@ -64,6 +67,9 @@ impl Default for Settings {
             autostart: false,
             theme: "soft".into(),
             watch_folders: Vec::new(),
+            font_family: "default".into(),
+            font_size: "medium".into(),
+            reminder_presets: vec!["m15".into(), "h1".into(), "tomorrow".into()],
         }
     }
 }
@@ -366,7 +372,7 @@ fn copy_text(text: String) {
 }
 
 #[tauri::command]
-fn copy_image(path: String) {
+async fn copy_image(path: String) {
     native::set_image_from_file(&path);
 }
 
@@ -415,7 +421,7 @@ fn reveal_path(app: AppHandle, path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn save_to_desktop(
+async fn save_to_desktop(
     app: AppHandle,
     kind: String,
     text: Option<String>,
@@ -463,14 +469,14 @@ fn update_settings(app: AppHandle, data: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn save_state(app: AppHandle, data: String) -> Result<(), String> {
+async fn save_state(app: AppHandle, data: String) -> Result<(), String> {
     let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).ok();
     std::fs::write(dir.join("data.json"), data).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn load_state(app: AppHandle) -> String {
+async fn load_state(app: AppHandle) -> String {
     if let Ok(dir) = app.path().app_config_dir() {
         if let Ok(s) = std::fs::read_to_string(dir.join("data.json")) {
             return s;
@@ -487,7 +493,7 @@ fn delete_file(path: String) {
 /// Read an image file and return it as a base64 data URL (so the webview can
 /// show it without relying on the asset protocol).
 #[tauri::command]
-fn read_image_data(path: String) -> Result<String, String> {
+async fn read_image_data(path: String) -> Result<String, String> {
     use base64::Engine;
     let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
     let ext = std::path::Path::new(&path)
@@ -550,7 +556,7 @@ fn get_pin_path(label: String) -> String {
 /// "pinned to the desktop". The image path is handed over by window label
 /// (via get_pin_path), never through the URL, so long/Unicode paths are safe.
 #[tauri::command]
-fn pin_image(app: AppHandle, path: String, w: Option<u32>, h: Option<u32>) -> Result<(), String> {
+async fn pin_image(app: AppHandle, path: String, w: Option<u32>, h: Option<u32>) -> Result<(), String> {
     let label = format!("pin{}", now_ms());
     PIN_PATHS
         .lock()
@@ -583,15 +589,16 @@ fn pin_image(app: AppHandle, path: String, w: Option<u32>, h: Option<u32>) -> Re
     Ok(())
 }
 
-#[tauri::command]
-fn open_settings(app: AppHandle) -> Result<(), String> {
+/// Create (or focus) the Settings window. Must NOT be called from a
+/// synchronous command handler: on Windows that deadlocks the main thread.
+fn create_settings_window(app: &AppHandle) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("settings") {
         let _ = w.show();
         let _ = w.set_focus();
         return Ok(());
     }
     tauri::WebviewWindowBuilder::new(
-        &app,
+        app,
         "settings",
         tauri::WebviewUrl::App("settings.html".into()),
     )
@@ -603,6 +610,11 @@ fn open_settings(app: AppHandle) -> Result<(), String> {
     .build()
     .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+async fn open_settings(app: AppHandle) -> Result<(), String> {
+    create_settings_window(&app)
 }
 
 #[tauri::command]
@@ -811,7 +823,10 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                 let _ = app.emit("ui:monitor", active);
             }
             "settings" => {
-                let _ = open_settings(app.clone());
+                let a = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = create_settings_window(&a);
+                });
             }
             "restart" => app.restart(),
             "quit" => app.exit(0),

@@ -14,6 +14,10 @@ const I = {
     secGeneral: "常规", language: "语言", autostart: "开机自启动",
     secTheme: "主题", tSoft: "柔彩日常", tSilver: "经典银灰", tLinen: "棉麻木夹", tPorcelain: "奶白轻盈", tGraphite: "石墨金属",
     secWatch: "监听文件夹", addFolder: "添加文件夹", watchHint: "这些文件夹新增文件会自动上绳", noFolders: "（未添加）",
+    secFont: "字体", fontFamily: "字体", fontSize: "字号", fsSmall: "小", fsMedium: "中", fsLarge: "大",
+    fDefault: "系统默认", fYahei: "微软雅黑", fDengxian: "等线", fSource: "思源黑体", fSimsun: "宋体", fKaiti: "楷体", fFangsong: "仿宋",
+    secRemind: "提醒快捷项", remindHint: "勾选在便签提醒面板里显示的快捷时间",
+    p_m5: "5 分钟后", p_m10: "10 分钟后", p_m15: "15 分钟后", p_m30: "30 分钟后", p_h1: "1 小时后", p_h2: "2 小时后", p_h3: "3 小时后", p_tonight: "今晚 20:00", p_tomorrow: "明天此时", p_tomorrow9: "明早 9:00", p_nextweek: "下周此时",
     secHelp: "使用说明", secAbout: "关于", save: "保存", cancel: "取消",
     help: [
       ["呼出", "鼠标顶到屏幕最上沿：左半剪贴板绳、右半便签绳；按住翻转键左右对调。或用快捷键。"],
@@ -33,6 +37,10 @@ const I = {
     secGeneral: "General", language: "Language", autostart: "Launch at startup",
     secTheme: "Theme", tSoft: "Soft color", tSilver: "Classic silver", tLinen: "Linen & wood", tPorcelain: "Porcelain", tGraphite: "Graphite",
     secWatch: "Watched folders", addFolder: "Add folder", watchHint: "New files in these folders hang automatically", noFolders: "(none)",
+    secFont: "Font", fontFamily: "Typeface", fontSize: "Size", fsSmall: "S", fsMedium: "M", fsLarge: "L",
+    fDefault: "System", fYahei: "Microsoft YaHei", fDengxian: "DengXian", fSource: "Source Han Sans", fSimsun: "SimSun", fKaiti: "KaiTi", fFangsong: "FangSong",
+    secRemind: "Reminder presets", remindHint: "Pick the quick times shown in the note reminder popover",
+    p_m5: "In 5 min", p_m10: "In 10 min", p_m15: "In 15 min", p_m30: "In 30 min", p_h1: "In 1 hour", p_h2: "In 2 hours", p_h3: "In 3 hours", p_tonight: "Tonight 20:00", p_tomorrow: "Tomorrow, same time", p_tomorrow9: "Tomorrow 9:00", p_nextweek: "Next week",
     secHelp: "How to use", secAbout: "About", save: "Save", cancel: "Cancel",
     help: [
       ["Invoke", "Top edge: left = clipboard, right = notes; hold the flip key to swap. Or hotkeys."],
@@ -45,6 +53,16 @@ const I = {
   },
 };
 let LANG = "zh";
+const FONTS = {
+  default: '-apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif',
+  yahei: '"Microsoft YaHei", "Segoe UI", sans-serif',
+  dengxian: '"DengXian", "Microsoft YaHei", sans-serif',
+  source: '"Source Han Sans SC", "Noto Sans SC", "Microsoft YaHei", sans-serif',
+  simsun: '"SimSun", "Songti SC", serif',
+  kaiti: '"KaiTi", "STKaiti", serif',
+  fangsong: '"FangSong", "STFangsong", serif',
+};
+function previewFont(name) { document.documentElement.style.setProperty("--app-font", FONTS[name] || FONTS.default); }
 const t = (k) => (I[LANG] && I[LANG][k] !== undefined ? I[LANG][k] : I.zh[k]);
 
 let cfg = {};
@@ -142,10 +160,49 @@ function render() {
 
   // Theme
   const st = section(t("secTheme"));
-  const themeSeg = seg(draft.theme, [["soft", t("tSoft")], ["silver", t("tSilver")], ["linen", t("tLinen")], ["porcelain", t("tPorcelain")], ["graphite", t("tGraphite")]], (v) => { draft.theme = v; emit("theme:preview", v); });
-  const trow = document.createElement("div"); trow.className = "set-row"; trow.style.flexDirection = "column"; trow.style.alignItems = "stretch"; trow.appendChild(themeSeg);
-  st.appendChild(trow);
+  const grid = document.createElement("div"); grid.className = "theme-grid";
+  [["soft", t("tSoft")], ["silver", t("tSilver")], ["linen", t("tLinen")], ["porcelain", t("tPorcelain")], ["graphite", t("tGraphite")]].forEach(([v, name]) => {
+    const th = document.createElement("div"); th.className = "theme-thumb" + ((draft.theme || "soft") === v ? " on" : ""); th.dataset.theme = v;
+    th.innerHTML = `<svg viewBox="0 0 120 40" preserveAspectRatio="none"><path d="M0,10 Q60,26 120,10" style="fill:none;stroke:var(--rope);stroke-width:2.4"/></svg>
+      <div class="tt-card" style="left:20px;top:22px;transform:rotate(-4deg)"><i class="tt-peg"></i></div>
+      <div class="tt-card" style="left:68px;top:23px;transform:rotate(3deg)"><i class="tt-peg"></i></div>
+      <div class="tt-name">${name}</div>`;
+    th.onclick = () => { draft.theme = v; grid.querySelectorAll(".theme-thumb").forEach((z) => z.classList.remove("on")); th.classList.add("on"); emit("theme:preview", v); };
+    grid.appendChild(th);
+  });
+  st.appendChild(grid);
   body.appendChild(st);
+
+  // Font
+  const sf = section(t("secFont"));
+  const fontSel = document.createElement("select"); fontSel.className = "set-select";
+  [["default", t("fDefault")], ["yahei", t("fYahei")], ["dengxian", t("fDengxian")], ["source", t("fSource")], ["simsun", t("fSimsun")], ["kaiti", t("fKaiti")], ["fangsong", t("fFangsong")]].forEach(([v, l]) => {
+    const o = document.createElement("option"); o.value = v; o.textContent = l; o.style.fontFamily = FONTS[v]; if ((draft.font_family || "default") === v) o.selected = true; fontSel.appendChild(o);
+  });
+  fontSel.onchange = () => { draft.font_family = fontSel.value; previewFont(fontSel.value); };
+  sf.appendChild(row(t("fontFamily"), fontSel));
+  sf.appendChild(row(t("fontSize"), seg(draft.font_size || "medium", [["small", t("fsSmall")], ["medium", t("fsMedium")], ["large", t("fsLarge")]], (v) => draft.font_size = v)));
+  body.appendChild(sf);
+
+  // Reminder presets
+  const sr = section(t("secRemind"));
+  const rh = document.createElement("div"); rh.className = "sub"; rh.style.marginBottom = "8px"; rh.textContent = t("remindHint"); sr.appendChild(rh);
+  const cg = document.createElement("div"); cg.className = "check-grid";
+  const ALL = ["m5", "m10", "m15", "m30", "h1", "h2", "h3", "tonight", "tomorrow", "tomorrow9", "nextweek"];
+  draft.reminder_presets = Array.isArray(draft.reminder_presets) ? draft.reminder_presets : ["m15", "h1", "tomorrow"];
+  ALL.forEach((id) => {
+    const lab = document.createElement("label");
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = draft.reminder_presets.includes(id);
+    cb.onchange = () => {
+      const set = new Set(draft.reminder_presets);
+      if (cb.checked) set.add(id); else set.delete(id);
+      draft.reminder_presets = ALL.filter((x) => set.has(x)); // keep a stable order
+    };
+    lab.appendChild(cb); lab.appendChild(document.createTextNode(t("p_" + id)));
+    cg.appendChild(lab);
+  });
+  sr.appendChild(cg);
+  body.appendChild(sr);
 
   // Watched folders
   const sw = section(t("secWatch"));
@@ -207,7 +264,8 @@ window.addEventListener("error", (e) => { const el = document.getElementById("se
 window.addEventListener("unhandledrejection", (e) => { const el = document.getElementById("setErr"); if (el) { const r = e.reason; el.textContent = "错误: " + (r && r.toString ? r.toString() : r); } });
 (async function boot() {
   try { const s = await invoke("get_settings"); if (s) cfg = JSON.parse(s); } catch (e) {}
-  draft = Object.assign({ hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [] }, cfg);
+  draft = Object.assign({ hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"] }, cfg);
+  previewFont(draft.font_family);
   LANG = draft.lang === "en" ? "en" : "zh";
   render();
 })();

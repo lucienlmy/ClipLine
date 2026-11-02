@@ -30,6 +30,7 @@ const I18N = {
     editorPh: "写点什么…\n第一行是标题\n用 [] 开头的行会变成勾选项",
     editorHint: "Ctrl+S 保存 · Esc 关闭", save: "保存", remind: "提醒",
     r15: "15 分钟后", r1h: "1 小时后", rtm: "明天此时", rclr: "清除提醒",
+    p_m5: "5 分钟后", p_m10: "10 分钟后", p_m15: "15 分钟后", p_m30: "30 分钟后", p_h1: "1 小时后", p_h2: "2 小时后", p_h3: "3 小时后", p_tonight: "今晚 20:00", p_tomorrow: "明天此时", p_tomorrow9: "明早 9:00", p_nextweek: "下周此时",
     pinDesktop: "钉到桌面", custom: "自定义时间", setTime: "设为提醒",
     repeat: "重复", rNone: "不重复", rDaily: "每天", rWeekly: "每周", rMonthly: "每月",
     next: "下次", arrived: "提醒已到", gotit: "知道了",
@@ -67,6 +68,7 @@ const I18N = {
     editorPh: "Write something…\nFirst line is the title\nLines starting with [] become checkboxes",
     editorHint: "Ctrl+S save · Esc close", save: "Save", remind: "Remind",
     r15: "In 15 min", r1h: "In 1 hour", rtm: "Tomorrow", rclr: "Clear reminder",
+    p_m5: "In 5 min", p_m10: "In 10 min", p_m15: "In 15 min", p_m30: "In 30 min", p_h1: "In 1 hour", p_h2: "In 2 hours", p_h3: "In 3 hours", p_tonight: "Tonight 20:00", p_tomorrow: "Tomorrow, same time", p_tomorrow9: "Tomorrow 9:00", p_nextweek: "Next week",
     pinDesktop: "Pin to desktop", custom: "Custom time", setTime: "Set reminder",
     repeat: "Repeat", rNone: "Once", rDaily: "Daily", rWeekly: "Weekly", rMonthly: "Monthly",
     next: "Next", arrived: "Reminder due", gotit: "Got it",
@@ -110,7 +112,37 @@ const tintOf = (k) => TINTS.find((x) => x.key === k) || TINTS[0];
 
 /* ---------- state ---------- */
 let state = { clips: [], notes: [] };
-let cfg = { hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [] };
+let cfg = { hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"] };
+const FONTS = {
+  default: '-apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif',
+  yahei: '"Microsoft YaHei", "Segoe UI", sans-serif',
+  dengxian: '"DengXian", "Microsoft YaHei", sans-serif',
+  source: '"Source Han Sans SC", "Noto Sans SC", "Microsoft YaHei", sans-serif',
+  simsun: '"SimSun", "Songti SC", serif',
+  kaiti: '"KaiTi", "STKaiti", serif',
+  fangsong: '"FangSong", "STFangsong", serif',
+};
+const FONT_SCALE = { small: 0.9, medium: 1, large: 1.15 };
+function applyFont(c) {
+  const root = document.documentElement;
+  root.style.setProperty("--app-font", FONTS[c.font_family] || FONTS.default);
+  root.style.setProperty("--fs", String(FONT_SCALE[c.font_size] || 1));
+}
+// Reminder quick presets: id -> () => timestamp
+function atTime(dayOffset, h, m) { const d = new Date(); d.setDate(d.getDate() + dayOffset); d.setHours(h, m, 0, 0); return d.getTime(); }
+const PRESETS = {
+  m5: () => Date.now() + 5 * 60000,
+  m10: () => Date.now() + 10 * 60000,
+  m15: () => Date.now() + 15 * 60000,
+  m30: () => Date.now() + 30 * 60000,
+  h1: () => Date.now() + 3600000,
+  h2: () => Date.now() + 2 * 3600000,
+  h3: () => Date.now() + 3 * 3600000,
+  tonight: () => { const t = atTime(0, 20, 0); return t > Date.now() ? t : atTime(1, 20, 0); },
+  tomorrow: () => Date.now() + 24 * 3600000,
+  tomorrow9: () => atTime(1, 9, 0),
+  nextweek: () => Date.now() + 7 * 24 * 3600000,
+};
 function applyTheme(name) { stage.dataset.theme = name || "soft"; }
 const ui = { deck: "clipboard", filter: "all", search: "", pinnedOnly: false, page: 0 };
 
@@ -434,7 +466,7 @@ function flash(card) {
   card.querySelector(".card-body").appendChild(f); setTimeout(() => f.remove(), 900);
 }
 function confirmRemove(e, item, isNote) {
-  const ctx = $("ctx"); ctx.innerHTML = "";
+  const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind");
   const b = document.createElement("button");
   b.textContent = t("confirmTake"); b.style.color = "#c0392b";
   b.onclick = () => { hideCtx(); removeItem(item, isNote); };
@@ -452,7 +484,7 @@ function removeItem(item, isNote) {
 /* ---------- context menu ---------- */
 function showCtx(e, item, isNote) {
   e.preventDefault();
-  const ctx = $("ctx"); ctx.innerHTML = "";
+  const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind");
   const add = (label, fn) => { const b = document.createElement("button"); b.textContent = label; b.onclick = () => { hideCtx(); fn(); }; ctx.appendChild(b); };
   const sep = () => { const s = document.createElement("div"); s.className = "sep"; ctx.appendChild(s); };
 
@@ -485,7 +517,7 @@ function showCtx(e, item, isNote) {
   ctx.style.left = Math.min(e.clientX, window.innerWidth - w) + "px";
   ctx.style.top = Math.min(e.clientY, window.innerHeight - h) + "px";
 }
-function hideCtx() { $("ctx").hidden = true; refreshModal(); }
+function hideCtx() { const c = $("ctx"); c.hidden = true; c.classList.remove("remind"); refreshModal(); }
 function normUrl(u) { u = (u || "").trim(); return /^https?:\/\//i.test(u) ? u : "http://" + u; }
 
 function saveDesktop(item) {
@@ -589,13 +621,16 @@ function nextOccurrence(ms, repeat) {
 /* A small reminder popover reused by note cards and the editor. */
 function showReminderPanel(e, note, after) {
   if (!note.repeat) note.repeat = "none";
-  const ctx = $("ctx"); ctx.innerHTML = "";
+  const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind");
   const commit = () => { save(); if (after) after(); };
 
   const btn = (label, fn) => { const b = document.createElement("button"); b.textContent = label; b.onclick = fn; return b; };
-  ctx.appendChild(btn(t("r15"), () => { setReminder(note, Date.now() + 15 * 60000); hideCtx(); commit(); }));
-  ctx.appendChild(btn(t("r1h"), () => { setReminder(note, Date.now() + 60 * 60000); hideCtx(); commit(); }));
-  ctx.appendChild(btn(t("rtm"), () => { setReminder(note, Date.now() + 24 * 3600000); hideCtx(); commit(); }));
+  ctx.classList.add("remind");
+  const presets = (cfg.reminder_presets && cfg.reminder_presets.length) ? cfg.reminder_presets : ["m15", "h1", "tomorrow"];
+  presets.forEach((id) => {
+    const fn = PRESETS[id]; if (!fn) return;
+    ctx.appendChild(btn(t("p_" + id), () => { setReminder(note, fn()); hideCtx(); commit(); }));
+  });
 
   // custom datetime
   const cwrap = document.createElement("div"); cwrap.style.padding = "6px 10px";
@@ -926,7 +961,7 @@ async function wire() {
   await listen("settings:changed", async () => {
     try { const s = await invoke("get_settings"); if (s) cfg = Object.assign(cfg, JSON.parse(s)); } catch (e) {}
     LANG = cfg.lang === "en" ? "en" : "zh";
-    applyLang(); applyTheme(cfg.theme); cleanup(); render();
+    applyLang(); applyTheme(cfg.theme); applyFont(cfg); cleanup(); render();
   });
   await listen("tauri://drag-drop", (ev) => {
     const p = ev.payload || {};
@@ -943,6 +978,7 @@ async function wire() {
   await load();
   applyLang();
   applyTheme(cfg.theme);
+  applyFont(cfg);
   await wire();
   render();
 })();
