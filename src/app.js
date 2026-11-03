@@ -587,6 +587,7 @@ function runTidy() {
 function render() {
   drawRope();
   if (ui.deck !== "notes") { renderClips(); return; }
+  $("foldBtn").hidden = true; $("tidy").hidden = true;
   const isNotes = ui.deck === "notes";
   const pitch = isNotes ? 240 : 188;
   const cardsEl = $("cards");

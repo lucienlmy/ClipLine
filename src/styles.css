@@ -146,7 +146,7 @@ html, body {
 #stage.deck-clipboard #plus { display: none; }
 .card.note { width: var(--note-w); }
 .card.note .card-body { background: var(--note-bg, #fff); }
-.note-inner { padding: 12px 14px; height: 300px; display: flex; flex-direction: column; }
+.note-inner { padding: 12px 14px; height: 228px; display: flex; flex-direction: column; }
 .note-title { font-size: calc(14px * var(--fs, 1)); font-weight: 600; margin-bottom: 6px; color: var(--note-ink, var(--ink)); word-break: break-word; }
 .note-lines { flex: 1; overflow: hidden; font-size: calc(12.5px * var(--fs, 1)); line-height: 1.6; color: var(--note-ink, var(--ink)); }
 .note-line { display: flex; gap: 6px; align-items: flex-start; }
