@@ -60,6 +60,7 @@ struct Settings {
     move_mod: String,              // shift | alt | ctrl — held when a card drag starts = move
     fold_by_date: bool,            // fold older clips into date stacks
     hotkey_shot: String,           // region screenshot ("" = off)
+    tray_icon: String,             // a terracotta | b pepsi blue | c leica red | d sky | e mint
 }
 
 impl Default for Settings {
@@ -84,6 +85,7 @@ impl Default for Settings {
             move_mod: "shift".into(),
             fold_by_date: true,
             hotkey_shot: "Ctrl+Alt+S".into(),
+            tray_icon: "a".into(),
         }
     }
 }
@@ -587,6 +589,33 @@ fn open_url(app: AppHandle, url: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn open_data_dir(app: AppHandle) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let _ = std::fs::create_dir_all(&dir);
+    app.opener()
+        .open_path(dir.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
+/// Tray icon in the chosen colour (the exe icon itself is fixed at build time).
+fn tray_icon_image(id: &str) -> Option<tauri::image::Image<'static>> {
+    let bytes: &'static [u8] = match id {
+        "b" => include_bytes!("../icons/tray/tray-b.png"),
+        "c" => include_bytes!("../icons/tray/tray-c.png"),
+        "d" => include_bytes!("../icons/tray/tray-d.png"),
+        "e" => include_bytes!("../icons/tray/tray-e.png"),
+        _ => include_bytes!("../icons/tray/tray-a.png"),
+    };
+    tauri::image::Image::from_bytes(bytes).ok()
+}
+
+fn apply_tray_icon(app: &AppHandle, id: &str) {
+    if let (Some(tray), Some(img)) = (app.tray_by_id("tray"), tray_icon_image(id)) {
+        let _ = tray.set_icon(Some(img));
+    }
+}
+
+#[tauri::command]
 fn open_path(app: AppHandle, path: String) -> Result<(), String> {
     app.opener()
         .open_path(path, None::<&str>)
@@ -640,6 +669,7 @@ fn update_settings(app: AppHandle, data: String) -> Result<String, String> {
     apply_settings_to_state(&s);
     // Side effects are best-effort and must not fail the save.
     let _ = apply_hotkeys(&app, &s.hotkey_clip, &s.hotkey_notes, &s.hotkey_shot);
+    apply_tray_icon(&app, &s.tray_icon);
     let _ = if s.autostart {
         app.autolaunch().enable()
     } else {
@@ -1329,7 +1359,8 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             }
         });
 
-    if let Some(icon) = app.default_window_icon().cloned() {
+    let chosen = SETTINGS.lock().unwrap().tray_icon.clone();
+    if let Some(icon) = tray_icon_image(&chosen).or_else(|| app.default_window_icon().cloned()) {
         builder = builder.icon(icon);
     }
     builder.build(app)?;
@@ -1381,6 +1412,7 @@ fn main() {
             set_passthrough,
             drag_text,
             drag_files,
+            open_data_dir,
             start_shot,
             get_shot_image,
             cancel_shot,

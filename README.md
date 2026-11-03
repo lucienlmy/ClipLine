@@ -1,86 +1,85 @@
-# ClipLine 晾衣绳
+<p align="center">
+  <img src="src-tauri/icons/128x128.png" width="96" alt="ClipLine" />
+</p>
 
-一根晾衣绳，穿起剪贴板和便签簿 —— Windows 版。
+<h1 align="center">ClipLine 晾衣绳</h1>
 
-复制过的文字、链接、颜色、图片各自成一张卡，晾在屏幕顶端的一根绳子上；
-便签也晾在另一条绳上。鼠标移到屏幕最上沿（左半出剪贴板绳、右半出便签绳），
-绳子滑下来；移开就收起，不打断手头的事。也可以用快捷键。
+<p align="center">
+  一根晾衣绳，穿起剪贴板、便签和截图 —— Windows 版<br/>
+  <a href="https://github.com/sjzy137/ClipLine/releases/latest"><b>⬇ 下载最新版</b></a> · 免安装 · 4 MB 左右 · 不联网 · 无广告
+</p>
 
-这是对 macOS 应用 **Clothespeg**（及其上游 **Tendedero**）的 Windows 独立重写，
-用 **Tauri（Rust + 系统自带 WebView2）** 实现，产物只有几 MB、内存占用远低于 Electron。
-名称与图标均为原创（上游许可证要求再分发必须换名换图标），见 `NOTICE.md`。
+<p align="center">
+  <img src="assets/screenshot.png" alt="ClipLine 截图" />
+</p>
 
----
+复制过的文字、链接、颜色、图片、文件，各自成一张卡片，晾在屏幕顶端的一根绳子上；便签挂在另一根绳上。鼠标顶到屏幕最上沿，绳子就滑下来，左半边是剪贴板绳，右半边是便签绳；鼠标移开，它就收起，不打断手头的事。
 
-## 一、构建（在你的 Windows 机器上，一条命令）
+## 下载
 
-前置条件：
-- **Rust 工具链**（你已安装）。Rust 在 Windows 默认用 MSVC，需要有 “Visual Studio
-  Build Tools (C++)”；若用 GNU 工具链亦可。
-- **WebView2 运行时**：Win10/11 一般已自带，无需安装。
+到 [Releases](https://github.com/sjzy137/ClipLine/releases/latest) 下载：
 
-### 免安装便携版（推荐，最省事）
+- `ClipLine_x.y.z_portable_x64.exe`：**免安装便携版**，双击即用
+- `ClipLine_x.y.z_x64-setup.exe`：安装版
+
+适用于 Windows 10 / 11（x64），需要系统自带的 WebView2，Win10/11 一般已内置。
+
+## 功能一览
+
+**剪贴板绳**
+- 自动收集复制的文字、链接、颜色、图片、文件；同样的内容不会重复挂。
+- 单击复制，双击编辑或打开；卡片可以拖出：文字拖到输入框直接插入，拖到文件夹生成 .txt/.md；文件拖出默认是复制，按住 Shift 拖是移动。
+- 从资源管理器把文件拖到屏幕顶端，绳子会滑下来接住。
+- **收藏区**固定在左端；**今天**的卡片散挂在中间；更早的自动折成「三日内 / 一周内 / 更早」三叠。
+- 多个文件挂成一叠，可以展开后单独复制或拖出；文件按类型显示彩色图标。
+- **整理**：一键取下原文件已经不在的卡片，可以撤销。
+
+**截图 · 标注 · 识别文字**
+- `Ctrl+Alt+S` 框选截图，可直接挂上绳、标注、识别文字或钉在桌面。
+- 标注工具：画笔、箭头、方框、椭圆、文字、马赛克、序号。
+- OCR 用的是 Windows 自带的文字识别：不联网，也不用下载模型。
+
+**便签绳**
+- 第一行是标题，以 `[]` 开头的行是勾选项；可设一次或重复的提醒（每天 / 每周 / 每月）。
+
+**其它**
+- 主题 5 种，强调色 4 种，可以自由搭配；托盘图标有 5 种颜色可选。
+- 快捷键可以自定义；可监听指定文件夹；支持开机自启；中英双语。
+- 数据只存在本机：`%APPDATA%\com.clipline.app`，设置里有「打开数据文件夹」按钮。
+
+详细用法见 [使用说明.md](使用说明.md)。
+
+## 常用操作
+
+| 操作 | 方式 |
+|---|---|
+| 呼出剪贴板绳 / 便签绳 | 鼠标顶到屏幕上沿左半 / 右半，或 `Ctrl+Alt+C` / `Ctrl+Alt+N` |
+| 截图上绳 | `Ctrl+Alt+S`，或底部栏「✂ 截图」 |
+| 收起 | 鼠标移开、`Esc`，或再按一次快捷键 |
+| 收藏 | 悬停卡片，点右下角 ☆ |
+| 移动文件 | 开始拖动时按住 Shift（可在设置里改成 Alt 或 Ctrl） |
+
+## 隐私
+
+ClipLine 不联网、不上传、不需要账号。剪贴板内容、便签、截图只保存在你自己的电脑上，删除 `%APPDATA%\com.clipline.app` 文件夹即可彻底清除。
+
+## 从源码构建
+
+需要 Rust 工具链（MSVC）和 Visual Studio C++ 生成工具。
 
 ```powershell
-cd clipline\src-tauri
-cargo build --release
+cd src-tauri
+cargo build --release          # 便携版：target\release\clipline.exe
+# 或：npm i -g @tauri-apps/cli@2 && tauri build   # 同时生成安装包
 ```
 
-产物：`clipline\src-tauri\target\release\clipline.exe`
-——单个 exe，双击即用，可随意拷走。前端资源已内嵌进 exe，无需其它文件。
-（想要图标文件名也叫 ClipLine，可把它重命名为 `ClipLine.exe`。）
+推送版本号后，也可以在 Actions 里运行 **Release** 工作流，自动编译并发布。
 
-### 安装版 / NSIS 安装包（可选）
+## 致谢与许可
 
-```powershell
-cargo install tauri-cli --version "^2"
-cd clipline\src-tauri
-cargo tauri build
-```
-
-产物在 `clipline\src-tauri\target\release\bundle\` 下（NSIS 安装包 + 便携 exe）。
+- 灵感来自 macOS 应用 Clothespeg（Apache-2.0）及其上游 Tendedero（MIT）；截图、标注、OCR 的功能取舍参考了 [截图吧](https://github.com/1003129155/jietuba)（MIT）。ClipLine 为独立重写，名称与图标均为原创，详见 [NOTICE.md](NOTICE.md)。
+- 本项目以 [Apache-2.0](LICENSE) 许可发布。
 
 ---
 
-## 二、使用
-
-- **呼出**：鼠标顶到屏幕最上沿——左半出「剪贴板绳」，右半出「便签绳」；
-  按住 **Shift** 时左右对调。或用快捷键：
-  - `Ctrl+Alt+C` 剪贴板绳
-  - `Ctrl+Alt+N` 便签绳
-- **收起**：鼠标移开、点绳子外的空白处，或再按一次快捷键 / `Esc`。
-- **卡片**：
-  - 悬停浮起，左上 ✕ 取下、右上 🔍 预览。
-  - **单击** = 复制（卡下闪「已复制」）。
-  - **双击** = 粘贴回你刚才的应用（自动 `Ctrl+V`；图片双击为复制）。
-  - **右键** = 复制 / 盯住 / 取下。
-- **便签**：点绳中间上方的 **+** 新建。第一行是标题；以 `[]` 开头的行会变成勾选项，
-  点方框打勾。页脚 🔔 可设 15 分钟 / 1 小时 / 明天此时的提醒。
-- **胶囊条**：按类型筛选（全部 / 文字 / 链接 / 颜色 / 图片）、搜索、只看盯住的（★）、
-  左右翻屏。
-- **托盘图标**：呼出两条绳、新建便签、暂停/恢复监控、退出。
-- **盯住**：右键「盯住」，该卡不受保留期自动清理影响。
-- **保留期**：默认 30 天自动清理（盯住的除外），数据与图片都存在本机、不联网。
-
----
-
-## 三、已还原 / 暂未实现
-
-**已实现**：剪贴板绳（文字/链接/颜色/图片）、便签绳（颜色/勾选项/编辑/提醒）、
-顶边悬停下拉（可调停顿时长、翻转键、可关）、**自定义全局快捷键（设置内录制）**、
-**设置面板**、**中英双语**、托盘、筛选胶囊、搜索、盯住、翻屏、落绳摆动与毛玻璃质感、
-保留期清理、本机持久化；右键「在浏览器打开 / 在资源管理器中显示 / 复制文件地址 /
-保存到桌面 / 转为便签」；**开机自启动**。截图（PrintScreen、Win+Shift+S）经剪贴板自动上绳。
-
-**暂未实现（后续单独迭代）**：从卡片拖拽到其它应用/文件夹（Ctrl 拖为移动）、
-拖文件到屏幕顶端挂绳、文件卡（文件引用）、监听自定义文件夹、图片内文字 OCR、
-资源管理器右键「挂到晾衣绳」、卡片拖动调序。详见 `使用说明.md`。
-
-> 说明：顶边探测、剪贴板监听（含图片）、粘贴回原应用这几处是 Windows 原生实现，
-> 作者在 Linux 侧校验了全部跨平台逻辑与第三方库调用；若你本机构建时某个原生细节
-> 需要微调，告诉我即可快速修正。
-
-## 四、许可证
-
-本重写部分以 **Apache-2.0** 发布。上游 Tendedero 为 MIT、Clothespeg 为 Apache-2.0；
-本项目为独立重写，未使用其源码、名称或图标。详见 `NOTICE.md`。
+<sub>English: ClipLine is a lightweight Windows clipboard manager and sticky-notes app with a clothesline metaphor — cards hang on a rope that drops from the top edge of the screen. Includes region screenshots with annotation and offline OCR. Portable single exe (~4 MB), no network, no accounts. Built with Tauri (Rust + WebView2).</sub>

@@ -12,7 +12,7 @@ const I = {
     flipNone: "关闭", mShift: "Shift", mCtrl: "Ctrl", mAlt: "Alt",
     secClean: "自动清理", retention: "保留天数", days: "天",
     secGeneral: "常规", language: "语言", autostart: "开机自启动",
-    secTheme: "主题", accent: "强调色", aTerra: "陶土橙", aMint: "薄荷绿", aSky: "晴空蓝", aNavy: "深海蓝", tSoft: "柔彩日常", tSilver: "经典银灰", tLinen: "棉麻木夹", tPorcelain: "奶白轻盈", tGraphite: "石墨金属",
+    secTheme: "主题", accent: "强调色", trBlue: "百事蓝", trRed: "徕卡红", trayIcon: "托盘图标", trayIconSub: "保存后立即生效；程序文件（exe）的图标固定为陶土橙", dataDir: "数据文件夹", openDataDir: "打开数据文件夹", aTerra: "陶土橙", aMint: "薄荷绿", aSky: "晴空蓝", aNavy: "深海蓝", tSoft: "柔彩日常", tSilver: "经典银灰", tLinen: "棉麻木夹", tPorcelain: "奶白轻盈", tGraphite: "石墨金属",
     secWatch: "监听文件夹", addFolder: "添加文件夹", watchHint: "这些文件夹新增文件会自动上绳", noFolders: "（未添加）",
     secFont: "字体", fontFamily: "字体", fontSize: "字号", fsSmall: "小", fsMedium: "中", fsLarge: "大",
     fDefault: "系统默认", fYahei: "微软雅黑", fDengxian: "等线", fSource: "思源黑体", fSimsun: "宋体", fKaiti: "楷体", fFangsong: "仿宋",
@@ -35,7 +35,7 @@ const I = {
     flipNone: "Off", mShift: "Shift", mCtrl: "Ctrl", mAlt: "Alt",
     secClean: "Auto cleanup", retention: "Keep for", days: "days",
     secGeneral: "General", language: "Language", autostart: "Launch at startup",
-    secTheme: "Theme", accent: "Accent", aTerra: "Terracotta", aMint: "Mint", aSky: "Sky", aNavy: "Navy", tSoft: "Soft color", tSilver: "Classic silver", tLinen: "Linen & wood", tPorcelain: "Porcelain", tGraphite: "Graphite",
+    secTheme: "Theme", accent: "Accent", trBlue: "Pepsi blue", trRed: "Leica red", trayIcon: "Tray icon", trayIconSub: "Applies on save; the exe icon itself stays terracotta", dataDir: "Data folder", openDataDir: "Open data folder", aTerra: "Terracotta", aMint: "Mint", aSky: "Sky", aNavy: "Navy", tSoft: "Soft color", tSilver: "Classic silver", tLinen: "Linen & wood", tPorcelain: "Porcelain", tGraphite: "Graphite",
     secWatch: "Watched folders", addFolder: "Add folder", watchHint: "New files in these folders hang automatically", noFolders: "(none)",
     secFont: "Font", fontFamily: "Typeface", fontSize: "Size", fsSmall: "S", fsMedium: "M", fsLarge: "L",
     fDefault: "System", fYahei: "Microsoft YaHei", fDengxian: "DengXian", fSource: "Source Han Sans", fSimsun: "SimSun", fKaiti: "KaiTi", fFangsong: "FangSong",
@@ -188,6 +188,15 @@ function render() {
     ar.appendChild(sw);
   });
   st.appendChild(row(t("accent"), ar));
+  // Tray icon colour (the exe icon is fixed; the tray one can change)
+  const tr = document.createElement("div"); tr.className = "accent-row";
+  [["a", t("aTerra")], ["b", t("trBlue")], ["c", t("trRed")], ["d", t("aSky")], ["e", t("aMint")]].forEach(([v, name]) => {
+    const sw = document.createElement("div"); sw.className = "accent-sw tray-sw" + ((draft.tray_icon || "a") === v ? " on" : "");
+    sw.innerHTML = `<img src="img/tray-${v}.png" width="30" height="30" alt=""><span>${name}</span>`;
+    sw.onclick = () => { draft.tray_icon = v; tr.querySelectorAll(".accent-sw").forEach((z) => z.classList.remove("on")); sw.classList.add("on"); };
+    tr.appendChild(sw);
+  });
+  st.appendChild(row(t("trayIcon"), tr, t("trayIconSub")));
   body.appendChild(st);
 
   // Font
@@ -260,7 +269,13 @@ function render() {
   // About
   const s6 = section(t("secAbout"));
   const ab = document.createElement("div"); ab.className = "set-about"; ab.textContent = t("about");
-  s6.appendChild(ab); body.appendChild(s6);
+  s6.appendChild(ab);
+  const dataRow = document.createElement("div"); dataRow.className = "set-row";
+  dataRow.innerHTML = `<div><div class="label">${t("dataDir")}</div><div class="sub">%APPDATA%\\com.clipline.app</div></div>`;
+  const ob = document.createElement("button"); ob.className = "btn-mini"; ob.textContent = t("openDataDir");
+  ob.onclick = () => invoke("open_data_dir").catch((e) => alert(e));
+  dataRow.appendChild(ob); s6.appendChild(dataRow);
+  body.appendChild(s6);
 
   $("cancelBtn").textContent = t("cancel");
   $("saveBtn").textContent = t("save");
@@ -281,7 +296,7 @@ window.addEventListener("error", (e) => { const el = document.getElementById("se
 window.addEventListener("unhandledrejection", (e) => { const el = document.getElementById("setErr"); if (el) { const r = e.reason; el.textContent = "错误: " + (r && r.toString ? r.toString() : r); } });
 (async function boot() {
   try { const s = await invoke("get_settings"); if (s) cfg = JSON.parse(s); } catch (e) {}
-  draft = Object.assign({ hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"], drop_to_hang: true, text_drag_ext: "txt", accent: "terra", move_mod: "shift", fold_by_date: true, hotkey_shot: "Ctrl+Alt+S" }, cfg);
+  draft = Object.assign({ hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"], drop_to_hang: true, text_drag_ext: "txt", accent: "terra", move_mod: "shift", fold_by_date: true, hotkey_shot: "Ctrl+Alt+S", tray_icon: "a" }, cfg);
   document.documentElement.dataset.accent = draft.accent || "terra";
   previewFont(draft.font_family);
   LANG = draft.lang === "en" ? "en" : "zh";

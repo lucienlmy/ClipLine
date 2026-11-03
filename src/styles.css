@@ -384,3 +384,6 @@ html, body {
 #toast.act { pointer-events: auto; }
 .toast-act { border: none; background: transparent; color: var(--clay-soft); font-weight: 600; font-size: 13px; cursor: pointer; padding: 0 2px; }
 .toast-act:hover { text-decoration: underline; }
+
+.tray-sw img { border-radius: 7px; box-shadow: 0 0 0 1px rgba(0,0,0,0.12); }
+.tray-sw.on img { box-shadow: 0 0 0 2px var(--ink); }
