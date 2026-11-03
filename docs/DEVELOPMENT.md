@@ -26,6 +26,7 @@
 # 一次性：把 rust 标准库源码放进 sysroot（rustup 下载不了时，从 GitHub 拉对应版本的 library/）
 RUSTC_BOOTSTRAP=1 cargo check -Zbuild-std=std,panic_abort --target x86_64-pc-windows-msvc
 ```
+拉源码的做法：`git clone --depth 1 --branch <rustc 版本号> --filter=blob:none --sparse https://github.com/rust-lang/rust.git`，`git sparse-checkout set library`；`library/backtrace` 是子模块，要按 `git ls-tree HEAD library/backtrace` 给出的提交号从 `rust-lang/backtrace-rs` 单独拉下来放进去；最后把 `library` 链接到 `$(rustc --print sysroot)/lib/rustlib/src/rust/library`。
 
 ## 发布
 - 改 `src-tauri/tauri.conf.json` 和 `Cargo.toml` 的版本号，更新 `RELEASE_NOTES.md`。
