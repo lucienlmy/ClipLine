@@ -76,11 +76,4 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: ClipLine v${{ env.VERSION }}
           files: dist/*.exe
-          body: |
-            ClipLine v${{ env.VERSION }} for Windows 10/11 (x64).
-
-            - `ClipLine_*_portable_x64.exe` — 免安装便携版，双击即用
-            - `ClipLine_*_x64-setup.exe` — 安装版
-
-            需要系统自带的 WebView2（Windows 10/11 通常已内置）。
-            使用说明见仓库中的 `使用说明.md`。
+          body_path: RELEASE_NOTES.md
