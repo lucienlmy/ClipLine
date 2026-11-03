@@ -75,7 +75,7 @@ function refreshModal() {
 const I18N = {
   zh: {
     all: "全部", text: "文字", link: "链接", color: "颜色", image: "图片", file: "文件",
-    search: "搜索…", copied: "已复制", editText: "编辑文字", moved: "已移动，卡片已取下", stackOpen: "展开这一叠", stackTitle: "这一叠共 {n} 个文件", stackSplit: "拆成单张", stackHint: "单击复制 · 拖出单个文件 · 双击打开", missing: "原文件已不在（被移动或删除了）", already: "已在绳上，已移到最前", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
+    search: "搜索…", copied: "已复制", editText: "编辑文字", favMore: "其余收藏", favZone: "左边是收藏区", g3: "三日内", g7: "一周内", gOld: "更早", cards: "张", total: "共", groupOpen: "展开这一叠", groupHint: "单击复制 · 拖出 · 双击编辑/打开 · 右键更多", takeAll: "全部取下", tookN: "已取下 {n} 张", undo: "撤销", favKeep: "收藏的卡片请先取消收藏", tidy: "整理", tidyTip: "取下原文件已不在的卡片", tidied: "已取下 {n} 张失效卡片", foldTip: "按日期折叠：今天散挂，更早的折成「三日内 / 一周内 / 更早」", foldOnT: "已按日期折叠", foldLabel: "按日期", foldOffT: "已全部散挂", moved: "已移动，卡片已取下", stackOpen: "展开这一叠", stackTitle: "这一叠共 {n} 个文件", stackSplit: "拆成单张", stackHint: "单击复制 · 拖出单个文件 · 双击打开", missing: "原文件已不在（被移动或删除了）", already: "已在绳上，已移到最前", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
     emptyClip: "绳上还空着 — 复制点什么试试",
     emptyNotes: "绳上还没有便签 — 点上方的 + 写一张",
     plus: "新建便签", gear: "设置", prev: "上一屏", next: "下一屏", pinOnly: "只看收藏（钉住）的卡片",
@@ -113,7 +113,7 @@ const I18N = {
   },
   en: {
     all: "All", text: "Text", link: "Link", color: "Color", image: "Image", file: "File",
-    search: "Search…", copied: "Copied", editText: "Edit text", moved: "Moved — card taken down", stackOpen: "Open this stack", stackTitle: "{n} files in this stack", stackSplit: "Split into cards", stackHint: "Click to copy · drag one out · double-click to open", missing: "The original file is gone (moved or deleted)", already: "Already on the line — moved to front", pasteBack: "Paste into previous app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
+    search: "Search…", copied: "Copied", editText: "Edit text", favMore: "More favourites", favZone: "Favourites are on the left", g3: "Last 3 days", g7: "This week", gOld: "Older", cards: "", total: "Total", groupOpen: "Open this stack", groupHint: "Click to copy · drag out · double-click to edit/open · right-click for more", takeAll: "Take all down", tookN: "Took down {n}", undo: "Undo", favKeep: "Remove it from favourites first", tidy: "Tidy", tidyTip: "Take down cards whose files are gone", tidied: "Took down {n} broken card(s)", foldTip: "Fold by date: today loose, older folded into stacks", foldOnT: "Folded by date", foldLabel: "By date", foldOffT: "All cards loose", moved: "Moved — card taken down", stackOpen: "Open this stack", stackTitle: "{n} files in this stack", stackSplit: "Split into cards", stackHint: "Click to copy · drag one out · double-click to open", missing: "The original file is gone (moved or deleted)", already: "Already on the line — moved to front", pasteBack: "Paste into previous app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
     emptyClip: "The line is empty — copy something",
     emptyNotes: "No notes yet — click + above to write one",
     plus: "New note", gear: "Settings", prev: "Previous", next: "Next", pinOnly: "Favourites (pinned) only",
@@ -309,9 +309,284 @@ function visibleList() {
   return arr.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 }
 
+/* ---------- clipboard layout: favourites zone · today loose · date stacks ---------- */
+const FAV_SLOTS = 3;
+function startOfToday() { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }
+function foldOn() { return cfg.fold_by_date !== false; }
+function clipZones(list) {
+  if (ui.search || ui.pinnedOnly) return { favs: [], favStack: null, loose: list, stacks: [] };
+  const favs = list.filter((c) => c.pinned), rest = list.filter((c) => !c.pinned);
+  let favShown = favs, favStack = null;
+  if (favs.length > FAV_SLOTS) {
+    favShown = favs.slice(0, FAV_SLOTS - 1);
+    favStack = { key: "fav", fav: true, label: t("favMore"), items: favs.slice(FAV_SLOTS - 1) };
+  }
+  if (!foldOn()) return { favs: favShown, favStack, loose: rest, stacks: [] };
+  const t0 = startOfToday(), d3 = t0 - 2 * 864e5, d7 = t0 - 6 * 864e5;
+  const loose = [], g3 = [], g7 = [], gOld = [];
+  rest.forEach((c) => { const ts = c.ts || 0; if (ts >= t0) loose.push(c); else if (ts >= d3) g3.push(c); else if (ts >= d7) g7.push(c); else gOld.push(c); });
+  const stacks = [["d3", t("g3"), g3], ["d7", t("g7"), g7], ["old", t("gOld"), gOld]]
+    .filter((x) => x[2].length).map(([key, label, items]) => ({ key, label, items }));
+  return { favs: favShown, favStack, loose, stacks };
+}
+function renderClips() {
+  const cardsEl = $("cards");
+  cardsEl.innerHTML = "";
+  const list = visibleList();
+  const Z = clipZones(list);
+  const W = window.innerWidth, pitch = 188, cardW = 170, GW = 146, GCARD = 128, KW = 70;
+  const fixedW = Z.favs.length * pitch + (Z.favStack ? GW : 0);
+  const knot = fixedW > 0 && (Z.loose.length || Z.stacks.length);
+  const fixed = fixedW + (knot ? KW : 0) + Z.stacks.length * GW;
+  const perPage = Math.max(1, Math.floor((W - 60 - fixed) / pitch));
+  const pages = Math.max(1, Math.ceil(Z.loose.length / perPage));
+  if (ui.page >= pages) ui.page = pages - 1;
+  if (ui.page < 0) ui.page = 0;
+  const looseSlice = Z.loose.slice(ui.page * perPage, ui.page * perPage + perPage);
+
+  const entries = [];
+  Z.favs.forEach((it) => entries.push({ kind: "card", item: it, zone: "fav", w: pitch }));
+  if (Z.favStack) entries.push({ kind: "group", group: Z.favStack, w: GW });
+  if (knot) entries.push({ kind: "knot", w: KW });
+  looseSlice.forEach((it) => entries.push({ kind: "card", item: it, zone: "loose", w: pitch }));
+  Z.stacks.forEach((g) => entries.push({ kind: "group", group: g, w: GW }));
+  const total = entries.reduce((n, e) => n + e.w, 0);
+  let x0 = Math.max(20, (W - total) / 2);
+  entries.forEach((e) => { e.x = x0 + e.w / 2; x0 += e.w; });
+
+  cardsEl.classList.toggle("no-anim", !!ui.noAnim);
+  ui.noAnim = false;
+  if (list.length === 0) {
+    const e = document.createElement("div"); e.className = "empty"; e.textContent = t("emptyClip"); cardsEl.appendChild(e);
+  }
+  entries.forEach((e, i) => {
+    if (e.kind === "knot") {
+      const k = document.createElement("div"); k.className = "knot"; k.title = t("favZone");
+      k.style.left = `${e.x - 7}px`; k.style.top = `${ropeY(e.x) - 9}px`;
+      cardsEl.appendChild(k); return;
+    }
+    const el = e.kind === "group" ? buildGroupCard(e.group) : buildClipCard(e.item);
+    el.style.left = `${e.x - (e.kind === "group" ? GCARD : cardW) / 2}px`;
+    el.style.top = `${ropeY(e.x)}px`;
+    el.style.setProperty("--swing", `${(i % 2 ? 1 : -1) * (5 + (i % 3) * 2)}deg`);
+    el.dataset.id = e.kind === "group" ? "group:" + e.group.key : e.item.id;
+    e.el = el;
+    cardsEl.appendChild(el);
+  });
+  ui.layout = { pitch, cardW, entries, isNotes: false };
+  attachZoneReorder(entries, "fav");
+  attachZoneReorder(entries, "loose");
+
+  const n = Z.loose.length;
+  const from = n ? ui.page * perPage + 1 : 0, to = Math.min(n, ui.page * perPage + perPage);
+  $("count").textContent = pages > 1 ? `${from}–${to} / ${n} · ${t("total")} ${list.length}` : `${t("total")} ${list.length}`;
+  $("prev").style.visibility = ui.page > 0 ? "visible" : "hidden";
+  $("next").style.visibility = ui.page < pages - 1 ? "visible" : "hidden";
+  renderFilters();
+  $("foldBtn").classList.toggle("on", foldOn());
+  $("foldBtn").hidden = false;
+  if (stackGroupKey) refreshGroup();
+  updateTidy();
+}
+
+/* reorder by the clip, within one zone (favourites, or today's loose cards) */
+function attachZoneReorder(entries, zone) {
+  const zs = entries.filter((e) => e.kind === "card" && e.zone === zone);
+  if (zs.length < 2) return;
+  const xs = zs.map((z) => z.x), cardW = 170;
+  zs.forEach((e, idx) => {
+    const card = e.el, peg = card.querySelector(".peg");
+    if (!peg) return;
+    peg.classList.add("grab"); peg.title = t("dragSort");
+    peg.addEventListener("pointerdown", (ev) => {
+      if (ev.button !== 0) return;
+      ev.stopPropagation(); ev.preventDefault();
+      const startLeft = parseFloat(card.style.left) || 0, sx = ev.clientX;
+      let target = idx;
+      try { peg.setPointerCapture(ev.pointerId); } catch (x) {}
+      card.classList.add("dragging");
+      zs.forEach((z) => { if (z.el !== card) z.el.classList.add("reflow"); });
+      invoke("set_modal", { on: true }).catch(() => {});
+      const move = (mv) => {
+        const left = startLeft + (mv.clientX - sx), cx = left + cardW / 2;
+        card.style.left = left + "px";
+        card.style.top = ropeY(Math.max(0, Math.min(window.innerWidth, cx))) + "px";
+        let best = 0, bd = 1e9;
+        xs.forEach((x, i) => { const d = Math.abs(x - cx); if (d < bd) { bd = d; best = i; } });
+        if (best === target) return;
+        target = best;
+        let slot = 0;
+        zs.forEach((z) => {
+          if (z.el === card) return;
+          if (slot === target) slot++;
+          z.el.style.left = xs[slot] - cardW / 2 + "px"; z.el.style.top = ropeY(xs[slot]) + "px";
+          slot++;
+        });
+      };
+      const up = () => {
+        peg.removeEventListener("pointermove", move); peg.removeEventListener("pointerup", up); peg.removeEventListener("pointercancel", up);
+        card.classList.remove("dragging"); refreshModal();
+        if (target !== idx) reorderSubset(zs.map((z) => z.item), idx, target);
+        ui.noAnim = true; render();
+      };
+      peg.addEventListener("pointermove", move); peg.addEventListener("pointerup", up); peg.addEventListener("pointercancel", up);
+    });
+  });
+}
+function reorderSubset(items, from, to) {
+  const arr = state.clips, next = items.slice();
+  const [m] = next.splice(from, 1); next.splice(to, 0, m);
+  const ids = new Set(items.map((x) => x.id)), slots = [];
+  arr.forEach((x, i) => { if (ids.has(x.id)) slots.push(i); });
+  slots.forEach((pos, k) => { arr[pos] = next[k]; });
+  save();
+}
+
+/* a folded stack on the rope (other favourites, or a date group) */
+function buildGroupCard(g) {
+  const card = document.createElement("div");
+  card.className = "card stack group" + (g.fav ? " favgroup pinned" : "");
+  const top = g.items[0] || {};
+  const peek = top.vis === "image" ? t("image") : top.vis === "file" ? baseName((top.files || [])[0] || "") : (top.text || "").trim().slice(0, 24);
+  card.innerHTML = `<div class="peg"></div><div class="card-body"><div class="c-group">
+    <div class="g-label">${g.fav ? "★ " : ""}${escapeHtml(g.label)}</div>
+    <div class="g-count">${g.items.length}<span>${t("cards")}</span></div>
+    <div class="g-peek">${escapeHtml(peek)}</div></div></div>`;
+  card.title = t("groupOpen");
+  card.querySelector(".card-body").addEventListener("click", () => openGroup(g, card));
+  card.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind");
+    const add = (label, fn) => { const b = document.createElement("button"); b.textContent = label; b.onclick = () => { hideCtx(); fn(); }; ctx.appendChild(b); };
+    add(t("groupOpen"), () => openGroup(g, card));
+    if (!g.fav) { add(t("takeAll"), () => removeItems(g.items.slice(), t("tookN"))); ctx.lastChild.style.color = "#c0392b"; }
+    ctx.hidden = false; refreshModal();
+    ctx.style.left = Math.min(e.clientX, window.innerWidth - 170) + "px";
+    ctx.style.top = Math.min(e.clientY, window.innerHeight - (ctx.offsetHeight || 80)) + "px";
+  });
+  return card;
+}
+
+/* the popover for a folded stack: every card as a tile with its usual actions */
+let stackGroupKey = null, stackAnchor = null;
+function openGroup(g, card) {
+  stackItem = null; stackGroupKey = g.key;
+  const r = card.getBoundingClientRect(); stackAnchor = r.left + r.width / 2;
+  fillGroup(g);
+  $("stackPop").hidden = false;
+  placeStack();
+  refreshModal();
+}
+function placeStack() {
+  const pop = $("stackPop"), w = pop.offsetWidth;
+  pop.style.left = Math.max(8, Math.min((stackAnchor || 0) - w / 2, window.innerWidth - w - 8)) + "px";
+}
+function refreshGroup() {
+  if (!stackGroupKey || $("stackPop").hidden) return;
+  const Z = clipZones(visibleList());
+  const g = stackGroupKey === "fav" ? Z.favStack : Z.stacks.find((x) => x.key === stackGroupKey);
+  if (!g || !g.items.length) { closeStack(); return; }
+  fillGroup(g);
+}
+function fillGroup(g) {
+  $("spTitle").textContent = `${g.fav ? "★ " : ""}${g.label} · ${g.items.length} ${t("cards")}`;
+  $("spSplit").textContent = t("takeAll");
+  $("spSplit").hidden = !!g.fav;
+  $("spHint").textContent = t("groupHint");
+  const box = $("spItems"); box.innerHTML = "";
+  g.items.forEach((it) => box.appendChild(buildTile(it)));
+}
+function buildTile(item) {
+  const d = document.createElement("div"); d.className = "sp-item tile" + (item.pinned ? " fav" : "");
+  if (item.vis === "image") d.innerHTML = `<div class="sp-ico"><img src="${item.thumb || ""}" alt=""></div><div class="sp-name">${t("image")}</div>`;
+  else if (item.vis === "file") {
+    const f = item.files || [], first = f[0] || "";
+    d.innerHTML = `<div class="sp-ico">${fileIconSvg(first, false)}</div><div class="sp-name">${escapeHtml(baseName(first))}${f.length > 1 ? " +" + (f.length - 1) : ""}</div>`;
+    withPathInfo([first], ([inf]) => { if (inf && inf[1]) d.querySelector(".sp-ico").innerHTML = fileIconSvg(first, true); if (inf && !inf[0]) d.classList.add("missing"); });
+  } else if (item.vis === "color") {
+    const v = (item.text || "").trim();
+    d.innerHTML = `<div class="sp-ico"><i class="sp-sw" style="background:${escapeHtml(v)}"></i></div><div class="sp-name">${escapeHtml(v)}</div>`;
+  } else d.innerHTML = `<div class="sp-text${item.vis === "link" ? " link" : ""}">${escapeHtml((item.text || "").slice(0, 140))}</div>`;
+  const x = document.createElement("button"); x.className = "sp-x"; x.textContent = "✕"; x.title = t("take");
+  x.addEventListener("click", (e) => { e.stopPropagation(); if (item.pinned) { toast(t("favKeep")); return; } removeItems([item], t("tookN")); });
+  x.addEventListener("pointerdown", (e) => e.stopPropagation());
+  d.appendChild(x);
+  // drag out
+  let sx = 0, sy = 0, armed = false;
+  d.addEventListener("pointerdown", (e) => { if (e.button !== 0) return; armed = true; sx = e.clientX; sy = e.clientY; });
+  d.addEventListener("pointerup", () => { armed = false; });
+  d.addEventListener("pointermove", (e) => {
+    if (!armed || (Math.abs(e.clientX - sx) < 6 && Math.abs(e.clientY - sy) < 6)) return;
+    armed = false;
+    suppressClickUntil = Date.now() + 500; selfDragUntil = Date.now() + 60000;
+    const done = () => { selfDragUntil = Date.now() + 400; };
+    if (item.vis === "image" || item.vis === "file") {
+      const paths = item.vis === "image" ? (item.path ? [item.path] : []) : (item.files || []);
+      const mov = moveHeld(e);
+      invoke("drag_files", { paths, mov }).catch((err) => toast(String(err).includes("不存在") ? t("missing") : t("dragFail") + err))
+        .then(() => { if (mov) afterMove(item, paths); }).finally(done);
+    } else invoke("drag_text", { text: item.text || "" }).catch((err) => toast(t("dragFail") + err)).finally(done);
+  });
+  d.addEventListener("click", () => { if (dragSuppressed()) return; copyClip(item, d); });
+  d.addEventListener("dblclick", () => {
+    if (item.vis === "file") { if ((item.files || []).length > 1) return; invoke("open_path", { path: item.files[0] }).catch(() => {}); return; }
+    closeStack();
+    if (item.vis === "image") openPreview(item); else openClipEditor(item);
+  });
+  d.addEventListener("contextmenu", (e) => { closeStack(); showCtx(e, item, false); });
+  return d;
+}
+
+/* remove several cards with an Undo (image cache files are deleted only once Undo expires) */
+function removeItems(items, msgTpl) {
+  const ids = new Set(items.map((x) => x.id));
+  const snapshot = state.clips.slice();
+  state.clips = state.clips.filter((c) => !ids.has(c.id));
+  save(); render();
+  let undone = false;
+  toastAction(msgTpl.replace("{n}", items.length), t("undo"), () => { undone = true; state.clips = snapshot; save(); render(); }, 5000, () => {
+    if (undone) return;
+    items.forEach((it) => { if (it.path) invoke("delete_file", { path: it.path }).catch(() => {}); });
+  });
+}
+let toastActTimer = null;
+function toastAction(msg, label, onAction, ms, onExpire) {
+  const el = $("toast");
+  el.innerHTML = ""; el.appendChild(document.createTextNode(msg + "  "));
+  const b = document.createElement("button"); b.className = "toast-act"; b.textContent = label;
+  let fired = false;
+  b.onclick = () => { if (fired) return; fired = true; onAction(); el.classList.remove("show", "act"); };
+  el.appendChild(b);
+  el.classList.add("show", "act");
+  clearTimeout(toastTimer); clearTimeout(toastActTimer);
+  toastActTimer = setTimeout(() => { el.classList.remove("show", "act"); if (!fired && onExpire) onExpire(); }, ms);
+}
+
+/* ---------- 整理: take down cards whose original files are gone ---------- */
+let tidyList = [];
+function updateTidy() {
+  const btn = $("tidy");
+  const cands = state.clips.filter((c) => c.vis === "file" && !c.pinned && (c.files || []).length);
+  if (!cands.length) { tidyList = []; btn.hidden = true; return; }
+  const all = [...new Set(cands.flatMap((c) => c.files))];
+  withPathInfo(all, (info) => {
+    const exists = new Map(all.map((p, i) => [p, info[i] ? info[i][0] : true]));
+    tidyList = cands.filter((c) => c.files.every((p) => exists.get(p) === false));
+    btn.hidden = !tidyList.length;
+    btn.textContent = `${t("tidy")} ${tidyList.length}`;
+  });
+}
+function runTidy() {
+  if (!tidyList.length) return;
+  const items = tidyList.slice(), ids = new Set(items.map((x) => x.id));
+  $("cards").querySelectorAll(".card").forEach((el) => { if (ids.has(el.dataset.id)) el.classList.add("falling"); });
+  setTimeout(() => removeItems(items, t("tidied")), 420);
+}
+
 /* ---------- render ---------- */
 function render() {
   drawRope();
+  if (ui.deck !== "notes") { renderClips(); return; }
   const isNotes = ui.deck === "notes";
   const pitch = isNotes ? 240 : 188;
   const cardsEl = $("cards");
@@ -530,7 +805,7 @@ function copyClip(item, card) {
 let stackItem = null;
 function baseName(p) { const q = String(p).replace(/[\\/]+$/, ""); return q.split(/[\\/]/).pop() || q; }
 function openStack(item, card) {
-  stackItem = item;
+  stackItem = item; stackGroupKey = null; $("spSplit").hidden = false;
   const files = item.files || [];
   $("spTitle").textContent = t("stackTitle").replace("{n}", files.length);
   $("spSplit").textContent = t("stackSplit");
@@ -575,7 +850,7 @@ function openStack(item, card) {
   pop.style.left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 8)) + "px";
   refreshModal();
 }
-function closeStack() { stackItem = null; $("stackPop").hidden = true; refreshModal(); }
+function closeStack() { stackItem = null; stackGroupKey = null; $("spSplit").hidden = false; $("stackPop").hidden = true; refreshModal(); }
 function splitStack() {
   const it = stackItem; if (!it) return;
   const idx = state.clips.indexOf(it); if (idx < 0) { closeStack(); return; }
@@ -981,7 +1256,7 @@ setInterval(() => {
 
 /* ---------- toast ---------- */
 let toastTimer = null;
-function toast(msg) { const el = $("toast"); el.textContent = msg; el.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), 1800); }
+function toast(msg) { const el = $("toast"); clearTimeout(toastActTimer); el.classList.remove("act"); el.textContent = msg; el.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), 1800); }
 
 /* ---------- util ---------- */
 function escapeHtml(s) { return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
@@ -1180,6 +1455,7 @@ function applyLang() {
   $("prev").title = t("prev");
   $("next").title = t("next");
   $("pinOnly").title = t("pinOnly");
+  $("tidy").title = t("tidyTip"); $("foldBtn").title = t("foldTip"); $("foldBtn").textContent = t("foldLabel");
   $("editorBody").placeholder = t("editorPh");
   $("bellText").textContent = t("remind");
   const hint = document.querySelector(".editor-foot .hint"); if (hint) hint.textContent = t("editorHint");
@@ -1192,7 +1468,7 @@ function setDeck(deck) {
   stage.classList.toggle("deck-notes", deck === "notes");
   stage.classList.toggle("deck-clipboard", deck === "clipboard");
 }
-function onDrop(deck) { setDeck(deck); stage.classList.remove("up"); render(); }
+function onDrop(deck) { pathInfoCache.clear(); setDeck(deck); stage.classList.remove("up"); render(); }
 function onRollup() {
   closeStack();
   stopCatch();
@@ -1237,9 +1513,25 @@ document.addEventListener("pointerdown", (e) => {
 }, true);
 $("preview").addEventListener("click", (e) => { if (e.target.id === "preview") closePreview(); });
 $("spClose").addEventListener("click", closeStack);
-$("spSplit").addEventListener("click", splitStack);
+$("spSplit").addEventListener("click", () => {
+  if (stackItem) { splitStack(); return; }
+  if (!stackGroupKey) return;
+  const Z = clipZones(visibleList());
+  const g = Z.stacks.find((x) => x.key === stackGroupKey);
+  if (g) { closeStack(); removeItems(g.items.slice(), t("tookN")); }
+});
+$("tidy").addEventListener("click", runTidy);
+$("foldBtn").addEventListener("click", async () => {
+  cfg.fold_by_date = !foldOn(); ui.page = 0; render();
+  toast(foldOn() ? t("foldOnT") : t("foldOffT"));
+  try {
+    const cur = JSON.parse((await invoke("get_settings")) || "{}");
+    cur.fold_by_date = cfg.fold_by_date;
+    await invoke("update_settings", { data: JSON.stringify(cur) });
+  } catch (e) {}
+});
 document.addEventListener("pointerdown", (e) => {
-  if (!$("stackPop").hidden && !e.target.closest("#stackPop") && !e.target.closest(".card.stack")) closeStack();
+  if (!$("stackPop").hidden && !e.target.closest("#stackPop") && !e.target.closest(".card.stack") && !e.target.closest("#ctx")) closeStack();
 });
 $("settings").addEventListener("click", (e) => { if (e.target.id === "settings") closeSettings(); });
 $("setClose").addEventListener("click", closeSettings);

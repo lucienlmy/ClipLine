@@ -57,6 +57,7 @@ struct Settings {
     text_drag_ext: String,         // txt | md — file type when a text card is dragged to Explorer
     accent: String,                // terra | mint | sky | navy
     move_mod: String,              // shift | alt | ctrl — held when a card drag starts = move
+    fold_by_date: bool,            // fold older clips into date stacks
 }
 
 impl Default for Settings {
@@ -79,6 +80,7 @@ impl Default for Settings {
             text_drag_ext: "txt".into(),
             accent: "terra".into(),
             move_mod: "shift".into(),
+            fold_by_date: true,
         }
     }
 }
