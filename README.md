@@ -75,6 +75,21 @@ cargo build --release          # 便携版：target\release\clipline.exe
 
 推送版本号后，也可以在 Actions 里运行 **Release** 工作流，自动编译并发布。
 
+## 支持作者
+
+ClipLine **永久免费**：源码开放、无广告、无账号、不联网，个人用、公司用都不必付费。
+
+如果它确实替你省了事，可以扫下面的码请我喝杯茶：
+
+<p>
+  <img src="assets/donate-wechat.png" width="200" alt="微信" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="assets/donate-alipay.png" width="200" alt="支付宝" />
+</p>
+<p><sub>左：微信　右：支付宝</sub></p>
+
+打赏完全自愿。它不会解锁任何功能，因为所有功能本来就都给你；也不换来「优先处理」，issue 一视同仁地看。
+
 ## 致谢与许可
 
 - 灵感来自 macOS 应用 Clothespeg（Apache-2.0）及其上游 Tendedero（MIT）；截图、标注、OCR 的功能取舍参考了 [截图吧](https://github.com/1003129155/jietuba)（MIT）。ClipLine 为独立重写，名称与图标均为原创，详见 [NOTICE.md](NOTICE.md)。

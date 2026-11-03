@@ -937,6 +937,74 @@ async fn ocr_to_line(app: AppHandle, path: String) -> Result<(), String> {
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Reminder cards: a small always-on-top window per due reminder
+// ---------------------------------------------------------------------------
+
+static REMIND_DATA: Lazy<Mutex<HashMap<String, serde_json::Value>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+
+/// Pop up a reminder card (bottom-right, above the taskbar). `data` carries
+/// the note id, title, body, colours and time text for remind.html.
+#[tauri::command]
+async fn show_reminder(app: AppHandle, data: serde_json::Value) -> Result<(), String> {
+    let id = data.get("id").and_then(|v| v.as_str()).unwrap_or("x").to_string();
+    let safe: String = id.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+    let label = format!("remind{safe}");
+    if let Some(w) = app.get_webview_window(&label) {
+        let _ = w.close();
+    }
+    REMIND_DATA.lock().unwrap().insert(label.clone(), data);
+    let open = app
+        .webview_windows()
+        .keys()
+        .filter(|k| k.starts_with("remind"))
+        .count() as f64;
+    let (lw, lh) = (340.0_f64, 216.0_f64);
+    let win = tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App("remind.html".into()))
+        .title("ClipLine 提醒")
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .resizable(false)
+        .shadow(false)
+        .visible(false)
+        .inner_size(lw, lh)
+        .build()
+        .map_err(|e| e.to_string())?;
+    if let Ok(Some(mon)) = win.primary_monitor() {
+        let wa = mon.work_area();
+        let sf = mon.scale_factor();
+        let (pw, ph) = ((lw * sf) as i32, (lh * sf) as i32);
+        let margin = (14.0 * sf) as i32;
+        let x = wa.position.x + wa.size.width as i32 - pw - margin;
+        let y = wa.position.y + wa.size.height as i32 - ph - margin - (open * (lh + 10.0) * sf) as i32;
+        let _ = win.set_position(PhysicalPosition::new(x, y.max(wa.position.y)));
+    }
+    let _ = win.show();
+    Ok(())
+}
+
+#[tauri::command]
+fn get_reminder(label: String) -> serde_json::Value {
+    REMIND_DATA.lock().unwrap().get(&label).cloned().unwrap_or(serde_json::Value::Null)
+}
+
+/// From a reminder card: ack | snooze | open. The main window updates the
+/// note; "open" also drops the notes line.
+#[tauri::command]
+async fn reminder_action(app: AppHandle, label: String, id: String, action: String) -> Result<(), String> {
+    REMIND_DATA.lock().unwrap().remove(&label);
+    if let Some(w) = app.get_webview_window(&label) {
+        let _ = w.close();
+    }
+    if action == "open" {
+        drop_line(Deck::Notes, true);
+    }
+    let _ = app.emit("remind:action", serde_json::json!({ "id": id, "action": action }));
+    Ok(())
+}
+
 static PIN_PATHS: Lazy<Mutex<HashMap<String, String>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[tauri::command]
@@ -1412,6 +1480,9 @@ fn main() {
             set_passthrough,
             drag_text,
             drag_files,
+            show_reminder,
+            get_reminder,
+            reminder_action,
             open_data_dir,
             start_shot,
             get_shot_image,

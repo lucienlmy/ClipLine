@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<title>ClipLine 提醒</title>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; user-select: none; -webkit-user-select: none; }
+  #card { position: absolute; inset: 8px; border-radius: 14px; background: var(--bg, #fffdf7); color: var(--ink, #2b2a27);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.06); padding: 14px 16px 12px; display: flex; flex-direction: column;
+    animation: swing 0.9s cubic-bezier(.3,1.4,.5,1) both; transform-origin: 50% -30px; }
+  @keyframes swing { 0% { transform: translateY(-30px) rotate(-6deg); opacity: 0; } 40% { opacity: 1; } 60% { transform: rotate(3deg); } 100% { transform: none; } }
+  #peg { position: absolute; top: -2px; left: 50%; width: 12px; height: 24px; margin-left: -6px; border-radius: 5px; background: linear-gradient(#e6a985, #d97757); }
+  .when { font-size: 12px; opacity: 0.75; display: flex; align-items: center; gap: 6px; }
+  .bell { display: inline-block; animation: ring 1.2s ease 0.3s 2; transform-origin: 50% 0; }
+  @keyframes ring { 0%,100% { transform: rotate(0); } 15% { transform: rotate(16deg); } 30% { transform: rotate(-14deg); } 45% { transform: rotate(10deg); } 60% { transform: rotate(-6deg); } 75% { transform: rotate(3deg); } }
+  #title { font-size: 16px; font-weight: 650; margin: 8px 0 4px; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #body { font-size: 12.5px; line-height: 1.55; opacity: 0.85; flex: 1; overflow: hidden; white-space: pre-wrap; word-break: break-word; }
+  .row { display: flex; gap: 6px; margin-top: 8px; }
+  button { border: none; border-radius: 999px; padding: 6px 12px; font-size: 12px; cursor: pointer; background: rgba(0,0,0,0.07); color: inherit; white-space: nowrap; }
+  button:hover { background: rgba(0,0,0,0.13); }
+  button.primary { background: #d97757; color: #fff; margin-left: auto; }
+  #x { position: absolute; top: 8px; right: 10px; width: 22px; height: 22px; padding: 0; border-radius: 50%; background: transparent; font-size: 12px; opacity: 0.55; }
+  #x:hover { opacity: 1; background: rgba(0,0,0,0.08); }
+</style>
+</head>
+<body>
+  <div id="card">
+    <i id="peg"></i>
+    <button id="x" title="知道了">✕</button>
+    <div class="when"><span class="bell">🔔</span><span id="when"></span></div>
+    <div id="title"></div>
+    <div id="body"></div>
+    <div class="row">
+      <button id="snooze">10 分钟后再提醒</button>
+      <button id="open">打开便签</button>
+      <button id="ack" class="primary">知道了</button>
+    </div>
+  </div>
+<script>
+  const T = window.__TAURI__;
+  const invoke = T.core.invoke;
+  const $ = (id) => document.getElementById(id);
+  let label = "", data = {};
+  try { label = T.window.getCurrentWindow().label; } catch (e) {}
+
+  // a soft two-note chime (no sound file needed)
+  function chime() {
+    try {
+      const ac = new (window.AudioContext || window.webkitAudioContext)();
+      [[880, 0], [1318.5, 0.18]].forEach(([f, t0]) => {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = "sine"; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, ac.currentTime + t0);
+        g.gain.exponentialRampToValueAtTime(0.18, ac.currentTime + t0 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + t0 + 0.9);
+        o.connect(g).connect(ac.destination); o.start(ac.currentTime + t0); o.stop(ac.currentTime + t0 + 1);
+      });
+    } catch (e) {}
+  }
+
+  (async () => {
+    try { data = (await invoke("get_reminder", { label })) || {}; } catch (e) {}
+    const card = $("card");
+    if (data.bg) card.style.setProperty("--bg", data.bg);
+    if (data.ink) card.style.setProperty("--ink", data.ink);
+    $("when").textContent = data.when || "";
+    $("title").textContent = data.title || "提醒";
+    $("body").textContent = data.body || "";
+    if (data.repeat) $("snooze").textContent = "10 分钟后再提醒";
+    if (data.sound !== false) chime();
+  })();
+
+  const act = (a) => invoke("reminder_action", { label, id: data.id || "", action: a }).catch(() => {});
+  $("ack").onclick = () => act("ack");
+  $("x").onclick = () => act("ack");
+  $("snooze").onclick = () => act("snooze");
+  $("open").onclick = () => act("open");
+</script>
+</body>
+</html>

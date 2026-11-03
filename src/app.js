@@ -1245,13 +1245,31 @@ function showReminderPanel(e, note, after) {
   ctx.style.top = Math.max(8, Math.min(e.clientY, window.innerHeight - h - 8)) + "px";
 }
 
+/* A due reminder pops up as its own card window (bottom-right, with a chime). */
+function popReminder(n) {
+  const lines = (n.body || "").split("\n").filter((l) => l.trim());
+  const title = stripMark(lines[0] || t("remind"));
+  const body = lines.slice(1, 5).map(stripMark).join("\n");
+  const tt = tintOf(n.tint);
+  const rep = { daily: t("rDaily"), weekly: t("rWeekly"), monthly: t("rMonthly") }[n.repeat] || "";
+  const when = fmtWhen(n.remindAt) + (rep ? " · " + rep : "");
+  invoke("show_reminder", { data: { id: n.id, title, body, when, bg: tt.bg, ink: tt.ink, repeat: !!rep } })
+    .catch(() => { toast("🔔 " + title); });
+}
+function onRemindAction(p) {
+  const n = state.notes.find((x) => x.id === (p && p.id));
+  if (!n) return;
+  if (p.action === "snooze") { n.remindAt = Date.now() + 10 * 60000; n.fired = false; n.acked = false; }
+  else if (p.action === "ack") { if (!n.repeat || n.repeat === "none") { n.acked = true; n.fired = false; n.remindAt = null; } }
+  else if (p.action === "open") { if (!n.repeat || n.repeat === "none") { n.acked = true; n.fired = false; n.remindAt = null; } save(); setTimeout(() => { setDeck("notes"); render(); openEditor(n); }, 150); return; }
+  save(); if (!stage.classList.contains("up") && ui.deck === "notes") render();
+}
+
 setInterval(() => {
   const now = Date.now(); let changed = false;
   state.notes.forEach((n) => {
     if (n.remindAt && !n.fired && now >= n.remindAt) {
-      const title = (n.body || "").split("\n").find((l) => l.trim()) || t("remind");
-      toast("🔔 " + stripMark(title));
-      try { if (window.Notification && Notification.permission === "granted") new Notification("ClipLine", { body: stripMark(title) }); } catch (e) {}
+      popReminder(n);
       if (n.repeat && n.repeat !== "none") {
         const nx = nextOccurrence(n.remindAt, n.repeat);
         n.remindAt = nx; // keep pending for the next round
@@ -1262,7 +1280,7 @@ setInterval(() => {
     }
   });
   if (changed) { save(); if (!stage.classList.contains("up") && ui.deck === "notes") render(); }
-}, 20000);
+}, 10000);
 
 /* ---------- toast ---------- */
 let toastTimer = null;
@@ -1612,6 +1630,7 @@ async function wire() {
   });
   await listen("line:catch", () => startCatch());
   await listen("ocr:done", (ev) => onOcrDone(ev.payload));
+  await listen("remind:action", (ev) => onRemindAction(ev.payload));
   await listen("files:enter", () => stage.classList.add("catch-over"));
   await listen("files:over", () => stage.classList.add("catch-over"));
   await listen("files:leave", () => stage.classList.remove("catch-over"));
