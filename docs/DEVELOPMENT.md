@@ -29,6 +29,7 @@ RUSTC_BOOTSTRAP=1 cargo check -Zbuild-std=std,panic_abort --target x86_64-pc-win
 
 ## 发布
 - 改 `src-tauri/tauri.conf.json` 和 `Cargo.toml` 的版本号，更新 `RELEASE_NOTES.md`。
-- 运行 Actions → **Release** 工作流：`release=true` 生成草稿，`publish=true` 直接发布，标签会自动打在当前提交上。
+- 运行 Actions → **Release** 工作流：默认直接发布（`publish=true`）；想先试再发，取消勾选 `publish` 即生成草稿。推送 `v*` 标签也会直接发布。标签会自动打在当前提交上。
+- 注意：在 Claude 会话里无法编辑或发布已有的 Release（GitHub 接口拒绝），草稿只能由仓库主人在网页上点「Publish release」。
 - 只改发布说明不用重新编译：运行 **Release notes** 工作流，填上标签即可。
 - 排查问题：在 exe 旁边放一个空的 `clipline-debug.log`，程序就会写诊断日志。

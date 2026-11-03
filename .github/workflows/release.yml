@@ -1,5 +1,5 @@
 # Build ClipLine on GitHub's Windows runners and attach the binaries to a
-# DRAFT release. Trigger: push a tag like v1.1.0, or run manually from the
+# published release (or a draft if `publish` is unticked). Trigger: push a tag like v1.1.0, or run manually from the
 # Actions tab (Run workflow) — the tag is then created from the version. The draft is only visible to the repo owner until published.
 name: Release
 
@@ -13,9 +13,9 @@ on:
         type: boolean
         default: true
       publish:
-        description: "Publish it right away (otherwise it stays a draft)"
+        description: "Publish it right away (untick to keep it as a draft)"
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: write
@@ -71,7 +71,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/') || inputs.release
         uses: softprops/action-gh-release@v2
         with:
-          draft: ${{ !inputs.publish }}
+          # Tag pushes publish directly; manual runs follow the publish input.
+          draft: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
           tag_name: v${{ env.VERSION }}
           target_commitish: ${{ github.sha }}
           name: ClipLine v${{ env.VERSION }}
