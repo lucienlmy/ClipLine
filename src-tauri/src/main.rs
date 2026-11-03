@@ -16,7 +16,7 @@ use tauri_plugin_autostart::ManagerExt as _;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tauri_plugin_opener::OpenerExt as _;
 
-const CLIP_H: f64 = 262.0;
+const CLIP_H: f64 = 306.0;
 const NOTES_H: f64 = 392.0;
 
 #[derive(Clone, Copy, PartialEq, Eq)]

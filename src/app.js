@@ -742,17 +742,20 @@ function buildNoteCard(note) {
     }
   });
   const due = note.fired && !note.acked;
-  const bellLabel = due ? t("arrived") : (note.remindAt ? t("next") + " " + fmtWhen(note.remindAt) + repeatMark(note) : "");
-  html += `</div><div class="note-foot">
-      <button data-act="edit">✎ ${t("edit")}</button>
-      <button data-act="bell" class="bell${due ? " dot" : ""}">🔔 ${escapeHtml(bellLabel)}</button>
+  // Reminder chip: "🔔 下次 11-04 09:00" on one line, the repeat (每天/每周/每月) on
+  // the next; always visible when a reminder is set. Editing is the ✎ corner
+  // or a double-click, so the foot no longer carries an Edit button.
+  const rep = { daily: t("rDaily"), weekly: t("rWeekly"), monthly: t("rMonthly") }[note.repeat] || "";
+  const line1 = due ? t("arrived") : (note.remindAt ? t("next") + " " + fmtWhen(note.remindAt) : t("remind"));
+  const hasRem = due || !!note.remindAt;
+  html += `</div><div class="note-foot${hasRem ? " has-rem" : ""}">
+      <button data-act="bell" class="bell${due ? " dot" : ""}${rep && !due ? " two" : ""}"><span class="b1">🔔 ${escapeHtml(line1)}</span>${rep && !due ? `<span class="b2">${escapeHtml(rep)}</span>` : ""}</button>
       ${due ? `<button data-act="ack">${t("gotit")}</button>` : ""}
     </div>`;
   inner.innerHTML = html;
   body.appendChild(inner);
 
   inner.querySelectorAll(".box").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); toggleCheck(note, parseInt(b.dataset.idx, 10)); }));
-  inner.querySelector('[data-act="edit"]').addEventListener("click", (e) => { e.stopPropagation(); openEditor(note); });
   inner.querySelector('[data-act="bell"]').addEventListener("click", (e) => { e.stopPropagation(); showReminderPanel(e, note, () => { save(); render(); }); });
   const ackBtn = inner.querySelector('[data-act="ack"]');
   if (ackBtn) ackBtn.addEventListener("click", (e) => { e.stopPropagation(); note.acked = true; note.fired = false; note.remindAt = null; save(); render(); });
