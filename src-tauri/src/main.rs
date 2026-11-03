@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod display;
 mod native;
 mod shot;
 mod update;
@@ -48,7 +49,7 @@ struct Settings {
     dwell_ms: u64,
     flip_mod: String, // none | shift | ctrl | alt
     retention_days: u32,
-    lang: String, // zh | en
+    lang: String, // auto (follow Windows) | zh | en
     autostart: bool,
     theme: String, // soft | silver | linen | porcelain | graphite
     watch_folders: Vec<String>,
@@ -64,6 +65,7 @@ struct Settings {
     tray_icon: String,             // a terracotta | b pepsi blue | c leica red | d sky | e mint
     update_mode: String,           // auto | notify | off — background check against GitHub Releases
     skipped_version: String,       // "Skip this version" — not offered again by the background check
+    line_display: String,          // cursor | primary | a monitor device name (\\.\DISPLAY2)
 }
 
 impl Default for Settings {
@@ -75,7 +77,8 @@ impl Default for Settings {
             dwell_ms: 250,
             flip_mod: "shift".into(),
             retention_days: 30,
-            lang: "zh".into(),
+            // New installs follow Windows; a saved settings.json keeps its value.
+            lang: "auto".into(),
             autostart: false,
             theme: "soft".into(),
             watch_folders: Vec::new(),
@@ -91,6 +94,7 @@ impl Default for Settings {
             tray_icon: "a".into(),
             update_mode: "notify".into(),
             skipped_version: String::new(),
+            line_display: "cursor".into(),
         }
     }
 }
@@ -108,6 +112,8 @@ struct LineState {
     dwell_ms: u64,
     flip_mod: String,
     drop_to_hang: bool,
+    line_display: String,
+    mon: String, // device name of the monitor the line is laid out on
 }
 
 impl Default for LineState {
@@ -125,6 +131,8 @@ impl Default for LineState {
             dwell_ms: 250,
             flip_mod: "shift".into(),
             drop_to_hang: true,
+            line_display: "cursor".into(),
+            mon: String::new(),
         }
     }
 }
@@ -276,8 +284,27 @@ fn settings_path(app: &AppHandle) -> Option<std::path::PathBuf> {
 fn load_settings(app: &AppHandle) -> Settings {
     if let Some(p) = settings_path(app) {
         if let Ok(s) = std::fs::read_to_string(&p) {
-            if let Ok(parsed) = serde_json::from_str::<Settings>(&s) {
+            if let Ok(mut parsed) = serde_json::from_str::<Settings>(&s) {
+                // Saved before "follow system" existed without a language:
+                // that user has been seeing Chinese — keep it.
+                let has_lang = serde_json::from_str::<serde_json::Value>(&s)
+                    .ok()
+                    .map(|v| v.get("lang").is_some())
+                    .unwrap_or(true);
+                if !has_lang {
+                    parsed.lang = "zh".into();
+                }
                 return parsed;
+            }
+        }
+        // No settings yet but the app has been used (cards saved): an
+        // existing user on the old default — keep Chinese. Only a truly new
+        // install follows the system language.
+        if let Some(dir) = p.parent() {
+            if dir.join("data.json").exists() {
+                let mut d = Settings::default();
+                d.lang = "zh".into();
+                return d;
             }
         }
     }
@@ -301,6 +328,83 @@ fn apply_settings_to_state(s: &Settings) {
     st.dwell_ms = s.dwell_ms;
     st.drop_to_hang = s.drop_to_hang;
     st.flip_mod = s.flip_mod.clone();
+    st.line_display = s.line_display.clone();
+}
+
+// ---------------------------------------------------------------------------
+// Which monitor
+// ---------------------------------------------------------------------------
+
+/// The monitor the line should drop on, per the "line appears on" setting.
+/// `at` = a cursor position to use instead of polling it. A chosen monitor
+/// that is not plugged in falls back to the primary one.
+fn target_monitor(at: Option<(i32, i32)>) -> Option<display::Mon> {
+    let mode = STATE.lock().unwrap().line_display.clone();
+    match mode.as_str() {
+        "primary" => display::primary(),
+        "cursor" | "" => at
+            .or_else(native::cursor_pos)
+            .and_then(|(x, y)| display::at(x, y))
+            .or_else(display::primary),
+        name => display::by_name(name).or_else(display::primary),
+    }
+}
+
+/// Lay the line state out on `m` (physical pixels, that monitor's scale).
+/// Returns the window rectangle to apply.
+fn fit_line_to(m: &display::Mon) -> (i32, i32, u32, u32) {
+    let clip_h = (CLIP_H * m.scale) as i32;
+    let notes_h = (NOTES_H * m.scale) as i32;
+    let mut st = STATE.lock().unwrap();
+    st.top = m.y;
+    st.left = m.x;
+    st.width = m.w;
+    st.clip_h = clip_h;
+    st.notes_h = notes_h;
+    st.mon = m.name.clone();
+    (m.x, m.y, m.w.max(1) as u32, notes_h.max(1) as u32)
+}
+
+/// Move + size a window onto another monitor. Crossing into a monitor with
+/// a different scale makes Windows resize it on the way (WM_DPICHANGED), so
+/// position first, then set the size, then pin the position again.
+fn place_window(w: &tauri::WebviewWindow, x: i32, y: i32, pw: u32, ph: u32) {
+    let _ = w.set_position(PhysicalPosition::new(x, y));
+    let _ = w.set_size(PhysicalSize::new(pw, ph));
+    let _ = w.set_position(PhysicalPosition::new(x, y));
+}
+
+/// Where a reminder / update card goes: the line's monitor while it is down,
+/// otherwise the monitor the line would drop on now.
+fn card_monitor() -> Option<display::Mon> {
+    let (dropped, mon) = {
+        let st = STATE.lock().unwrap();
+        (st.dropped, st.mon.clone())
+    };
+    if dropped && !mon.is_empty() {
+        if let Some(m) = display::by_name(&mon) {
+            return Some(m);
+        }
+    }
+    target_monitor(None)
+}
+
+/// Bottom-right corner of that monitor's work area; `stack` = how many cards
+/// are already showing there (each next one goes above).
+fn place_corner_card(win: &tauri::WebviewWindow, lw: f64, lh: f64, stack: f64) {
+    let area = card_monitor().map(|m| (m.wx, m.wy, m.ww, m.wh, m.scale)).or_else(|| {
+        win.primary_monitor().ok().flatten().map(|mon| {
+            let wa = mon.work_area();
+            (wa.position.x, wa.position.y, wa.size.width as i32, wa.size.height as i32, mon.scale_factor())
+        })
+    });
+    if let Some((ax, ay, aw, ah, sf)) = area {
+        let (pw, ph) = ((lw * sf) as i32, (lh * sf) as i32);
+        let margin = (14.0 * sf) as i32;
+        let x = ax + aw - pw - margin;
+        let y = (ay + ah - ph - margin - (stack * (lh + 10.0) * sf) as i32).max(ay);
+        place_window(win, x, y, pw.max(1) as u32, ph.max(1) as u32);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -327,6 +431,9 @@ fn drop_line(deck: Deck, sticky: bool) {
 /// focus in the middle of someone else's drag is unnecessary and jarring.
 fn drop_line_ex(deck: Deck, sticky: bool, focus: bool) {
     native::remember_foreground();
+    // Lay the line out on the right monitor before it shows (the hover thread
+    // reads the new geometry right away).
+    let rect = target_monitor(None).map(|m| fit_line_to(&m));
     {
         let mut st = STATE.lock().unwrap();
         st.dropped = true;
@@ -334,6 +441,9 @@ fn drop_line_ex(deck: Deck, sticky: bool, focus: bool) {
         st.sticky = sticky;
     }
     with_window(move |w| {
+        if let Some((x, y, pw, ph)) = rect {
+            place_window(&w, x, y, pw, ph);
+        }
         let _ = w.set_ignore_cursor_events(false);
         let _ = w.show();
         if focus {
@@ -658,10 +768,27 @@ async fn save_to_desktop(
     }
 }
 
+/// Settings as JSON for the pages, plus `sys_lang` (what "follow system"
+/// resolves to). Unknown fields sent back on save are ignored.
+fn settings_json(s: &Settings) -> String {
+    let mut v = serde_json::to_value(s).unwrap_or(serde_json::Value::Null);
+    if let Some(o) = v.as_object_mut() {
+        let sys = if display::system_is_chinese() { "zh" } else { "en" };
+        o.insert("sys_lang".into(), serde_json::Value::from(sys));
+    }
+    v.to_string()
+}
+
 #[tauri::command]
 fn get_settings() -> String {
     let s = SETTINGS.lock().unwrap().clone();
-    serde_json::to_string(&s).unwrap_or_default()
+    settings_json(&s)
+}
+
+/// Monitors for the "line appears on" picker.
+#[tauri::command]
+fn list_monitors() -> Vec<display::Mon> {
+    display::list()
 }
 
 #[tauri::command]
@@ -683,7 +810,7 @@ fn update_settings(app: AppHandle, data: String) -> Result<String, String> {
     } else {
         app.autolaunch().disable()
     };
-    serde_json::to_string(&s).map_err(|e| e.to_string())
+    Ok(settings_json(&s))
 }
 
 #[tauri::command]
@@ -980,15 +1107,7 @@ async fn show_reminder(app: AppHandle, data: serde_json::Value) -> Result<(), St
         .inner_size(lw, lh)
         .build()
         .map_err(|e| e.to_string())?;
-    if let Ok(Some(mon)) = win.primary_monitor() {
-        let wa = mon.work_area();
-        let sf = mon.scale_factor();
-        let (pw, ph) = ((lw * sf) as i32, (lh * sf) as i32);
-        let margin = (14.0 * sf) as i32;
-        let x = wa.position.x + wa.size.width as i32 - pw - margin;
-        let y = wa.position.y + wa.size.height as i32 - ph - margin - (open * (lh + 10.0) * sf) as i32;
-        let _ = win.set_position(PhysicalPosition::new(x, y.max(wa.position.y)));
-    }
+    place_corner_card(&win, lw, lh, open);
     let _ = win.show();
     Ok(())
 }
@@ -1290,15 +1409,7 @@ async fn show_update_window(app: &AppHandle, check: bool) -> Result<(), String> 
             .inner_size(lw, lh)
             .build()
             .map_err(|e| e.to_string())?;
-        if let Ok(Some(mon)) = win.primary_monitor() {
-            let wa = mon.work_area();
-            let sf = mon.scale_factor();
-            let (pw, ph) = ((lw * sf) as i32, (lh * sf) as i32);
-            let margin = (14.0 * sf) as i32;
-            let x = wa.position.x + wa.size.width as i32 - pw - margin;
-            let y = wa.position.y + wa.size.height as i32 - ph - margin;
-            let _ = win.set_position(PhysicalPosition::new(x, y.max(wa.position.y)));
-        }
+        place_corner_card(&win, lw, lh, 0.0);
         let _ = win.show();
     }
     if check {
@@ -1421,7 +1532,10 @@ fn start_folder_watch() {
 
 fn setup_geometry(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("line") {
-        if let Ok(Some(mon)) = w.current_monitor() {
+        if let Some(m) = target_monitor(None) {
+            let (x, y, pw, ph) = fit_line_to(&m);
+            place_window(&w, x, y, pw, ph);
+        } else if let Ok(Some(mon)) = w.current_monitor() {
             let pos = mon.position();
             let size = mon.size();
             let scale = mon.scale_factor();
@@ -1491,6 +1605,30 @@ fn start_cursor_thread() {
                     st.drop_to_hang,
                 )
             };
+            // While up, the top edge to watch is the target monitor's (in
+            // "follow the mouse" mode: the monitor the pointer is on). While
+            // down, the line's own geometry applies.
+            let (top, left, width) = if dropped {
+                (top, left, width)
+            } else {
+                match target_monitor(Some((x, y))) {
+                    Some(m) => (m.y, m.x, m.w),
+                    None => (top, left, width),
+                }
+            };
+            // The line's monitor was unplugged while it was down: roll up
+            // (the next drop lays it out on a monitor that exists).
+            if dropped {
+                let mon = STATE.lock().unwrap().mon.clone();
+                if !mon.is_empty() && !display::list().is_empty() && display::by_name(&mon).is_none() {
+                    winx::dlog(&format!("monitor {mon} went away; rolling up"));
+                    rollup();
+                    with_window(|w| {
+                        let _ = w.hide();
+                    });
+                    continue;
+                }
+            }
             // A drag (left button held, started well below the top edge and
             // travelled) that reaches the top band: drop the line to catch it.
             if !dropped && hang && x >= left && x < left + width && y <= top + 2 {
@@ -1614,7 +1752,8 @@ fn start_cursor_thread() {
                 released_at = None;
                 if !sticky && !MODAL.load(Ordering::Relaxed) {
                     let h = if deck == Deck::Notes { notes_h } else { clip_h };
-                    if y > top + h + 12 {
+                    // below the line, or off to the side onto another monitor
+                    if y > top + h + 12 || x < left - 12 || x >= left + width + 12 {
                         rollup();
                     }
                 }
@@ -1781,6 +1920,7 @@ fn main() {
             get_pin_path,
             pick_folder,
             open_settings,
+            list_monitors,
             update_status,
             check_update,
             download_update,

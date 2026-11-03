@@ -8,6 +8,7 @@
   - `native.rs`：剪贴板（arboard / clipboard-win）、光标、粘贴回原应用、图片卡保存 `save_rgba_card`。
   - `winx.rs`：低级鼠标钩子、自研 OLE 拖出（文字卡：资源管理器得到文件 / 其它应用得到文字；文件卡：shell 数据对象）、自研拖入目标（替代 wry 失效的那个）、资源管理器选中项兜底、诊断日志 `dlog`。
   - `shot.rs`：GDI 截全虚拟屏、Windows 自带 OCR（Windows.Media.Ocr）。
+  - `display.rs`：显示器列表（Win32 `EnumDisplayMonitors` + `GetDpiForMonitor`，缓存 1 秒，插拔后自动更新）、系统界面语言。`main.rs` 里 `target_monitor` 按设置 `line_display`（`cursor` / `primary` / 设备名如 `\\.\DISPLAY2`）选屏，`fit_line_to` 按那块屏的缩放重算绳子尺寸，`place_window` 先移位再改尺寸再移位（跨缩放比例移动时 Windows 会先自动缩放一次）。提醒 / 更新卡片用 `place_corner_card` 放在同一块屏右下角。
   - `update.rs`：检查更新。用系统的 `URLDownloadToFileW` 访问 GitHub API（`releases/latest`）和下载安装文件，不引入 TLS 库，走系统代理；状态集中在 `STATUS`，每次变化由 `main.rs` 广播 `update:status`，`update.html` 负责显示。
 - `src/`：前端静态页。`app.js` 主界面（绳子布局：收藏区 / 今天 / 日期叠、卡片、便签、提醒、整理），`settings.*`、`pin.html`、`shot.html`（截图选区）、`annotate.html`（标注）、`remind.html`（提醒卡片）、`update.html`（更新卡片）。
 
@@ -19,7 +20,8 @@
 5. 前端要显示图片时，用 `read_image_data` 返回的 base64，**不要用 asset 协议**（之前出现过白屏）。
 6. 自动更新靠**发布文件名**找安装文件：便携版必须含 `_portable_`、安装版必须以 `-setup.exe` 结尾（Release 工作流现在就是这样命名，改工作流时别动）。程序判断自己是哪种版本的依据是 exe 旁边有没有 `uninstall.exe`。
 7. 便携版更新：运行中的 exe 可以改名但不能覆盖，所以先把自己改名为 `*.exe.old`，新文件放到原路径，再带 `--after-update <pid>` 启动新版（新版先等旧进程退出，再清理 `.old`）。安装版更新：运行 setup 带 `/P /UPDATE /R`（免打扰、保留自启动项、装完重新打开）。
-8. 版本比较只看 `主.次.修订` 三段数字；发布时 `tauri.conf.json`、`Cargo.toml` 的版本号和标签必须一致，否则会反复提示更新。
+8. 语言设置 `lang` 可为 `auto`：`get_settings` / `update_settings` 返回的 JSON 额外带 `sys_lang`（zh / en），前端用 `pickLang` 解析；`Settings` 默认值是 `auto`，但已存的 settings.json 保留原值。
+9. 版本比较只看 `主.次.修订` 三段数字；发布时 `tauri.conf.json`、`Cargo.toml` 的版本号和标签必须一致，否则会反复提示更新。
 
 ## 在 Linux 上检查 Windows 代码
 ```bash
@@ -30,6 +32,7 @@ RUSTC_BOOTSTRAP=1 cargo check -Zbuild-std=std,panic_abort --target x86_64-pc-win
 
 ## 发布
 - 改 `src-tauri/tauri.conf.json` 和 `Cargo.toml` 的版本号，更新 `RELEASE_NOTES.md`。
+- 工作流里的 Actions 都已是 Node.js 24 版本（checkout@v7、setup-node@v7、upload-artifact@v7、action-gh-release@v3、rust-cache@v2.9+）。
 - 运行 Actions → **Release** 工作流：默认直接发布（`publish=true`）；想先试再发，取消勾选 `publish` 即生成草稿。推送 `v*` 标签也会直接发布。标签会自动打在当前提交上。
 - 注意：在 Claude 会话里无法编辑或发布已有的 Release（GitHub 接口拒绝），草稿只能由仓库主人在网页上点「Publish release」。
 - 只改发布说明不用重新编译：运行 **Release notes** 工作流，填上标签即可。

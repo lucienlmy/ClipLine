@@ -11,7 +11,8 @@ const I = {
     secInvoke: "呼出方式", hoverOn: "顶边悬停呼出", dwell: "停顿时长", flip: "左右翻转修饰键", hangOn: "拖文件到屏幕顶部自动放绳", moveMod: "拖出卡片时「移动」用的按键", foldDate: "按日期折叠", foldDateSub: "今天的卡片散挂；更早的自动折成「三日内 / 一周内 / 更早」三叠（底部「按日期」按钮也可切换）", moveModSub: "开始拖动时按住即为移动（之后可松开）；不按为复制。默认 Shift，与 Windows 习惯一致", textExt: "文字卡片拖到文件夹时保存为",
     flipNone: "关闭", mShift: "Shift", mCtrl: "Ctrl", mAlt: "Alt",
     secClean: "自动清理", retention: "保留天数", days: "天",
-    secGeneral: "常规", language: "语言", autostart: "开机自启动",
+    secGeneral: "常规", language: "语言", langAuto: "跟随系统", autostart: "开机自启动",
+    lineDisplay: "晾衣绳出现在", ldCursor: "跟随鼠标", ldPrimary: "主显示器", ldMon: "显示器", ldMain: "（主）", ldMissing: "（未连接）", ldSub: "跟随鼠标：在哪块屏幕顶边呼出就在哪块屏幕放下；选定的显示器未连接时改用主显示器。提醒和更新卡片也弹在这块屏幕上",
     secTheme: "主题", accent: "强调色", trBlue: "百事蓝", trRed: "徕卡红", trayIcon: "托盘图标", trayIconSub: "保存后立即生效；程序文件（exe）的图标固定为陶土橙", dataDir: "数据文件夹", openDataDir: "打开数据文件夹", aTerra: "陶土橙", aMint: "薄荷绿", aSky: "晴空蓝", aNavy: "深海蓝", tSoft: "柔彩日常", tSilver: "经典银灰", tLinen: "棉麻木夹", tPorcelain: "奶白轻盈", tGraphite: "石墨金属",
     secWatch: "监听文件夹", addFolder: "添加文件夹", watchHint: "这些文件夹新增文件会自动上绳", noFolders: "（未添加）",
     secFont: "字体", fontFamily: "字体", fontSize: "字号", fsSmall: "小", fsMedium: "中", fsLarge: "大",
@@ -36,7 +37,8 @@ const I = {
     secInvoke: "Invoke", hoverOn: "Drop on top-edge hover", dwell: "Dwell", flip: "Flip modifier", hangOn: "Drag files to top edge to drop the line", moveMod: "Key for moving when dragging a card out", foldDate: "Fold by date", foldDateSub: "Today's cards hang loose; older ones fold into Last 3 days / This week / Older (also via the By date button)", moveModSub: "Hold it when the drag starts to move (you can let go afterwards); otherwise it copies. Default Shift, as in Windows", textExt: "Text card dragged to a folder becomes",
     flipNone: "Off", mShift: "Shift", mCtrl: "Ctrl", mAlt: "Alt",
     secClean: "Auto cleanup", retention: "Keep for", days: "days",
-    secGeneral: "General", language: "Language", autostart: "Launch at startup",
+    secGeneral: "General", language: "Language", langAuto: "Follow system", autostart: "Launch at startup",
+    lineDisplay: "Line appears on", ldCursor: "Follow the mouse", ldPrimary: "Primary display", ldMon: "Display", ldMain: " (primary)", ldMissing: " (not connected)", ldSub: "Follow the mouse: it drops on whichever screen's top edge you use; a chosen display that is unplugged falls back to the primary one. Reminder and update cards appear on that screen too",
     secTheme: "Theme", accent: "Accent", trBlue: "Pepsi blue", trRed: "Leica red", trayIcon: "Tray icon", trayIconSub: "Applies on save; the exe icon itself stays terracotta", dataDir: "Data folder", openDataDir: "Open data folder", aTerra: "Terracotta", aMint: "Mint", aSky: "Sky", aNavy: "Navy", tSoft: "Soft color", tSilver: "Classic silver", tLinen: "Linen & wood", tPorcelain: "Porcelain", tGraphite: "Graphite",
     secWatch: "Watched folders", addFolder: "Add folder", watchHint: "New files in these folders hang automatically", noFolders: "(none)",
     secFont: "Font", fontFamily: "Typeface", fontSize: "Size", fsSmall: "S", fsMedium: "M", fsLarge: "L",
@@ -57,6 +59,7 @@ const I = {
   },
 };
 let LANG = "zh";
+function pickLang(c) { const l = c.lang === "auto" ? c.sys_lang : c.lang; return l === "en" ? "en" : "zh"; }
 const FONTS = {
   default: '-apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif',
   yahei: '"Microsoft YaHei", "Segoe UI", sans-serif',
@@ -71,6 +74,7 @@ const t = (k) => (I[LANG] && I[LANG][k] !== undefined ? I[LANG][k] : I.zh[k]);
 
 let cfg = {};
 let draft = {};
+let monitors = [];
 let capturing = null;
 const $ = (id) => document.getElementById(id);
 
@@ -151,6 +155,20 @@ function render() {
   s2.appendChild(row(t("foldDate"), switchEl(draft.fold_by_date !== false, (v) => draft.fold_by_date = v), t("foldDateSub")));
   s2.appendChild(row(t("moveMod"), seg(draft.move_mod || "shift", [["shift", "Shift"], ["alt", "Alt"], ["ctrl", "Ctrl"]], (v) => draft.move_mod = v), t("moveModSub")));
   s2.appendChild(row(t("textExt"), seg(draft.text_drag_ext, [["txt", ".txt"], ["md", ".md"]], (v) => draft.text_drag_ext = v)));
+  const ldSel = document.createElement("select"); ldSel.className = "set-select";
+  const ldOpts = [["cursor", t("ldCursor")], ["primary", t("ldPrimary")]];
+  monitors.forEach((m) => {
+    const num = (String(m.name).match(/(\d+)\s*$/) || [])[1] || "?";
+    ldOpts.push([m.name, `${t("ldMon")} ${num} · ${m.w}×${m.h} · ${Math.round(m.scale * 100)}%${m.primary ? t("ldMain") : ""}`]);
+  });
+  const ld = draft.line_display || "cursor";
+  if (!ldOpts.some(([v]) => v === ld)) {
+    const num = (String(ld).match(/(\d+)\s*$/) || [])[1] || "?";
+    ldOpts.push([ld, `${t("ldMon")} ${num}${t("ldMissing")}`]);
+  }
+  ldOpts.forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; if (ld === v) o.selected = true; ldSel.appendChild(o); });
+  ldSel.onchange = () => { draft.line_display = ldSel.value; };
+  s2.appendChild(row(t("lineDisplay"), ldSel, t("ldSub")));
   body.appendChild(s2);
 
   // Cleanup
@@ -161,8 +179,8 @@ function render() {
   // General
   const s4 = section(t("secGeneral"));
   const langSel = document.createElement("select"); langSel.className = "set-select";
-  [["zh", "中文"], ["en", "English"]].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; if (draft.lang === v) o.selected = true; langSel.appendChild(o); });
-  langSel.onchange = () => { draft.lang = langSel.value; LANG = draft.lang === "en" ? "en" : "zh"; render(); };
+  [["auto", t("langAuto")], ["zh", "中文"], ["en", "English"]].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; if (draft.lang === v) o.selected = true; langSel.appendChild(o); });
+  langSel.onchange = () => { draft.lang = langSel.value; LANG = pickLang(draft); render(); };
   s4.appendChild(row(t("language"), langSel));
   s4.appendChild(row(t("autostart"), switchEl(draft.autostart, (v) => draft.autostart = v)));
   body.appendChild(s4);
@@ -307,9 +325,10 @@ window.addEventListener("error", (e) => { const el = document.getElementById("se
 window.addEventListener("unhandledrejection", (e) => { const el = document.getElementById("setErr"); if (el) { const r = e.reason; el.textContent = "错误: " + (r && r.toString ? r.toString() : r); } });
 (async function boot() {
   try { const s = await invoke("get_settings"); if (s) cfg = JSON.parse(s); } catch (e) {}
-  draft = Object.assign({ hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"], drop_to_hang: true, text_drag_ext: "txt", accent: "terra", move_mod: "shift", fold_by_date: true, hotkey_shot: "Ctrl+Alt+S", tray_icon: "a", update_mode: "notify", skipped_version: "" }, cfg);
+  try { monitors = (await invoke("list_monitors")) || []; } catch (e) {}
+  draft = Object.assign({ hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "auto", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"], drop_to_hang: true, text_drag_ext: "txt", accent: "terra", move_mod: "shift", fold_by_date: true, hotkey_shot: "Ctrl+Alt+S", tray_icon: "a", update_mode: "notify", skipped_version: "", line_display: "cursor" }, cfg);
   document.documentElement.dataset.accent = draft.accent || "terra";
   previewFont(draft.font_family);
-  LANG = draft.lang === "en" ? "en" : "zh";
+  LANG = pickLang(draft);
   render();
 })();

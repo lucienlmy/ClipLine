@@ -151,6 +151,8 @@ const I18N = {
   },
 };
 let LANG = "zh";
+// "auto" follows Windows (sys_lang comes from the backend: zh for any Chinese UI, else en).
+function pickLang(c) { const l = c.lang === "auto" ? c.sys_lang : c.lang; return l === "en" ? "en" : "zh"; }
 const t = (k) => (I18N[LANG] && I18N[LANG][k] !== undefined ? I18N[LANG][k] : (I18N.zh[k] || k));
 
 /* ---------- note tints ---------- */
@@ -168,7 +170,7 @@ const tintOf = (k) => TINTS.find((x) => x.key === k) || TINTS[0];
 
 /* ---------- state ---------- */
 let state = { clips: [], notes: [], ordered: true };
-let cfg = { hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"] };
+let cfg = { hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "auto", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"] };
 const FONTS = {
   default: '-apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif',
   yahei: '"Microsoft YaHei", "Segoe UI", sans-serif',
@@ -226,7 +228,7 @@ async function load() {
     const s = await invoke("get_settings");
     if (s) cfg = Object.assign(cfg, JSON.parse(s));
   } catch (e) {}
-  LANG = cfg.lang === "en" ? "en" : "zh";
+  LANG = pickLang(cfg);
   // Every card needs a stable id (used for reordering / removal).
   state.clips.forEach((c, i) => { if (!c.id) c.id = "c" + Date.now() + "-" + i; });
   state.notes.forEach((n, i) => { if (!n.id) n.id = "n" + Date.now() + "-" + i; });
@@ -1356,7 +1358,7 @@ function renderSettings() {
   // General
   const s4 = section(t("secGeneral"));
   const langSel = document.createElement("select"); langSel.className = "set-select";
-  [["zh", "中文"], ["en", "English"]].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; if (draft.lang === v) o.selected = true; langSel.appendChild(o); });
+  [["auto", LANG === "en" ? "Follow system" : "跟随系统"], ["zh", "中文"], ["en", "English"]].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; if (draft.lang === v) o.selected = true; langSel.appendChild(o); });
   langSel.onchange = () => { draft.lang = langSel.value; };
   s4.appendChild(row(t("language"), langSel));
   const autoSw = switchEl(draft.autostart, (v) => draft.autostart = v);
@@ -1468,7 +1470,7 @@ function saveSettings() {
   invoke("update_settings", { data: JSON.stringify(draft) })
     .then((res) => {
       if (res) cfg = JSON.parse(res);
-      LANG = cfg.lang === "en" ? "en" : "zh";
+      LANG = pickLang(cfg);
       applyLang();
       applyTheme(cfg.theme);
       cleanup(); render();
@@ -1624,13 +1626,20 @@ function stopCatch() {
 async function wire() {
   await listen("clip:add", (ev) => addClip(ev.payload));
   await listen("line:drop", (ev) => onDrop(ev.payload.deck));
+  // The line can move to another monitor (different width / scale) right
+  // before it drops: lay the rope out again once the new size lands.
+  let resizeRaf = 0;
+  window.addEventListener("resize", () => {
+    cancelAnimationFrame(resizeRaf);
+    resizeRaf = requestAnimationFrame(() => { if (!stage.classList.contains("up")) render(); });
+  });
   await listen("line:rollup", () => onRollup());
   await listen("ui:newnote", () => { setDeck("notes"); stage.classList.remove("up"); render(); newNote(); });
   await listen("theme:preview", (ev) => applyTheme(ev.payload || "soft"));
   await listen("accent:preview", (ev) => applyAccent(ev.payload || "terra"));
   await listen("settings:changed", async () => {
     try { const s = await invoke("get_settings"); if (s) cfg = Object.assign(cfg, JSON.parse(s)); } catch (e) {}
-    LANG = cfg.lang === "en" ? "en" : "zh";
+    LANG = pickLang(cfg);
     applyLang(); applyTheme(cfg.theme); applyAccent(cfg.accent); applyFont(cfg); cleanup(); render();
   });
   await listen("line:catch", () => startCatch());

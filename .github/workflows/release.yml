@@ -24,7 +24,7 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -32,9 +32,10 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
+          package-manager-cache: false
 
       - name: Install Tauri CLI
         run: npm install -g @tauri-apps/cli@^2
@@ -55,7 +56,7 @@ jobs:
           Get-ChildItem dist
           "VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ClipLine-windows
           path: dist/*.exe
@@ -69,7 +70,7 @@ jobs:
 
       - name: Draft GitHub release
         if: startsWith(github.ref, 'refs/tags/') || inputs.release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           # Tag pushes publish directly; manual runs follow the publish input.
           draft: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
