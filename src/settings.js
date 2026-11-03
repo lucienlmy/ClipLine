@@ -6,7 +6,7 @@ const getCurrentWindow = T.window.getCurrentWindow;
 
 const I = {
   zh: {
-    title: "设置", secHotkeys: "快捷键", hkClip: "剪贴板绳", hkNotes: "便签绳",
+    title: "设置", secHotkeys: "快捷键", hkClip: "剪贴板绳", hkNotes: "便签绳", hkShot: "截图上绳", hkShotSub: "框选区域后可挂上绳、标注、识别文字或钉在桌面",
     hkHint: "点击后按下组合键录制", restoreDefault: "恢复默认",
     secInvoke: "呼出方式", hoverOn: "顶边悬停呼出", dwell: "停顿时长", flip: "左右翻转修饰键", hangOn: "拖文件到屏幕顶部自动放绳", moveMod: "拖出卡片时「移动」用的按键", foldDate: "按日期折叠", foldDateSub: "今天的卡片散挂；更早的自动折成「三日内 / 一周内 / 更早」三叠（底部「按日期」按钮也可切换）", moveModSub: "开始拖动时按住即为移动（之后可松开）；不按为复制。默认 Shift，与 Windows 习惯一致", textExt: "文字卡片拖到文件夹时保存为",
     flipNone: "关闭", mShift: "Shift", mCtrl: "Ctrl", mAlt: "Alt",
@@ -29,7 +29,7 @@ const I = {
     about: "ClipLine · 晾衣绳主题剪贴板 / 便签。灵感来自 Tendedero (MIT) 与 Clothespeg (Apache-2.0)；独立重写，名称与图标均为原创。",
   },
   en: {
-    title: "Settings", secHotkeys: "Hotkeys", hkClip: "Clipboard line", hkNotes: "Notes line",
+    title: "Settings", secHotkeys: "Hotkeys", hkClip: "Clipboard line", hkNotes: "Notes line", hkShot: "Screenshot", hkShotSub: "Select a region, then hang it, annotate, OCR or pin it",
     hkHint: "Click, then press a key combo", restoreDefault: "Restore defaults",
     secInvoke: "Invoke", hoverOn: "Drop on top-edge hover", dwell: "Dwell", flip: "Flip modifier", hangOn: "Drag files to top edge to drop the line", moveMod: "Key for moving when dragging a card out", foldDate: "Fold by date", foldDateSub: "Today's cards hang loose; older ones fold into Last 3 days / This week / Older (also via the By date button)", moveModSub: "Hold it when the drag starts to move (you can let go afterwards); otherwise it copies. Default Shift, as in Windows", textExt: "Text card dragged to a folder becomes",
     flipNone: "Off", mShift: "Shift", mCtrl: "Ctrl", mAlt: "Alt",
@@ -130,8 +130,9 @@ function render() {
   };
   s1.appendChild(row(t("hkClip"), mkHk("hotkey_clip"), t("hkHint")));
   s1.appendChild(row(t("hkNotes"), mkHk("hotkey_notes")));
+  s1.appendChild(row(t("hkShot"), mkHk("hotkey_shot"), t("hkShotSub")));
   const restore = document.createElement("button"); restore.className = "btn-mini"; restore.textContent = t("restoreDefault");
-  restore.onclick = () => { draft.hotkey_clip = "Ctrl+Alt+C"; draft.hotkey_notes = "Ctrl+Alt+N"; render(); };
+  restore.onclick = () => { draft.hotkey_clip = "Ctrl+Alt+C"; draft.hotkey_notes = "Ctrl+Alt+N"; draft.hotkey_shot = "Ctrl+Alt+S"; render(); };
   const rr = document.createElement("div"); rr.className = "set-row"; rr.style.justifyContent = "flex-end"; rr.appendChild(restore);
   s1.appendChild(rr);
   const err = document.createElement("div"); err.className = "set-err"; err.id = "setErr"; s1.appendChild(err);
@@ -280,7 +281,7 @@ window.addEventListener("error", (e) => { const el = document.getElementById("se
 window.addEventListener("unhandledrejection", (e) => { const el = document.getElementById("setErr"); if (el) { const r = e.reason; el.textContent = "错误: " + (r && r.toString ? r.toString() : r); } });
 (async function boot() {
   try { const s = await invoke("get_settings"); if (s) cfg = JSON.parse(s); } catch (e) {}
-  draft = Object.assign({ hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"], drop_to_hang: true, text_drag_ext: "txt", accent: "terra", move_mod: "shift", fold_by_date: true }, cfg);
+  draft = Object.assign({ hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"], drop_to_hang: true, text_drag_ext: "txt", accent: "terra", move_mod: "shift", fold_by_date: true, hotkey_shot: "Ctrl+Alt+S" }, cfg);
   document.documentElement.dataset.accent = draft.accent || "terra";
   previewFont(draft.font_family);
   LANG = draft.lang === "en" ? "en" : "zh";

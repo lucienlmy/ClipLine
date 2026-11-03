@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<title>ClipLine 截图</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; cursor: crosshair; user-select: none; -webkit-user-select: none;
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #000; }
+  #bg { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; pointer-events: none; -webkit-user-drag: none; }
+  #mask { position: fixed; inset: 0; pointer-events: none; }
+  #sel { position: fixed; border: 1.5px solid #5db2fc; box-shadow: 0 0 0 9999px rgba(0,0,0,0.45); display: none; pointer-events: none; }
+  #dim { position: fixed; inset: 0; background: rgba(0,0,0,0.45); pointer-events: none; }
+  #size { position: fixed; background: rgba(20,20,20,0.85); color: #fff; font-size: 12px; padding: 2px 7px; border-radius: 4px; display: none; pointer-events: none; }
+  #hint { position: fixed; top: 18px; left: 50%; transform: translateX(-50%); background: rgba(20,20,20,0.8); color: #fff;
+    font-size: 13px; padding: 6px 14px; border-radius: 999px; pointer-events: none; }
+  #bar { position: fixed; display: none; gap: 4px; background: #fff; border-radius: 10px; padding: 5px; box-shadow: 0 6px 20px rgba(0,0,0,0.35); cursor: default; }
+  #bar button { border: none; background: transparent; border-radius: 7px; padding: 6px 10px; font-size: 13px; cursor: pointer; color: #2b2a27; white-space: nowrap; }
+  #bar button:hover { background: rgba(0,0,0,0.07); }
+  #bar button.primary { background: #d97757; color: #fff; }
+  #bar button.primary:hover { filter: brightness(1.05); }
+</style>
+</head>
+<body>
+  <img id="bg" alt="" draggable="false" />
+  <div id="dim"></div>
+  <div id="sel"></div>
+  <div id="size"></div>
+  <div id="hint">拖动框选区域 · Esc 或右键取消</div>
+  <div id="bar">
+    <button data-a="hang" class="primary" title="Enter / 双击">✓ 挂上绳</button>
+    <button data-a="annotate">✎ 标注</button>
+    <button data-a="ocr">文 识别文字</button>
+    <button data-a="pin">📌 钉在桌面</button>
+    <button data-a="cancel">✕</button>
+  </div>
+<script>
+  const { invoke } = window.__TAURI__.core;
+  const $ = (id) => document.getElementById(id);
+  const bg = $("bg"), sel = $("sel"), dim = $("dim"), size = $("size"), bar = $("bar"), hint = $("hint");
+  let natW = 0, natH = 0;
+  let start = null, rect = null, dragging = false, done = false;
+
+  invoke("get_shot_image").then((src) => {
+    bg.onload = () => { natW = bg.naturalWidth; natH = bg.naturalHeight; };
+    bg.src = src;
+  }).catch((e) => { hint.textContent = "截图失败：" + e; setTimeout(cancel, 1500); });
+
+  // CSS pixels → image pixels (the image fills the window exactly)
+  const toImg = (r) => {
+    const sx = (natW || window.innerWidth) / window.innerWidth, sy = (natH || window.innerHeight) / window.innerHeight;
+    return { x: Math.round(r.x * sx), y: Math.round(r.y * sy), w: Math.round(r.w * sx), h: Math.round(r.h * sy) };
+  };
+  function draw() {
+    if (!rect || rect.w < 1 || rect.h < 1) { sel.style.display = "none"; size.style.display = "none"; dim.style.display = "block"; return; }
+    dim.style.display = "none";
+    Object.assign(sel.style, { display: "block", left: rect.x + "px", top: rect.y + "px", width: rect.w + "px", height: rect.h + "px" });
+    const p = toImg(rect);
+    size.textContent = `${p.w} × ${p.h}`;
+    size.style.display = "block";
+    size.style.left = rect.x + "px";
+    size.style.top = Math.max(0, rect.y - 24) + "px";
+  }
+  function showBar() {
+    bar.style.display = "flex";
+    const bw = bar.offsetWidth, bh = bar.offsetHeight;
+    let left = Math.min(rect.x + rect.w - bw, window.innerWidth - bw - 6);
+    left = Math.max(6, left);
+    let top = rect.y + rect.h + 8;
+    if (top + bh > window.innerHeight - 6) top = Math.max(6, rect.y - bh - 8);
+    if (top < 6) top = rect.y + 8;
+    bar.style.left = left + "px"; bar.style.top = top + "px";
+  }
+  function act(a) {
+    if (done) return;
+    if (a === "cancel") { cancel(); return; }
+    if (!rect || rect.w < 3 || rect.h < 3) return;
+    done = true;
+    const p = toImg(rect);
+    invoke("finish_shot", { x: p.x, y: p.y, w: p.w, h: p.h, action: a }).catch((e) => { hint.textContent = "失败：" + e; done = false; });
+  }
+  function cancel() { invoke("cancel_shot").catch(() => {}); }
+
+  document.addEventListener("mousedown", (e) => {
+    if (e.target.closest("#bar")) return;
+    if (e.button === 2) { e.preventDefault(); if (rect && !dragging) { rect = null; bar.style.display = "none"; draw(); } else cancel(); return; }
+    if (e.button !== 0) return;
+    e.preventDefault();
+    start = { x: e.clientX, y: e.clientY }; dragging = true; rect = { x: start.x, y: start.y, w: 0, h: 0 };
+    bar.style.display = "none"; hint.style.display = "none"; draw();
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    rect = { x: Math.min(start.x, e.clientX), y: Math.min(start.y, e.clientY), w: Math.abs(e.clientX - start.x), h: Math.abs(e.clientY - start.y) };
+    draw();
+  });
+  document.addEventListener("mouseup", (e) => {
+    if (!dragging) return;
+    dragging = false;
+    if (!rect || rect.w < 3 || rect.h < 3) { rect = null; draw(); hint.style.display = "block"; return; }
+    showBar();
+  });
+  document.addEventListener("dblclick", (e) => { if (!e.target.closest("#bar") && rect) act("hang"); });
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  document.addEventListener("dragstart", (e) => e.preventDefault());
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") cancel();
+    else if (e.key === "Enter") act("hang");
+  });
+  bar.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) act(b.dataset.a); });
+</script>
+</body>
+</html>

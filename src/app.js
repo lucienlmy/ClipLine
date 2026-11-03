@@ -75,7 +75,7 @@ function refreshModal() {
 const I18N = {
   zh: {
     all: "全部", text: "文字", link: "链接", color: "颜色", image: "图片", file: "文件",
-    search: "搜索…", copied: "已复制", editText: "编辑文字", favMore: "其余收藏", favZone: "左边是收藏区", g3: "三日内", g7: "一周内", gOld: "更早", cards: "张", total: "共", groupOpen: "展开这一叠", groupHint: "单击复制 · 拖出 · 双击编辑/打开 · 右键更多", takeAll: "全部取下", tookN: "已取下 {n} 张", undo: "撤销", favKeep: "收藏的卡片请先取消收藏", tidy: "整理", tidyTip: "取下原文件已不在的卡片", tidied: "已取下 {n} 张失效卡片", foldTip: "按日期折叠：今天散挂，更早的折成「三日内 / 一周内 / 更早」", foldOnT: "已按日期折叠", foldLabel: "按日期", foldOffT: "已全部散挂", moved: "已移动，卡片已取下", stackOpen: "展开这一叠", stackTitle: "这一叠共 {n} 个文件", stackSplit: "拆成单张", stackHint: "单击复制 · 拖出单个文件 · 双击打开", missing: "原文件已不在（被移动或删除了）", already: "已在绳上，已移到最前", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
+    search: "搜索…", copied: "已复制", editText: "编辑文字", annotate: "✎ 标注", ocr: "文 识别文字（OCR）", ocrRunning: "正在识别文字…", ocrFail: "识别失败：", ocrNone: "没有识别到文字", ocrDone: "已识别 {n} 个字，已复制，可在这里修改", shotTip: "截图上绳", favMore: "其余收藏", favZone: "左边是收藏区", g3: "三日内", g7: "一周内", gOld: "更早", cards: "张", total: "共", groupOpen: "展开这一叠", groupHint: "单击复制 · 拖出 · 双击编辑/打开 · 右键更多", takeAll: "全部取下", tookN: "已取下 {n} 张", undo: "撤销", favKeep: "收藏的卡片请先取消收藏", tidy: "整理", tidyTip: "取下原文件已不在的卡片", tidied: "已取下 {n} 张失效卡片", foldTip: "按日期折叠：今天散挂，更早的折成「三日内 / 一周内 / 更早」", foldOnT: "已按日期折叠", foldLabel: "按日期", foldOffT: "已全部散挂", moved: "已移动，卡片已取下", stackOpen: "展开这一叠", stackTitle: "这一叠共 {n} 个文件", stackSplit: "拆成单张", stackHint: "单击复制 · 拖出单个文件 · 双击打开", missing: "原文件已不在（被移动或删除了）", already: "已在绳上，已移到最前", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
     emptyClip: "绳上还空着 — 复制点什么试试",
     emptyNotes: "绳上还没有便签 — 点上方的 + 写一张",
     plus: "新建便签", gear: "设置", prev: "上一屏", next: "下一屏", pinOnly: "只看收藏（钉住）的卡片",
@@ -113,7 +113,7 @@ const I18N = {
   },
   en: {
     all: "All", text: "Text", link: "Link", color: "Color", image: "Image", file: "File",
-    search: "Search…", copied: "Copied", editText: "Edit text", favMore: "More favourites", favZone: "Favourites are on the left", g3: "Last 3 days", g7: "This week", gOld: "Older", cards: "", total: "Total", groupOpen: "Open this stack", groupHint: "Click to copy · drag out · double-click to edit/open · right-click for more", takeAll: "Take all down", tookN: "Took down {n}", undo: "Undo", favKeep: "Remove it from favourites first", tidy: "Tidy", tidyTip: "Take down cards whose files are gone", tidied: "Took down {n} broken card(s)", foldTip: "Fold by date: today loose, older folded into stacks", foldOnT: "Folded by date", foldLabel: "By date", foldOffT: "All cards loose", moved: "Moved — card taken down", stackOpen: "Open this stack", stackTitle: "{n} files in this stack", stackSplit: "Split into cards", stackHint: "Click to copy · drag one out · double-click to open", missing: "The original file is gone (moved or deleted)", already: "Already on the line — moved to front", pasteBack: "Paste into previous app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
+    search: "Search…", copied: "Copied", editText: "Edit text", annotate: "✎ Annotate", ocr: "Recognise text (OCR)", ocrRunning: "Recognising text…", ocrFail: "OCR failed: ", ocrNone: "No text found", ocrDone: "Recognised {n} characters — copied; edit here if needed", shotTip: "Screenshot to the line", favMore: "More favourites", favZone: "Favourites are on the left", g3: "Last 3 days", g7: "This week", gOld: "Older", cards: "", total: "Total", groupOpen: "Open this stack", groupHint: "Click to copy · drag out · double-click to edit/open · right-click for more", takeAll: "Take all down", tookN: "Took down {n}", undo: "Undo", favKeep: "Remove it from favourites first", tidy: "Tidy", tidyTip: "Take down cards whose files are gone", tidied: "Took down {n} broken card(s)", foldTip: "Fold by date: today loose, older folded into stacks", foldOnT: "Folded by date", foldLabel: "By date", foldOffT: "All cards loose", moved: "Moved — card taken down", stackOpen: "Open this stack", stackTitle: "{n} files in this stack", stackSplit: "Split into cards", stackHint: "Click to copy · drag one out · double-click to open", missing: "The original file is gone (moved or deleted)", already: "Already on the line — moved to front", pasteBack: "Paste into previous app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
     emptyClip: "The line is empty — copy something",
     emptyNotes: "No notes yet — click + above to write one",
     plus: "New note", gear: "Settings", prev: "Previous", next: "Next", pinOnly: "Favourites (pinned) only",
@@ -1052,6 +1052,12 @@ function showCtx(e, item, isNote) {
   const sep = () => { const s = document.createElement("div"); s.className = "sep"; ctx.appendChild(s); };
 
   if (!isNote) {
+    const imgP = imagePathOf(item);
+    if (imgP) {
+      add(t("annotate"), () => invoke("annotate_image", { path: imgP, w: item.w || null, h: item.h || null }).catch((e) => toast(String(e))));
+      add(t("ocr"), () => runOcr(imgP));
+      sep();
+    }
     if (item.vis === "image") {
       add(t("copyImg"), () => invoke("copy_image", { path: item.path }).catch(()=>{}));
       add(t("openIt"), () => invoke("open_path", { path: item.path }).catch(()=>{}));
@@ -1459,7 +1465,7 @@ function applyLang() {
   $("prev").title = t("prev");
   $("next").title = t("next");
   $("pinOnly").title = t("pinOnly");
-  $("tidy").title = t("tidyTip"); $("foldBtn").title = t("foldTip"); $("foldBtn").textContent = t("foldLabel");
+  $("shotBtn").title = t("shotTip"); $("tidy").title = t("tidyTip"); $("foldBtn").title = t("foldTip"); $("foldBtn").textContent = t("foldLabel");
   $("editorBody").placeholder = t("editorPh");
   $("bellText").textContent = t("remind");
   const hint = document.querySelector(".editor-foot .hint"); if (hint) hint.textContent = t("editorHint");
@@ -1525,6 +1531,7 @@ $("spSplit").addEventListener("click", () => {
   if (g) { closeStack(); removeItems(g.items.slice(), t("tookN")); }
 });
 $("tidy").addEventListener("click", runTidy);
+$("shotBtn").addEventListener("click", () => invoke("start_shot").catch((e) => toast(String(e))));
 $("foldBtn").addEventListener("click", async () => {
   cfg.fold_by_date = !foldOn(); ui.page = 0; render();
   toast(foldOn() ? t("foldOnT") : t("foldOffT"));
@@ -1560,6 +1567,23 @@ window.addEventListener("wheel", (e) => {
 }, { passive: true });
 window.addEventListener("resize", () => { if (!stage.classList.contains("up")) render(); });
 
+/* ---------- OCR: recognise text in an image, hang it as an editable text card ---------- */
+function runOcr(path) {
+  toast(t("ocrRunning"));
+  invoke("ocr_to_line", { path }).catch((e) => toast(t("ocrFail") + e));
+}
+function onOcrDone(p) {
+  if (!p || p.error) { toast(t("ocrFail") + (p && p.error ? p.error : "")); return; }
+  const text = (p.text || "").trim();
+  if (!text) { toast(t("ocrNone")); return; }
+  const item = { id: "o" + Date.now() + "-" + Math.floor(Math.random() * 1e6), kind: "text", text, ts: Date.now() };
+  addClip(item);
+  invoke("copy_text", { text }).catch(() => {});
+  setDeck("clipboard"); stage.classList.remove("up"); render();
+  // let the user check / correct what was recognised
+  setTimeout(() => { openClipEditor(item); toast(t("ocrDone").replace("{n}", text.replace(/\s/g, "").length)); }, 120);
+}
+
 /* ---------- drag files to the top edge: the line comes down to catch them ----------
    Rust decides when to go back up (button released without a drop). */
 let catching = false;
@@ -1587,6 +1611,7 @@ async function wire() {
     applyLang(); applyTheme(cfg.theme); applyAccent(cfg.accent); applyFont(cfg); cleanup(); render();
   });
   await listen("line:catch", () => startCatch());
+  await listen("ocr:done", (ev) => onOcrDone(ev.payload));
   await listen("files:enter", () => stage.classList.add("catch-over"));
   await listen("files:over", () => stage.classList.add("catch-over"));
   await listen("files:leave", () => stage.classList.remove("catch-over"));

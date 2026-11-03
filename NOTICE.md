@@ -27,3 +27,5 @@ macOS，强依赖「刘海」等系统特性；ClipLine 以 Rust (Tauri) + HTML/
 ## 许可证
 
 本项目以 **Apache License 2.0** 发布，与上游 Clothespeg 的许可证一致且相容。
+
+- 截图上绳、标注与文字识别（v1.4）的功能取舍参考了 [截图吧 jietuba](https://github.com/1003129155/jietuba)（MIT License）的设计；ClipLine 的实现为独立编写，未复制其代码。

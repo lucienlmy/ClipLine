@@ -276,6 +276,19 @@ mod imp {
         })
     }
 
+    /// Save an RGBA image as an image card (file in the images dir + thumb)
+    /// and return it as JSON for the frontend's clip:add.
+    pub fn save_rgba_card(rgba: image::RgbaImage) -> Option<serde_json::Value> {
+        let (w, h) = rgba.dimensions();
+        let data = arboard::ImageData {
+            width: w as usize,
+            height: h as usize,
+            bytes: std::borrow::Cow::Owned(rgba.into_raw()),
+        };
+        let item = save_image(&data)?;
+        serde_json::to_value(item).ok()
+    }
+
     pub fn start_clipboard_watch(app: AppHandle) {
         std::thread::spawn(move || {
             let mut cb = match arboard::Clipboard::new() {
@@ -390,6 +403,9 @@ mod imp {
     pub fn set_files(_paths: &[String]) {}
     pub fn paste_text(_s: &str) {}
     pub fn start_clipboard_watch(_app: AppHandle) {}
+    pub fn save_rgba_card(_rgba: image::RgbaImage) -> Option<serde_json::Value> {
+        None
+    }
 }
 
 pub use imp::*;

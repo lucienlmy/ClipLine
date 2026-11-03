@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod native;
+mod shot;
 mod winx;
 
 use once_cell::sync::{Lazy, OnceCell};
@@ -58,6 +59,7 @@ struct Settings {
     accent: String,                // terra | mint | sky | navy
     move_mod: String,              // shift | alt | ctrl — held when a card drag starts = move
     fold_by_date: bool,            // fold older clips into date stacks
+    hotkey_shot: String,           // region screenshot ("" = off)
 }
 
 impl Default for Settings {
@@ -81,6 +83,7 @@ impl Default for Settings {
             accent: "terra".into(),
             move_mod: "shift".into(),
             fold_by_date: true,
+            hotkey_shot: "Ctrl+Alt+S".into(),
         }
     }
 }
@@ -124,6 +127,7 @@ static STATE: Lazy<Mutex<LineState>> = Lazy::new(|| Mutex::new(LineState::defaul
 static SETTINGS: Lazy<Mutex<Settings>> = Lazy::new(|| Mutex::new(Settings::default()));
 static CUR_CLIP: Lazy<Mutex<Option<Shortcut>>> = Lazy::new(|| Mutex::new(None));
 static CUR_NOTES: Lazy<Mutex<Option<Shortcut>>> = Lazy::new(|| Mutex::new(None));
+static CUR_SHOT: Lazy<Mutex<Option<Shortcut>>> = Lazy::new(|| Mutex::new(None));
 // While a menu / editor / preview / settings overlay is open, the line must
 // not auto-roll-up even if the pointer leaves the panel to reach it.
 /// True while the line was dropped to catch a file drag (until rollup).
@@ -230,7 +234,7 @@ fn parse_shortcut(s: &str) -> Option<Shortcut> {
     ))
 }
 
-fn apply_hotkeys(app: &AppHandle, clip: &str, notes: &str) -> Result<(), String> {
+fn apply_hotkeys(app: &AppHandle, clip: &str, notes: &str, shot_key: &str) -> Result<(), String> {
     let scc = parse_shortcut(clip).ok_or_else(|| format!("无法识别快捷键：{clip}"))?;
     let scn = parse_shortcut(notes).ok_or_else(|| format!("无法识别快捷键：{notes}"))?;
     let gs = app.global_shortcut();
@@ -241,6 +245,17 @@ fn apply_hotkeys(app: &AppHandle, clip: &str, notes: &str) -> Result<(), String>
         .map_err(|e| format!("快捷键可能已被占用：{notes}（{e}）"))?;
     *CUR_CLIP.lock().unwrap() = Some(scc);
     *CUR_NOTES.lock().unwrap() = Some(scn);
+    // Screenshot hotkey is optional and must never block the other two.
+    *CUR_SHOT.lock().unwrap() = None;
+    if !shot_key.trim().is_empty() {
+        match parse_shortcut(shot_key) {
+            Some(scs) => match gs.register(scs.clone()) {
+                Ok(_) => *CUR_SHOT.lock().unwrap() = Some(scs),
+                Err(e) => winx::dlog(&format!("screenshot hotkey {shot_key} unavailable: {e}")),
+            },
+            None => winx::dlog(&format!("screenshot hotkey {shot_key} not recognised")),
+        }
+    }
     Ok(())
 }
 
@@ -624,7 +639,7 @@ fn update_settings(app: AppHandle, data: String) -> Result<String, String> {
     *SETTINGS.lock().unwrap() = s.clone();
     apply_settings_to_state(&s);
     // Side effects are best-effort and must not fail the save.
-    let _ = apply_hotkeys(&app, &s.hotkey_clip, &s.hotkey_notes);
+    let _ = apply_hotkeys(&app, &s.hotkey_clip, &s.hotkey_notes, &s.hotkey_shot);
     let _ = if s.autostart {
         app.autolaunch().enable()
     } else {
@@ -716,6 +731,180 @@ fn set_sticky(on: bool) {
     if st.dropped {
         st.sticky = on;
     }
+}
+
+// ---------------------------------------------------------------------------
+// Screenshot → selection overlay → card; annotation window; OCR
+// ---------------------------------------------------------------------------
+
+static SHOT: Lazy<Mutex<Option<shot::Capture>>> = Lazy::new(|| Mutex::new(None));
+/// A screenshot overlay is open: no hover-drop / drag-catch meanwhile.
+static SHOOTING: AtomicBool = AtomicBool::new(false);
+
+/// Hide the line, freeze the desktop, open the selection overlay.
+#[tauri::command]
+async fn start_shot(app: AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("shot") {
+        let _ = w.set_focus();
+        return Ok(());
+    }
+    SHOOTING.store(true, Ordering::Relaxed);
+    rollup();
+    // let the line and any menu finish disappearing
+    tokio_sleep(280).await;
+    let cap = match tauri::async_runtime::spawn_blocking(shot::capture_virtual_screen).await {
+        Ok(Ok(c)) => c,
+        Ok(Err(e)) => { SHOOTING.store(false, Ordering::Relaxed); return Err(e); }
+        Err(e) => { SHOOTING.store(false, Ordering::Relaxed); return Err(e.to_string()); }
+    };
+    let (x, y, w, h) = (cap.x, cap.y, cap.img.width(), cap.img.height());
+    *SHOT.lock().unwrap() = Some(cap);
+    let win = tauri::WebviewWindowBuilder::new(&app, "shot", tauri::WebviewUrl::App("shot.html".into()))
+        .title("ClipLine 截图")
+        .decorations(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .resizable(false)
+        .visible(false)
+        .shadow(false)
+        .build()
+        .map_err(|e| e.to_string())?;
+    let _ = win.set_position(PhysicalPosition::new(x, y));
+    let _ = win.set_size(PhysicalSize::new(w, h));
+    let _ = win.show();
+    let _ = win.set_focus();
+    Ok(())
+}
+
+async fn tokio_sleep(ms: u64) {
+    let _ = tauri::async_runtime::spawn_blocking(move || std::thread::sleep(std::time::Duration::from_millis(ms))).await;
+}
+
+/// The frozen desktop for the overlay background (JPEG data URL — fast to encode).
+#[tauri::command]
+async fn get_shot_image() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        use base64::Engine;
+        let guard = SHOT.lock().unwrap();
+        let cap = guard.as_ref().ok_or("没有截图")?;
+        let rgb = image::DynamicImage::ImageRgba8(cap.img.clone()).to_rgb8();
+        let mut buf = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 88)
+            .encode_image(&rgb)
+            .map_err(|e| e.to_string())?;
+        Ok::<String, String>(format!(
+            "data:image/jpeg;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(&buf)
+        ))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn cancel_shot(app: AppHandle) -> Result<(), String> {
+    *SHOT.lock().unwrap() = None;
+    SHOOTING.store(false, Ordering::Relaxed);
+    if let Some(w) = app.get_webview_window("shot") {
+        let _ = w.close();
+    }
+    Ok(())
+}
+
+/// Crop the selection (image pixels), hang it as a card, copy it, then do
+/// the follow-up the user picked: hang | annotate | ocr | pin.
+#[tauri::command]
+async fn finish_shot(app: AppHandle, x: u32, y: u32, w: u32, h: u32, action: String) -> Result<(), String> {
+    // take the capture BEFORE closing the overlay (its destroy handler clears it)
+    let cap = SHOT.lock().unwrap().take();
+    SHOOTING.store(false, Ordering::Relaxed);
+    if let Some(win) = app.get_webview_window("shot") {
+        let _ = win.close();
+    }
+    let cap = cap.ok_or("没有截图")?;
+    let (iw, ih) = cap.img.dimensions();
+    let x = x.min(iw.saturating_sub(1));
+    let y = y.min(ih.saturating_sub(1));
+    let w = w.max(1).min(iw - x);
+    let h = h.max(1).min(ih - y);
+    let crop = image::imageops::crop_imm(&cap.img, x, y, w, h).to_image();
+    drop(cap);
+    let item = tauri::async_runtime::spawn_blocking(move || native::save_rgba_card(crop))
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or("保存截图失败")?;
+    let path = item.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let _ = app.emit("clip:add", item.clone());
+    {
+        let p = path.clone();
+        std::thread::spawn(move || native::set_image_from_file(&p));
+    }
+    match action.as_str() {
+        "pin" => pin_image(app.clone(), path, Some(w), Some(h)).await?,
+        "annotate" => annotate_image(app.clone(), path, Some(w), Some(h)).await?,
+        "ocr" => ocr_to_line(app.clone(), path).await?,
+        _ => drop_line_ex(Deck::Clipboard, false, true),
+    }
+    Ok(())
+}
+
+/// Annotation editor for an image (its own window).
+#[tauri::command]
+async fn annotate_image(app: AppHandle, path: String, w: Option<u32>, h: Option<u32>) -> Result<(), String> {
+    rollup();
+    let label = format!("ann{}", now_ms());
+    PIN_PATHS.lock().unwrap().insert(label.clone(), path);
+    let (mut iw, mut ih) = (w.unwrap_or(800) as f64, h.unwrap_or(600) as f64);
+    let (maxw, maxh) = (1180.0_f64, 760.0_f64);
+    if iw > maxw { ih = ih * maxw / iw; iw = maxw; }
+    if ih > maxh { iw = iw * maxh / ih; ih = maxh; }
+    tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App("annotate.html".into()))
+        .title("标注 — ClipLine")
+        .resizable(true)
+        .always_on_top(true)
+        .inner_size((iw + 40.0).max(680.0), (ih + 110.0).max(460.0))
+        .center()
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Save the annotated picture (PNG data URL) as a new card and copy it.
+#[tauri::command]
+async fn save_annotated(app: AppHandle, data: String) -> Result<(), String> {
+    let item = tauri::async_runtime::spawn_blocking(move || -> Result<serde_json::Value, String> {
+        use base64::Engine;
+        let b64 = data.split(',').nth(1).ok_or("数据无效")?;
+        let bytes = base64::engine::general_purpose::STANDARD.decode(b64).map_err(|e| e.to_string())?;
+        let img = image::load_from_memory(&bytes).map_err(|e| e.to_string())?.to_rgba8();
+        native::save_rgba_card(img).ok_or_else(|| "保存失败".to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    let path = item.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let _ = app.emit("clip:add", item);
+    std::thread::spawn(move || native::set_image_from_file(&path));
+    Ok(())
+}
+
+/// OCR an image file; returns the text.
+#[tauri::command]
+async fn ocr_image(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || shot::ocr_file(&path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// OCR, then show the result on the line (as an editable text card).
+#[tauri::command]
+async fn ocr_to_line(app: AppHandle, path: String) -> Result<(), String> {
+    let r = ocr_image(path).await;
+    drop_line_ex(Deck::Clipboard, true, true);
+    let _ = match r {
+        Ok(text) => app.emit("ocr:done", serde_json::json!({ "text": text })),
+        Err(e) => app.emit("ocr:done", serde_json::json!({ "error": e })),
+    };
+    Ok(())
 }
 
 static PIN_PATHS: Lazy<Mutex<HashMap<String, String>>> = Lazy::new(|| Mutex::new(HashMap::new()));
@@ -925,6 +1114,11 @@ fn start_cursor_thread() {
         let mut fallback_done = false;
         loop {
             std::thread::sleep(std::time::Duration::from_millis(40));
+            if SHOOTING.load(Ordering::Relaxed) {
+                cand = None;
+                catch_since = None;
+                continue;
+            }
             let Some((x, y)) = native::cursor_pos() else {
                 std::thread::sleep(std::time::Duration::from_millis(400));
                 continue;
@@ -1084,12 +1278,13 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let item_new = MenuItemBuilder::with_id("newnote", "新建便签 / New note").build(app)?;
     let item_mon = MenuItemBuilder::with_id("togglemon", "暂停 / 恢复监控").build(app)?;
     let item_set = MenuItemBuilder::with_id("settings", "设置 / Settings").build(app)?;
+    let item_shot = MenuItemBuilder::with_id("shot", "截图上绳 / Screenshot").build(app)?;
     let item_restart = MenuItemBuilder::with_id("restart", "重启 / Restart").build(app)?;
     let item_quit = MenuItemBuilder::with_id("quit", "退出 / Quit").build(app)?;
     let menu = MenuBuilder::new(app)
         .items(&[&item_clip, &item_notes])
         .separator()
-        .items(&[&item_new, &item_mon, &item_set])
+        .items(&[&item_shot, &item_new, &item_mon, &item_set])
         .separator()
         .items(&[&item_restart, &item_quit])
         .build()?;
@@ -1107,6 +1302,12 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             "togglemon" => {
                 let active = !native::toggle_paused();
                 let _ = app.emit("ui:monitor", active);
+            }
+            "shot" => {
+                let a = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = start_shot(a).await;
+                });
             }
             "settings" => {
                 let a = app.clone();
@@ -1138,6 +1339,12 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 fn main() {
     tauri::Builder::default()
         .on_window_event(|w, e| {
+            if let tauri::WindowEvent::Destroyed = e {
+                if w.label() == "shot" {
+                    SHOOTING.store(false, Ordering::Relaxed);
+                    *SHOT.lock().unwrap() = None;
+                }
+            }
             if let tauri::WindowEvent::DragDrop(d) = e {
                 winx::dlog(&format!("[rust] window {} drag event: {:?}", w.label(), d));
             }
@@ -1155,7 +1362,13 @@ fn main() {
                     if event.state() == ShortcutState::Pressed {
                         let is_clip = CUR_CLIP.lock().unwrap().as_ref() == Some(shortcut);
                         let is_notes = CUR_NOTES.lock().unwrap().as_ref() == Some(shortcut);
-                        if is_clip {
+                        let is_shot = CUR_SHOT.lock().unwrap().as_ref() == Some(shortcut);
+                        if is_shot {
+                            let a = _app.clone();
+                            tauri::async_runtime::spawn(async move {
+                                let _ = start_shot(a).await;
+                            });
+                        } else if is_clip {
                             toggle_deck(Deck::Clipboard);
                         } else if is_notes {
                             toggle_deck(Deck::Notes);
@@ -1168,6 +1381,14 @@ fn main() {
             set_passthrough,
             drag_text,
             drag_files,
+            start_shot,
+            get_shot_image,
+            cancel_shot,
+            finish_shot,
+            annotate_image,
+            save_annotated,
+            ocr_image,
+            ocr_to_line,
             path_info,
             dbg_log,
             rollup_now,
@@ -1216,10 +1437,10 @@ fn main() {
             setup_geometry(&handle);
             build_tray(&handle)?;
 
-            if apply_hotkeys(&handle, &settings.hotkey_clip, &settings.hotkey_notes).is_err() {
+            if apply_hotkeys(&handle, &settings.hotkey_clip, &settings.hotkey_notes, &settings.hotkey_shot).is_err() {
                 // Fall back to defaults if the saved hotkeys fail to register.
                 let d = Settings::default();
-                let _ = apply_hotkeys(&handle, &d.hotkey_clip, &d.hotkey_notes);
+                let _ = apply_hotkeys(&handle, &d.hotkey_clip, &d.hotkey_notes, &d.hotkey_shot);
             }
 
             native::start_clipboard_watch(handle.clone());

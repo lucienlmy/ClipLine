@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<title>标注 — ClipLine</title>
+<style>
+  :root { --accent: #d97757; --ink: #2b2a27; --soft: #6b6862; }
+  html, body { margin: 0; height: 100%; background: #f3f1ec; font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    user-select: none; -webkit-user-select: none; }
+  #wrap { display: flex; flex-direction: column; height: 100vh; }
+  #tools { display: flex; align-items: center; gap: 4px; padding: 8px 10px; background: #fffdf9; border-bottom: 1px solid rgba(0,0,0,0.08); flex-wrap: wrap; }
+  .tb { border: none; background: transparent; border-radius: 7px; height: 30px; min-width: 32px; padding: 0 8px; font-size: 13px; cursor: pointer; color: var(--ink); }
+  .tb:hover { background: rgba(0,0,0,0.06); }
+  .tb.on { background: rgba(217,119,87,0.16); color: #b85c3d; font-weight: 600; }
+  .sep { width: 1px; height: 22px; background: rgba(0,0,0,0.1); margin: 0 6px; }
+  .sw { flex: none; display: inline-block; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.18); cursor: pointer; margin: 0 2px; }
+  .sw.on { box-shadow: 0 0 0 2px var(--ink); }
+  .grow { flex: 1; }
+  #colors { display: inline-flex; align-items: center; }
+  @media (max-width: 1060px) { .lbl { display: none; } .tb { padding: 0 5px; min-width: 28px; } .sep { margin: 0 3px; } .act { padding: 0 11px; } .sw { margin: 0 1px; } }
+  .act { border: none; border-radius: 999px; height: 30px; padding: 0 14px; font-size: 13px; cursor: pointer; background: rgba(0,0,0,0.06); color: var(--ink); margin-left: 4px; }
+  .act.primary { background: var(--accent); color: #fff; }
+  #stage { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; padding: 14px; }
+  #cv { max-width: 100%; max-height: 100%; box-shadow: 0 4px 18px rgba(0,0,0,0.18); background: #fff; cursor: crosshair; touch-action: none; }
+  #txt { position: absolute; display: none; min-width: 60px; padding: 2px 4px; border: 1.5px dashed var(--accent); background: rgba(255,255,255,0.7);
+    outline: none; font-family: inherit; white-space: pre; user-select: text; -webkit-user-select: text; }
+  #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 7px 14px; border-radius: 999px;
+    font-size: 13px; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="tools">
+    <button class="tb on" data-tool="pen" title="画笔 (P)">✏<span class="lbl"> 画笔</span></button>
+    <button class="tb" data-tool="arrow" title="箭头 (A)">↗<span class="lbl"> 箭头</span></button>
+    <button class="tb" data-tool="rect" title="方框 (R)">▭<span class="lbl"> 方框</span></button>
+    <button class="tb" data-tool="ellipse" title="椭圆 (E)">◯<span class="lbl"> 椭圆</span></button>
+    <button class="tb" data-tool="text" title="文字 (T)">T<span class="lbl"> 文字</span></button>
+    <button class="tb" data-tool="mosaic" title="马赛克 (M)">▦<span class="lbl"> 马赛克</span></button>
+    <button class="tb" data-tool="num" title="序号 (N)">①<span class="lbl"> 序号</span></button>
+    <span class="sep"></span>
+    <span id="colors"></span>
+    <span class="sep"></span>
+    <button class="tb" data-size="1" title="细">细</button>
+    <button class="tb on" data-size="2" title="中">中</button>
+    <button class="tb" data-size="3" title="粗">粗</button>
+    <span class="sep"></span>
+    <button class="tb" id="undo" title="撤销 (Ctrl+Z)">↶</button>
+    <button class="tb" id="redo" title="重做 (Ctrl+Y)">↷</button>
+    <span class="grow"></span>
+    <button class="act" id="ocr" title="识别图片中的文字">文 识别文字</button>
+    <button class="act" id="cancel">取消</button>
+    <button class="act primary" id="done" title="保存为新卡片并复制 (Ctrl+S)">✓ 完成</button>
+  </div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="txt" contenteditable="true"></div>
+  </div>
+</div>
+<div id="toast"></div>
+<script>
+  const T = window.__TAURI__;
+  const invoke = T.core.invoke;
+  const $ = (id) => document.getElementById(id);
+  const cv = $("cv"), ctx = cv.getContext("2d"), txt = $("txt");
+  const COLORS = ["#e5252a", "#f0a020", "#58b980", "#5db2fc", "#193584", "#2b2a27", "#ffffff"];
+  let tool = "pen", color = COLORS[0], sizeLv = 2;
+  let base = null, mosaicCv = null, path = "";
+  let ops = [], redo = [], cur = null, numNext = 1;
+  const win = () => { try { return T.window.getCurrentWindow(); } catch (e) { return null; } };
+  const toast = (m) => { const t = $("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("show"), 1800); };
+
+  // colours
+  COLORS.forEach((c, i) => {
+    const s = document.createElement("span"); s.className = "sw" + (i === 0 ? " on" : ""); s.style.background = c; s.title = c;
+    s.onclick = () => { color = c; document.querySelectorAll(".sw").forEach((z) => z.classList.remove("on")); s.classList.add("on"); };
+    $("colors").appendChild(s);
+  });
+  document.querySelectorAll("[data-tool]").forEach((b) => b.onclick = () => setTool(b.dataset.tool));
+  document.querySelectorAll("[data-size]").forEach((b) => b.onclick = () => {
+    sizeLv = +b.dataset.size; document.querySelectorAll("[data-size]").forEach((z) => z.classList.remove("on")); b.classList.add("on");
+  });
+  function setTool(t) {
+    commitText();
+    tool = t; document.querySelectorAll("[data-tool]").forEach((z) => z.classList.toggle("on", z.dataset.tool === t));
+    cv.style.cursor = t === "text" ? "text" : "crosshair";
+  }
+
+  // sizes scale with the picture so marks look the same on small and large shots
+  const unit = () => Math.max(1.5, Math.min(cv.width, cv.height) / 320);
+  const lineW = () => unit() * [0, 1.2, 2.2, 4][sizeLv];
+  const fontPx = () => Math.round(unit() * [0, 9, 13, 19][sizeLv]);
+
+  (async function load() {
+    try {
+      const label = win() ? win().label : "";
+      path = await invoke("get_pin_path", { label });
+      const src = await invoke("read_image_data", { path });
+      const img = new Image();
+      img.onload = () => {
+        base = img; cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+        // pixelated copy for the mosaic tool
+        const block = Math.max(6, Math.round(Math.min(cv.width, cv.height) / 60));
+        const small = document.createElement("canvas");
+        small.width = Math.max(1, Math.ceil(cv.width / block)); small.height = Math.max(1, Math.ceil(cv.height / block));
+        small.getContext("2d").drawImage(img, 0, 0, small.width, small.height);
+        mosaicCv = document.createElement("canvas"); mosaicCv.width = cv.width; mosaicCv.height = cv.height;
+        const m = mosaicCv.getContext("2d"); m.imageSmoothingEnabled = false; m.drawImage(small, 0, 0, cv.width, cv.height);
+        render();
+      };
+      img.src = src;
+    } catch (e) { toast("无法打开图片：" + e); }
+  })();
+
+  function pos(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height };
+  }
+  function render() {
+    if (!base) return;
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(base, 0, 0);
+    ops.forEach(drawOp);
+    if (cur) drawOp(cur);
+  }
+  function drawOp(o) {
+    ctx.save();
+    ctx.strokeStyle = o.c; ctx.fillStyle = o.c; ctx.lineWidth = o.w; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    if (o.t === "pen") {
+      ctx.beginPath(); o.pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.stroke();
+    } else if (o.t === "rect") {
+      ctx.strokeRect(Math.min(o.a.x, o.b.x), Math.min(o.a.y, o.b.y), Math.abs(o.b.x - o.a.x), Math.abs(o.b.y - o.a.y));
+    } else if (o.t === "ellipse") {
+      ctx.beginPath();
+      ctx.ellipse((o.a.x + o.b.x) / 2, (o.a.y + o.b.y) / 2, Math.abs(o.b.x - o.a.x) / 2, Math.abs(o.b.y - o.a.y) / 2, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (o.t === "arrow") {
+      const ang = Math.atan2(o.b.y - o.a.y, o.b.x - o.a.x), head = o.w * 4.2;
+      const bx = o.b.x - Math.cos(ang) * head * 0.6, by = o.b.y - Math.sin(ang) * head * 0.6;
+      ctx.beginPath(); ctx.moveTo(o.a.x, o.a.y); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(o.b.x, o.b.y);
+      ctx.lineTo(o.b.x - head * Math.cos(ang - 0.42), o.b.y - head * Math.sin(ang - 0.42));
+      ctx.lineTo(o.b.x - head * Math.cos(ang + 0.42), o.b.y - head * Math.sin(ang + 0.42));
+      ctx.closePath(); ctx.fill();
+    } else if (o.t === "mosaic") {
+      const x = Math.min(o.a.x, o.b.x), y = Math.min(o.a.y, o.b.y), w = Math.abs(o.b.x - o.a.x), h = Math.abs(o.b.y - o.a.y);
+      if (w > 0 && h > 0) ctx.drawImage(mosaicCv, x, y, w, h, x, y, w, h);
+    } else if (o.t === "text") {
+      ctx.font = `${o.f}px "Microsoft YaHei", "Segoe UI", sans-serif`; ctx.textBaseline = "top";
+      String(o.s).split("\n").forEach((ln, i) => ctx.fillText(ln, o.p.x, o.p.y + i * o.f * 1.25));
+    } else if (o.t === "num") {
+      const r = o.r; ctx.beginPath(); ctx.arc(o.p.x, o.p.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = o.c.toLowerCase() === "#ffffff" ? "#2b2a27" : "#fff";
+      ctx.font = `bold ${Math.round(r * 1.15)}px "Segoe UI", sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(String(o.n), o.p.x, o.p.y + r * 0.04);
+    }
+    ctx.restore();
+  }
+  function push(o) { ops.push(o); redo = []; render(); }
+
+  cv.addEventListener("mousedown", (e) => e.preventDefault());
+  cv.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || !base) return;
+    e.preventDefault();
+    const p = pos(e);
+    if (tool === "text") { startText(e, p); return; }
+    if (tool === "num") { push({ t: "num", p, n: numNext++, c: color, r: unit() * [0, 7, 9.5, 13][sizeLv] }); return; }
+    cv.setPointerCapture(e.pointerId);
+    cur = tool === "pen" ? { t: "pen", pts: [p], c: color, w: lineW() } : { t: tool, a: p, b: p, c: color, w: lineW() };
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (!cur) return;
+    const p = pos(e);
+    if (cur.t === "pen") cur.pts.push(p);
+    else if (e.shiftKey && (cur.t === "rect" || cur.t === "ellipse")) {
+      const d = Math.max(Math.abs(p.x - cur.a.x), Math.abs(p.y - cur.a.y));
+      cur.b = { x: cur.a.x + Math.sign(p.x - cur.a.x) * d, y: cur.a.y + Math.sign(p.y - cur.a.y) * d };
+    } else cur.b = p;
+    render();
+  });
+  const endDraw = () => {
+    if (!cur) return;
+    const o = cur; cur = null;
+    const tiny = o.t === "pen" ? o.pts.length < 2 : Math.hypot(o.b.x - o.a.x, o.b.y - o.a.y) < 3;
+    if (!tiny) push(o); else render();
+  };
+  cv.addEventListener("pointerup", endDraw);
+  cv.addEventListener("pointercancel", endDraw);
+
+  // text tool: an editable box over the canvas, committed on Enter/blur
+  let textAt = null;
+  function startText(e, p) {
+    commitText();
+    const r = cv.getBoundingClientRect(), st = $("stage").getBoundingClientRect();
+    const scale = r.width / cv.width;
+    textAt = { p, f: fontPx(), c: color };
+    Object.assign(txt.style, {
+      display: "block", left: (e.clientX - st.left) + "px", top: (e.clientY - st.top) + "px",
+      fontSize: Math.max(11, textAt.f * scale) + "px", color: color === "#ffffff" ? "#fff" : color,
+      background: color === "#ffffff" ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.7)",
+    });
+    txt.textContent = ""; txt.focus(); setTimeout(() => txt.focus(), 30);
+  }
+  function commitText() {
+    if (!textAt) return;
+    const s = txt.innerText.replace(/\n$/, "");
+    if (s.trim()) push({ t: "text", p: textAt.p, s, f: textAt.f, c: textAt.c });
+    textAt = null; txt.style.display = "none"; txt.textContent = "";
+  }
+  txt.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitText(); }
+    if (e.key === "Escape") { e.preventDefault(); textAt = null; txt.style.display = "none"; }
+    e.stopPropagation();
+  });
+  txt.addEventListener("blur", () => setTimeout(commitText, 0));
+
+  function undo() { commitText(); if (!ops.length) return; const o = ops.pop(); redo.push(o); if (o.t === "num") numNext = Math.max(1, numNext - 1); render(); }
+  function redoOp() { if (!redo.length) return; const o = redo.pop(); ops.push(o); if (o.t === "num") numNext++; render(); }
+  $("undo").onclick = undo; $("redo").onclick = redoOp;
+
+  function closeSelf() { const w = win(); if (w) w.close(); else window.close(); }
+  async function done() {
+    commitText(); if (!base) return;
+    $("done").disabled = true;
+    try {
+      await invoke("save_annotated", { data: cv.toDataURL("image/png") });
+      closeSelf();
+    } catch (e) { $("done").disabled = false; toast("保存失败：" + e); }
+  }
+  $("done").onclick = done;
+  $("cancel").onclick = () => { if (ops.length && !confirm("放弃这些标注？")) return; closeSelf(); };
+  $("ocr").onclick = async () => {
+    if (!path) return;
+    toast("正在识别…");
+    try { await invoke("ocr_to_line", { path }); toast("识别结果已挂上绳"); } catch (e) { toast("识别失败：" + e); }
+  };
+
+  document.addEventListener("keydown", (e) => {
+    if (e.target === txt) return;
+    const k = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && k === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
+    else if ((e.ctrlKey || e.metaKey) && (k === "y" || (k === "z" && e.shiftKey))) { e.preventDefault(); redoOp(); }
+    else if ((e.ctrlKey || e.metaKey) && k === "s") { e.preventDefault(); done(); }
+    else if (e.key === "Escape") $("cancel").click();
+    else if (!e.ctrlKey && !e.altKey) {
+      const map = { p: "pen", a: "arrow", r: "rect", e: "ellipse", t: "text", m: "mosaic", n: "num" };
+      if (map[k]) setTool(map[k]);
+    }
+  });
+</script>
+</body>
+</html>
