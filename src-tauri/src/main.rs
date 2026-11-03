@@ -2,6 +2,7 @@
 
 mod native;
 mod shot;
+mod update;
 mod winx;
 
 use once_cell::sync::{Lazy, OnceCell};
@@ -61,6 +62,8 @@ struct Settings {
     fold_by_date: bool,            // fold older clips into date stacks
     hotkey_shot: String,           // region screenshot ("" = off)
     tray_icon: String,             // a terracotta | b pepsi blue | c leica red | d sky | e mint
+    update_mode: String,           // auto | notify | off — background check against GitHub Releases
+    skipped_version: String,       // "Skip this version" — not offered again by the background check
 }
 
 impl Default for Settings {
@@ -86,6 +89,8 @@ impl Default for Settings {
             fold_by_date: true,
             hotkey_shot: "Ctrl+Alt+S".into(),
             tray_icon: "a".into(),
+            update_mode: "notify".into(),
+            skipped_version: String::new(),
         }
     }
 }
@@ -661,7 +666,10 @@ fn get_settings() -> String {
 
 #[tauri::command]
 fn update_settings(app: AppHandle, data: String) -> Result<String, String> {
-    let s: Settings = serde_json::from_str(&data).map_err(|e| e.to_string())?;
+    let mut s: Settings = serde_json::from_str(&data).map_err(|e| e.to_string())?;
+    // Only the update card sets this; a settings window opened earlier must
+    // not overwrite it with a stale copy.
+    s.skipped_version = SETTINGS.lock().unwrap().skipped_version.clone();
     // Persist FIRST so a hotkey/autostart hiccup can never lose the user's
     // settings (theme, watched folders, etc.).
     save_settings(&app, &s)?;
@@ -1096,7 +1104,252 @@ async fn pick_folder(app: AppHandle) -> Option<String> {
 
 #[tauri::command]
 fn quit(app: AppHandle) {
+    quit_app(&app);
+}
+
+/// Quit; in "auto" update mode a downloaded update is installed on the way
+/// out (without relaunching).
+fn quit_app(app: &AppHandle) {
+    let auto = SETTINGS.lock().unwrap().update_mode == "auto";
+    if auto && update::pending() {
+        if let Err(e) = update::apply(false) {
+            winx::dlog(&format!("[update] apply on quit failed: {e}"));
+        }
+    }
     app.exit(0);
+}
+
+// ---------------------------------------------------------------------------
+// Updates (GitHub Releases). State lives in update.rs; every change is
+// broadcast as `update:status` and rendered by update.html.
+// ---------------------------------------------------------------------------
+
+fn publish_status(s: &update::Status) {
+    if let Some(app) = APP.get() {
+        let _ = app.emit("update:status", s);
+    }
+}
+
+#[tauri::command]
+fn update_status() -> update::Status {
+    update::status()
+}
+
+/// Check now (manual). Ignores "skip this version".
+#[tauri::command]
+async fn check_update() -> update::Status {
+    run_check().await;
+    update::status()
+}
+
+async fn run_check() -> Option<update::Info> {
+    let ph = update::status().phase;
+    if ph == "downloading" || ph == "installing" || ph == "checking" {
+        return update::status().info;
+    }
+    publish_status(&update::set_status(|s| {
+        s.phase = "checking".into();
+        s.error.clear();
+    }));
+    let res = tauri::async_runtime::spawn_blocking(update::check)
+        .await
+        .unwrap_or_else(|e| Err(e.to_string()));
+    let st = update::set_status(|s| match &res {
+        Ok(info) => {
+            s.phase = if !info.newer {
+                "uptodate"
+            } else if update::ready_for(&info.latest) {
+                "ready"
+            } else {
+                "available"
+            }
+            .into();
+            s.info = Some(info.clone());
+            s.error.clear();
+        }
+        Err(e) => {
+            s.phase = "error".into();
+            s.error = e.clone();
+        }
+    });
+    publish_status(&st);
+    res.ok()
+}
+
+#[tauri::command]
+async fn download_update() -> update::Status {
+    run_download().await;
+    update::status()
+}
+
+async fn run_download() -> bool {
+    let Some(info) = update::status().info.filter(|i| i.newer) else {
+        return false;
+    };
+    publish_status(&update::set_status(|s| {
+        s.phase = "downloading".into();
+        s.done = 0;
+        s.total = info.size;
+        s.error.clear();
+    }));
+    let last = std::sync::Arc::new(AtomicU64::new(0));
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        update::fetch(
+            &info,
+            Box::new(move |done, total| {
+                // throttle to ~10 updates/s
+                let t = now_ms() as u64;
+                if done < total && t.saturating_sub(last.load(Ordering::Relaxed)) < 100 {
+                    return;
+                }
+                last.store(t, Ordering::Relaxed);
+                publish_status(&update::set_status(|s| {
+                    s.done = done;
+                    if total > 0 {
+                        s.total = total;
+                    }
+                }));
+            }),
+        )
+    })
+    .await
+    .unwrap_or_else(|e| Err(e.to_string()));
+    let ok = res.is_ok();
+    publish_status(&update::set_status(|s| match res {
+        Ok(_) => {
+            s.phase = "ready".into();
+            s.done = s.total;
+        }
+        Err(e) => {
+            s.phase = "error".into();
+            s.error = e;
+        }
+    }));
+    ok
+}
+
+/// Install the downloaded update and relaunch.
+#[tauri::command]
+async fn install_update(app: AppHandle) -> Result<(), String> {
+    publish_status(&update::set_status(|s| s.phase = "installing".into()));
+    match update::apply(true) {
+        Ok(()) => {
+            tokio_sleep(300).await;
+            app.exit(0);
+            Ok(())
+        }
+        Err(e) => {
+            publish_status(&update::set_status(|s| {
+                s.phase = "error".into();
+                s.error = e.clone();
+            }));
+            Err(e)
+        }
+    }
+}
+
+#[tauri::command]
+async fn skip_update(app: AppHandle, version: String) -> Result<(), String> {
+    let s = {
+        let mut g = SETTINGS.lock().unwrap();
+        g.skipped_version = version;
+        g.clone()
+    };
+    save_settings(&app, &s)?;
+    if let Some(w) = app.get_webview_window("update") {
+        let _ = w.close();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn open_release_page(app: AppHandle) -> Result<(), String> {
+    let url = update::status()
+        .info
+        .map(|i| i.page)
+        .unwrap_or_else(|| update::RELEASES_PAGE.to_string());
+    app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
+}
+
+/// Show the update card (bottom-right). `check`: also run a check now.
+async fn show_update_window(app: &AppHandle, check: bool) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("update") {
+        let _ = w.show();
+        let _ = w.set_focus();
+    } else {
+        let (lw, lh) = (380.0_f64, 330.0_f64);
+        let win = tauri::WebviewWindowBuilder::new(app, "update", tauri::WebviewUrl::App("update.html".into()))
+            .title("ClipLine 更新")
+            .decorations(false)
+            .transparent(true)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .shadow(false)
+            .visible(false)
+            .inner_size(lw, lh)
+            .build()
+            .map_err(|e| e.to_string())?;
+        if let Ok(Some(mon)) = win.primary_monitor() {
+            let wa = mon.work_area();
+            let sf = mon.scale_factor();
+            let (pw, ph) = ((lw * sf) as i32, (lh * sf) as i32);
+            let margin = (14.0 * sf) as i32;
+            let x = wa.position.x + wa.size.width as i32 - pw - margin;
+            let y = wa.position.y + wa.size.height as i32 - ph - margin;
+            let _ = win.set_position(PhysicalPosition::new(x, y.max(wa.position.y)));
+        }
+        let _ = win.show();
+    }
+    if check {
+        run_check().await;
+    }
+    Ok(())
+}
+
+/// From the tray / settings: open the card and check right away.
+#[tauri::command]
+async fn open_update_window(app: AppHandle) -> Result<(), String> {
+    let ph = update::status().phase;
+    let busy = ph == "downloading" || ph == "ready" || ph == "installing";
+    show_update_window(&app, !busy).await
+}
+
+/// Background check: shortly after start, then every 6 hours. Pops the card
+/// once per new version per run; in "auto" mode downloads first.
+fn start_update_thread(app: AppHandle) {
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(25));
+        let mut shown = String::new();
+        loop {
+            let (mode, skipped) = {
+                let s = SETTINGS.lock().unwrap();
+                (s.update_mode.clone(), s.skipped_version.clone())
+            };
+            if mode != "off" {
+                let found = tauri::async_runtime::block_on(async move {
+                    let info = run_check().await?;
+                    if !info.newer || info.latest == skipped {
+                        return None;
+                    }
+                    if mode == "auto" && !run_download().await {
+                        return None;
+                    }
+                    Some(info.latest)
+                });
+                if let Some(v) = found {
+                    if v != shown {
+                        shown = v;
+                        let a = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let _ = show_update_window(&a, false).await;
+                        });
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(6 * 3600));
+        }
+    });
 }
 
 static WATCH_SEQ: AtomicU64 = AtomicU64::new(0);
@@ -1377,6 +1630,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let item_mon = MenuItemBuilder::with_id("togglemon", "暂停 / 恢复监控").build(app)?;
     let item_set = MenuItemBuilder::with_id("settings", "设置 / Settings").build(app)?;
     let item_shot = MenuItemBuilder::with_id("shot", "截图上绳 / Screenshot").build(app)?;
+    let item_upd = MenuItemBuilder::with_id("update", "检查更新 / Check for updates").build(app)?;
     let item_restart = MenuItemBuilder::with_id("restart", "重启 / Restart").build(app)?;
     let item_quit = MenuItemBuilder::with_id("quit", "退出 / Quit").build(app)?;
     let menu = MenuBuilder::new(app)
@@ -1384,7 +1638,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .separator()
         .items(&[&item_shot, &item_new, &item_mon, &item_set])
         .separator()
-        .items(&[&item_restart, &item_quit])
+        .items(&[&item_upd, &item_restart, &item_quit])
         .build()?;
 
     let mut builder = TrayIconBuilder::with_id("tray")
@@ -1413,8 +1667,14 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                     let _ = create_settings_window(&a);
                 });
             }
+            "update" => {
+                let a = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = open_update_window(a).await;
+                });
+            }
             "restart" => app.restart(),
-            "quit" => app.exit(0),
+            "quit" => quit_app(app),
             _ => {}
         })
         .on_tray_icon_event(|_tray, event| {
@@ -1436,6 +1696,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 }
 
 fn main() {
+    update::on_startup();
     tauri::Builder::default()
         .on_window_event(|w, e| {
             if let tauri::WindowEvent::Destroyed = e {
@@ -1520,6 +1781,13 @@ fn main() {
             get_pin_path,
             pick_folder,
             open_settings,
+            update_status,
+            check_update,
+            download_update,
+            install_update,
+            skip_update,
+            open_release_page,
+            open_update_window,
             quit
         ])
         .setup(|app| {
@@ -1559,6 +1827,7 @@ fn main() {
             winx::start_mouse_hook();
             start_cursor_thread();
             start_folder_watch();
+            start_update_thread(handle.clone());
 
             Ok(())
         })

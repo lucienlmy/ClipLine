@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<title>ClipLine 更新</title>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; user-select: none; -webkit-user-select: none; }
+  #card { position: absolute; inset: 8px; border-radius: 14px; background: #fffdf7; color: #2b2a27;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.06); padding: 16px 16px 12px; display: flex; flex-direction: column;
+    animation: swing 0.9s cubic-bezier(.3,1.4,.5,1) both; transform-origin: 50% -30px; }
+  @keyframes swing { 0% { transform: translateY(-30px) rotate(-6deg); opacity: 0; } 40% { opacity: 1; } 60% { transform: rotate(3deg); } 100% { transform: none; } }
+  #peg { position: absolute; top: -2px; left: 50%; width: 12px; height: 24px; margin-left: -6px; border-radius: 5px; background: linear-gradient(#e6a985, #d97757); }
+  #drag { position: absolute; inset: 0 40px auto 0; height: 34px; -webkit-app-region: drag; }
+  #x { position: absolute; top: 8px; right: 10px; width: 22px; height: 22px; padding: 0; border-radius: 50%; background: transparent; font-size: 12px; opacity: 0.55; }
+  #x:hover { opacity: 1; background: rgba(0,0,0,0.08); }
+  .kicker { font-size: 12px; opacity: 0.7; display: flex; align-items: center; gap: 6px; }
+  #title { font-size: 16px; font-weight: 650; margin: 6px 0 2px; }
+  #sub { font-size: 12px; opacity: 0.7; line-height: 1.5; }
+  #mid { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #notes { flex: 1; min-height: 0; overflow-y: auto; margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: rgba(0,0,0,0.035);
+    font-size: 12px; line-height: 1.6; user-select: text; -webkit-user-select: text; }
+  #notes h4 { margin: 8px 0 2px; font-size: 12.5px; }
+  #notes h4:first-child { margin-top: 0; }
+  #notes ul { margin: 2px 0; padding-left: 16px; }
+  #notes code { font-family: Consolas, monospace; font-size: 11px; background: rgba(0,0,0,0.06); padding: 0 3px; border-radius: 3px; }
+  #notes p { margin: 3px 0; }
+  .spacer { flex: 1; }
+  #bar { height: 8px; border-radius: 99px; background: rgba(0,0,0,0.08); overflow: hidden; margin-top: 14px; }
+  #fill { height: 100%; width: 0; background: #d97757; border-radius: 99px; transition: width 0.2s; }
+  #bar.indet #fill { width: 35%; animation: slide 1.1s ease-in-out infinite; }
+  @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(290%); } }
+  .row { display: flex; gap: 6px; margin-top: 10px; align-items: center; }
+  button { border: none; border-radius: 999px; padding: 6px 12px; font-size: 12px; cursor: pointer; background: rgba(0,0,0,0.07); color: inherit; white-space: nowrap; }
+  button:hover { background: rgba(0,0,0,0.13); }
+  button.primary { background: #d97757; color: #fff; }
+  button.primary:hover { background: #c96646; }
+  button.link { background: transparent; padding: 6px 4px; opacity: 0.7; text-decoration: underline; }
+  .push { margin-left: auto; }
+  .err { color: #b2442a; }
+  .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(0,0,0,0.15); border-top-color: #d97757; border-radius: 50%; animation: rot 0.8s linear infinite; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+  <div id="card">
+    <i id="peg"></i>
+    <div id="drag"></div>
+    <button id="x" title="关闭">✕</button>
+    <div class="kicker"><span id="icon">⬆</span><span id="kick">ClipLine 更新</span></div>
+    <div id="title"></div>
+    <div id="sub"></div>
+    <div id="mid"></div>
+    <div class="row" id="btns"></div>
+  </div>
+<script>
+  const T = window.__TAURI__;
+  const invoke = T.core.invoke;
+  const $ = (id) => document.getElementById(id);
+  const win = T.window.getCurrentWindow();
+  let mode = "notify";
+  let st = { phase: "idle" };
+
+  const close = () => { try { win.close(); } catch (e) {} };
+  const mb = (n) => (n / 1048576).toFixed(1) + " MB";
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  // Release notes are Markdown; show the part from the first heading on
+  // (the file list above it is not interesting here).
+  function md(src) {
+    let lines = (src || "").replace(/\r/g, "").split("\n");
+    const h = lines.findIndex((l) => /^#{2,4}\s/.test(l));
+    if (h > 0) lines = lines.slice(h);
+    let out = "", inList = false;
+    const inline = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>");
+    for (const raw of lines) {
+      const l = raw.trimEnd();
+      const li = l.match(/^\s*[-*]\s+(.*)$/);
+      if (li) { if (!inList) { out += "<ul>"; inList = true; } out += "<li>" + inline(li[1]) + "</li>"; continue; }
+      if (inList) { out += "</ul>"; inList = false; }
+      const hd = l.match(/^#{1,6}\s+(.*)$/);
+      if (hd) out += "<h4>" + inline(hd[1]) + "</h4>";
+      else if (l.trim()) out += "<p>" + inline(l) + "</p>";
+    }
+    if (inList) out += "</ul>";
+    return out || "<p>（这个版本没有写更新说明）</p>";
+  }
+
+  function btn(label, fn, cls) {
+    const b = document.createElement("button");
+    b.textContent = label; if (cls) b.className = cls; b.onclick = fn;
+    $("btns").appendChild(b); return b;
+  }
+
+  function render() {
+    const i = st.info || {};
+    const kind = i.kind === "installer" ? "安装版" : "便携版";
+    $("btns").innerHTML = "";
+    $("icon").textContent = "⬆";
+    $("sub").classList.remove("err");
+    const mid = $("mid"); mid.innerHTML = "";
+
+    switch (st.phase) {
+      case "checking":
+      case "idle":
+        $("icon").innerHTML = '<span class="spin"></span>';
+        $("title").textContent = "正在检查更新…";
+        $("sub").textContent = "正在连接 GitHub";
+        btn("关闭", close, "push");
+        break;
+      case "uptodate":
+        $("icon").textContent = "✓";
+        $("title").textContent = "已是最新版本";
+        $("sub").textContent = `当前 v${i.current || ""}（${kind}），GitHub 上最新为 v${i.latest || ""}`;
+        btn("查看发布页", () => invoke("open_release_page"), "link");
+        btn("好的", close, "primary push");
+        break;
+      case "available": {
+        $("title").textContent = `发现新版本 v${i.latest}`;
+        $("sub").textContent = `当前 v${i.current} · ${kind}` + (i.size ? ` · ${mb(i.size)}` : "");
+        const notes = document.createElement("div"); notes.id = "notes"; notes.innerHTML = md(i.notes);
+        mid.appendChild(notes);
+        btn("跳过此版本", () => invoke("skip_update", { version: i.latest }).catch(() => close()), "link");
+        btn("以后再说", close, "push");
+        btn("立即更新", () => invoke("download_update"), "primary");
+        break;
+      }
+      case "downloading": {
+        $("title").textContent = `正在下载 v${i.latest}`;
+        const pct = st.total ? Math.min(100, Math.round((st.done / st.total) * 100)) : 0;
+        $("sub").textContent = st.total ? `${mb(st.done)} / ${mb(st.total)}（${pct}%）` : "正在下载…";
+        const bar = document.createElement("div"); bar.id = "bar"; if (!st.total) bar.className = "indet";
+        const fill = document.createElement("div"); fill.id = "fill"; if (st.total) fill.style.width = pct + "%";
+        bar.appendChild(fill); mid.appendChild(bar);
+        btn("后台下载", close, "push");
+        break;
+      }
+      case "ready":
+        $("icon").textContent = "✓";
+        $("title").textContent = `v${i.latest} 已下载好`;
+        $("sub").textContent = (i.kind === "installer"
+          ? "将以免打扰方式安装，完成后自动重新打开。"
+          : "将直接替换当前程序文件（文件名和位置不变），然后自动重新打开。")
+          + (mode === "auto" ? "选「稍后」的话，退出 ClipLine 时会自动安装。" : "");
+        btn("稍后", close, "push");
+        btn("重启并更新", () => invoke("install_update").catch(() => {}), "primary");
+        break;
+      case "installing":
+        $("icon").innerHTML = '<span class="spin"></span>';
+        $("title").textContent = "正在更新…";
+        $("sub").textContent = "ClipLine 会自动关闭并重新打开";
+        break;
+      case "error":
+      default:
+        $("icon").textContent = "!";
+        $("title").textContent = "更新没有成功";
+        $("sub").textContent = st.error || "未知错误";
+        $("sub").classList.add("err");
+        btn("打开发布页手动下载", () => invoke("open_release_page"), "link");
+        btn("关闭", close, "push");
+        btn("重试", () => (st.info && st.info.newer ? invoke("download_update") : invoke("check_update")), "primary");
+        break;
+    }
+  }
+
+  $("x").onclick = close;
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+  T.event.listen("update:status", (e) => { st = e.payload || st; render(); });
+  (async () => {
+    try { const s = JSON.parse(await invoke("get_settings")); mode = s.update_mode || "notify"; } catch (e) {}
+    try { st = (await invoke("update_status")) || st; } catch (e) {}
+    render();
+  })();
+</script>
+</body>
+</html>

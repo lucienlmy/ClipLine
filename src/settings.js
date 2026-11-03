@@ -19,6 +19,8 @@ const I = {
     secRemind: "提醒快捷项", remindHint: "勾选在便签提醒面板里显示的快捷时间",
     p_m5: "5 分钟后", p_m10: "10 分钟后", p_m15: "15 分钟后", p_m30: "30 分钟后", p_h1: "1 小时后", p_h2: "2 小时后", p_h3: "3 小时后", p_tonight: "今晚 20:00", p_tomorrow: "明天此时", p_tomorrow9: "明早 9:00", p_nextweek: "下周此时",
     secHelp: "使用说明", secAbout: "关于", save: "保存", cancel: "取消",
+    version: "当前版本", checkUpdate: "检查更新", updMode: "自动更新", updAuto: "自动下载", updNotify: "有新版时提醒", updOff: "关闭",
+    updModeSub: "从 GitHub 发布页检查新版本。「自动下载」会在后台下好，提示一次后重启即可完成，不重启的话下次退出时自动安装；「有新版时提醒」只弹卡片，由你决定是否更新",
     help: [
       ["呼出", "鼠标顶到屏幕最上沿：左半剪贴板绳、右半便签绳；按住翻转键左右对调。或用快捷键。"],
       ["单击/双击", "单击复制（卡上浮现「已复制」）；文字卡双击放大编辑，图片双击复制，文件双击打开。"],
@@ -42,6 +44,8 @@ const I = {
     secRemind: "Reminder presets", remindHint: "Pick the quick times shown in the note reminder popover",
     p_m5: "In 5 min", p_m10: "In 10 min", p_m15: "In 15 min", p_m30: "In 30 min", p_h1: "In 1 hour", p_h2: "In 2 hours", p_h3: "In 3 hours", p_tonight: "Tonight 20:00", p_tomorrow: "Tomorrow, same time", p_tomorrow9: "Tomorrow 9:00", p_nextweek: "Next week",
     secHelp: "How to use", secAbout: "About", save: "Save", cancel: "Cancel",
+    version: "Version", checkUpdate: "Check for updates", updMode: "Automatic updates", updAuto: "Download automatically", updNotify: "Notify me", updOff: "Off",
+    updModeSub: "Checks the GitHub releases page. Download automatically fetches it in the background and installs on restart (or when you quit); Notify me only shows a card and lets you decide",
     help: [
       ["Invoke", "Top edge: left = clipboard, right = notes; hold the flip key to swap. Or hotkeys."],
       ["Click", "Click copies; double-click pastes into your previous app."],
@@ -275,6 +279,13 @@ function render() {
   const ob = document.createElement("button"); ob.className = "btn-mini"; ob.textContent = t("openDataDir");
   ob.onclick = () => invoke("open_data_dir").catch((e) => alert(e));
   dataRow.appendChild(ob); s6.appendChild(dataRow);
+  const verRow = document.createElement("div"); verRow.className = "set-row";
+  verRow.innerHTML = `<div><div class="label">${t("version")}</div><div class="sub" id="verText">…</div></div>`;
+  const cu = document.createElement("button"); cu.className = "btn-mini"; cu.textContent = t("checkUpdate");
+  cu.onclick = () => invoke("open_update_window").catch((e) => { const el = $("setErr"); if (el) el.textContent = String(e); });
+  verRow.appendChild(cu); s6.appendChild(verRow);
+  try { T.app.getVersion().then((v) => { const el = $("verText"); if (el) el.textContent = "v" + v; }); } catch (e) {}
+  s6.appendChild(row(t("updMode"), seg(draft.update_mode || "notify", [["auto", t("updAuto")], ["notify", t("updNotify")], ["off", t("updOff")]], (v) => draft.update_mode = v), t("updModeSub")));
   body.appendChild(s6);
 
   $("cancelBtn").textContent = t("cancel");
@@ -296,7 +307,7 @@ window.addEventListener("error", (e) => { const el = document.getElementById("se
 window.addEventListener("unhandledrejection", (e) => { const el = document.getElementById("setErr"); if (el) { const r = e.reason; el.textContent = "错误: " + (r && r.toString ? r.toString() : r); } });
 (async function boot() {
   try { const s = await invoke("get_settings"); if (s) cfg = JSON.parse(s); } catch (e) {}
-  draft = Object.assign({ hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"], drop_to_hang: true, text_drag_ext: "txt", accent: "terra", move_mod: "shift", fold_by_date: true, hotkey_shot: "Ctrl+Alt+S", tray_icon: "a" }, cfg);
+  draft = Object.assign({ hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"], drop_to_hang: true, text_drag_ext: "txt", accent: "terra", move_mod: "shift", fold_by_date: true, hotkey_shot: "Ctrl+Alt+S", tray_icon: "a", update_mode: "notify", skipped_version: "" }, cfg);
   document.documentElement.dataset.accent = draft.accent || "terra";
   previewFont(draft.font_family);
   LANG = draft.lang === "en" ? "en" : "zh";
