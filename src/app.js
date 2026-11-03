@@ -7,6 +7,62 @@ const listen = TAURI ? TAURI.event.listen : async () => () => {};
 const convertFileSrc = (p) => { try { return TAURI ? TAURI.core.convertFileSrc(p) : p; } catch (e) { return p; } };
 const isImagePath = (p) => /\.(png|jpe?g|gif|bmp|webp)$/i.test(p || "");
 const FILE_SVG = '<svg width="40" height="44" viewBox="0 0 40 44" xmlns="http://www.w3.org/2000/svg"><path d="M7 2h18l9 9v29a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#f1efe8" stroke="#c9b79a" stroke-width="2"/><path d="M25 2v9h9" fill="none" stroke="#c9b79a" stroke-width="2"/><line x1="11" y1="20" x2="29" y2="20" stroke="#d8d3c8" stroke-width="2.5" stroke-linecap="round"/><line x1="11" y1="27" x2="29" y2="27" stroke="#d8d3c8" stroke-width="2.5" stroke-linecap="round"/><line x1="11" y1="34" x2="23" y2="34" stroke="#d8d3c8" stroke-width="2.5" stroke-linecap="round"/></svg>';
+
+/* ---------- file-type icons: colour band + extension, like Office/Explorer ---------- */
+const FILE_KINDS = [
+  ["#2b579a", "doc docx rtf odt wps dot dotx"],
+  ["#217346", "xls xlsx xlsm csv ods et"],
+  ["#d24726", "ppt pptx pps ppsx odp dps"],
+  ["#e5252a", "pdf"],
+  ["#8e5bd8", "png jpg jpeg gif bmp webp svg ico tif tiff heic psd ai"],
+  ["#e0457b", "mp4 mkv avi mov wmv flv webm m4v"],
+  ["#f0a020", "mp3 wav flac aac m4a ogg wma"],
+  ["#8d6e63", "zip rar 7z tar gz bz2 xz iso cab"],
+  ["#455a64", "js ts jsx tsx py rs java c cpp h hpp cs go rb php html htm css scss json xml yml yaml toml sh bat cmd ps1 sql md"],
+  ["#78909c", "txt log ini cfg conf"],
+  ["#37474f", "exe msi apk lnk dll appx msix"],
+];
+function extOf(p) { const b = baseName(p); const m = b.match(/\.([^.\\/]{1,8})$/); return m ? m[1].toLowerCase() : ""; }
+function kindColor(ext) { for (const [c, list] of FILE_KINDS) if ((" " + list + " ").includes(" " + ext + " ")) return c; return "#9e9e9e"; }
+function fileIconSvg(p, isDir, size) {
+  const w = size || 40, h = Math.round(w * 1.1);
+  if (isDir) {
+    return `<svg width="${w + 4}" height="${h}" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg"><path d="M3 9a3 3 0 0 1 3-3h10l4 4h18a3 3 0 0 1 3 3v22a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z" fill="#f2c14e"/><path d="M3 15h38v20a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z" fill="#f7d675"/></svg>`;
+  }
+  const ext = extOf(p), c = kindColor(ext), label = (ext || "file").toUpperCase().slice(0, 4);
+  const fs = label.length > 3 ? 7.5 : 9;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 40 44" xmlns="http://www.w3.org/2000/svg"><path d="M7 2h18l9 9v29a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#fbfaf6" stroke="#cfc7b8" stroke-width="1.6"/><path d="M25 2v7a2 2 0 0 0 2 2h7" fill="#ece6da" stroke="#cfc7b8" stroke-width="1.6"/><rect x="2" y="23" width="30" height="13" rx="2.5" fill="${c}"/><text x="17" y="32.6" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="${fs}" font-weight="700" fill="#fff">${label}</text></svg>`;
+}
+/* exists / is-folder, cached per path for this session */
+const pathInfoCache = new Map();
+function withPathInfo(paths, cb) {
+  const need = paths.filter((p) => !pathInfoCache.has(p));
+  if (!need.length) { cb(paths.map((p) => pathInfoCache.get(p))); return; }
+  invoke("path_info", { paths: need }).then((r) => {
+    need.forEach((p, i) => pathInfoCache.set(p, r[i] || [true, false]));
+    cb(paths.map((p) => pathInfoCache.get(p)));
+  }).catch(() => {});
+}
+/* which modifier means "move" when a card drag starts (settings) */
+function moveHeld(e) { const m = cfg.move_mod || "shift"; return m === "alt" ? e.altKey : m === "ctrl" ? e.ctrlKey : e.shiftKey; }
+/* after a move: drop the paths that are gone from the card (or the whole card) */
+function afterMove(item, paths, tries) {
+  // Explorer may finish the move a moment later (copy engine) — check again.
+  tries = tries || 0;
+  pathInfoCache.clear();
+  withPathInfo(paths, (info) => {
+    if (!paths.some((p, i) => info[i] && !info[i][0])) { if (tries < 2) setTimeout(() => afterMove(item, paths, tries + 1), tries ? 2500 : 600); return; }
+    const gone = paths.filter((p, i) => info[i] && !info[i][0]);
+    if (!gone.length) return;
+    if (item.vis === "image") { state.clips = state.clips.filter((c) => c !== item); }
+    else {
+      item.files = (item.files || []).filter((p) => !gone.includes(p));
+      if (!item.files.length) state.clips = state.clips.filter((c) => c !== item);
+      else item.text = item.files.join("\n");
+    }
+    save(); render(); toast(t("moved"));
+  });
+}
 const DRAG_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADgAAAA4CAYAAACohjseAAAABmJLR0QA/wD/AP+gvaeTAAADMklEQVRoge2azWsTQRjGf7NJbJN+6KEqQooIfvQg9mCt7aFi9aL2rv9B8T/opVI/QNCLnu3Nk2gRWpAKNgpeKsEPBCmkaAUteolF25pNm2TGy6aINDqbmY1p2N8lG9h53nl23uwDmYGQkJCQkJCKCD83z06Pn4ygxhQcA1oCmtNPIC3hdv/Z4SlTMW2D6ek7owquAI5pUV2E4GrvmeExIw2dm2anx086qJRwIk7yQA+7kl1EYttM6lakVFgn+2WeT5k0SpakkHKwd+ji82r1tFbDQV0GnOSBHvbsOxKYOYBIbBu79x4muf8ogKMc57KJnm67HQXYlewyqeWLnZ0btXpMdHQNtuI93VoRjTWVL9tMdGr2wvhfNLzBqA2R3MIcSzMT5Bc/INfXbEgCsMP7zIxcUOV8VErc7rp5TzsfjVdw6elDFsevkVuYs2puE1qAQSHUZGbkwhXdQUYrmFuYI/vkASISoXVgiER3H6I5YSJZEZXP4b57yfKzSSgVR+dHzqcO3rj/z3w0WsFvMxOgFK0DQ7QcPxWYOQDRnCDRc4K2gXMAjkJo5aORwbXFBQAS3X0mMr6Id/eXL7Xy0cigXM+D93RrhRPfqKWVjw0fE6HBrY6VoP+T5ewixbW8Fa1oUzPtHcnqx1uZxW/8yH7m6/s3VjUViu0dnVWNDVvUL9s7OhEI8u6yFb3meHt9tShAe0eS9iCEq6DhWzQ0uNUJ5Dfo5laRxZIVLScaIZ5orXq8dYNubpXvS1nbslWbDFvUL+UnXSgWrOjForH6alE8k/EghKug4Vs0NLjVqZscNM27StRdDto2GbaoX6rNQdO8q4SuwRWgrVRY19oj3HI5KOAVQPbLfOATso2WwRLcAviUSfP141uKhUB3kayiZbD/7PCUEFxVsiQ/Z9K8Tt0l/Xg8+NlZQPst2ntmeExIOQg8BVaDnZY9fL1FvfMqp8vfvZ3XuqbhczA0+A9W8LaXa4V0N2pp/bNsZLCcj+67lyYyvnDfznpXSquo2Q6vErcAlp9Nsvoihcy7JnJ/r+Xm+PkixcrzRwASqXeGzdd50c3wjnSM1vD3LEFcOnTj3nWdm38BEHbzQzZC4kIAAAAASUVORK5CYII=";
 
 /* Keep the line from auto-rolling-up while a menu / overlay is open. */
@@ -19,7 +75,7 @@ function refreshModal() {
 const I18N = {
   zh: {
     all: "全部", text: "文字", link: "链接", color: "颜色", image: "图片", file: "文件",
-    search: "搜索…", copied: "已复制", editText: "编辑文字", stackOpen: "展开这一叠", stackTitle: "这一叠共 {n} 个文件", stackSplit: "拆成单张", stackHint: "单击复制 · 拖出单个文件 · 双击打开", missing: "原文件已不在（被移动或删除了）", already: "已在绳上，已移到最前", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
+    search: "搜索…", copied: "已复制", editText: "编辑文字", moved: "已移动，卡片已取下", stackOpen: "展开这一叠", stackTitle: "这一叠共 {n} 个文件", stackSplit: "拆成单张", stackHint: "单击复制 · 拖出单个文件 · 双击打开", missing: "原文件已不在（被移动或删除了）", already: "已在绳上，已移到最前", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
     emptyClip: "绳上还空着 — 复制点什么试试",
     emptyNotes: "绳上还没有便签 — 点上方的 + 写一张",
     plus: "新建便签", gear: "设置", prev: "上一屏", next: "下一屏", pinOnly: "只看收藏（钉住）的卡片",
@@ -57,7 +113,7 @@ const I18N = {
   },
   en: {
     all: "All", text: "Text", link: "Link", color: "Color", image: "Image", file: "File",
-    search: "Search…", copied: "Copied", editText: "Edit text", stackOpen: "Open this stack", stackTitle: "{n} files in this stack", stackSplit: "Split into cards", stackHint: "Click to copy · drag one out · double-click to open", missing: "The original file is gone (moved or deleted)", already: "Already on the line — moved to front", pasteBack: "Paste into previous app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
+    search: "Search…", copied: "Copied", editText: "Edit text", moved: "Moved — card taken down", stackOpen: "Open this stack", stackTitle: "{n} files in this stack", stackSplit: "Split into cards", stackHint: "Click to copy · drag one out · double-click to open", missing: "The original file is gone (moved or deleted)", already: "Already on the line — moved to front", pasteBack: "Paste into previous app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
     emptyClip: "The line is empty — copy something",
     emptyNotes: "No notes yet — click + above to write one",
     plus: "New note", gear: "Settings", prev: "Previous", next: "Next", pinOnly: "Favourites (pinned) only",
@@ -350,8 +406,13 @@ function buildClipCard(item) {
       invoke("read_image_data", { path: first }).then((data) => { if (data) d.querySelector("img").src = data; }).catch(() => {});
     } else {
       const d = document.createElement("div"); d.className = "c-file";
-      d.innerHTML = `<div class="ico">${FILE_SVG}</div><div class="fname">${escapeHtml(base)}</div>${more}`;
+      d.innerHTML = `<div class="ico">${fileIconSvg(first, false, 50)}</div><div class="fname">${escapeHtml(base)}</div>${more}`;
       body.appendChild(d);
+      withPathInfo([first], ([inf]) => {
+        if (!inf) return;
+        if (inf[1]) d.querySelector(".ico").innerHTML = fileIconSvg(first, true, 50);
+        if (!inf[0]) { card.classList.add("missing"); card.title = t("missing"); }
+      });
     }
   } else {
     const d = document.createElement("div"); d.className = "c-text" + (item.vis === "code" ? " code" : "");
@@ -477,7 +538,8 @@ function openStack(item, card) {
   const box = $("spItems"); box.innerHTML = "";
   files.forEach((p) => {
     const d = document.createElement("div"); d.className = "sp-item"; d.title = p;
-    d.innerHTML = `<div class="sp-ico">${FILE_SVG}</div><div class="sp-name">${escapeHtml(baseName(p))}</div>`;
+    d.innerHTML = `<div class="sp-ico">${fileIconSvg(p, false)}</div><div class="sp-name">${escapeHtml(baseName(p))}</div>`;
+    withPathInfo([p], ([inf]) => { if (inf && inf[1]) d.querySelector(".sp-ico").innerHTML = fileIconSvg(p, true); if (inf && !inf[0]) d.classList.add("missing"); });
     if (isImagePath(p)) {
       invoke("read_image_data", { path: p }).then((data) => {
         if (data) d.querySelector(".sp-ico").innerHTML = `<img src="${data}" alt="">`;
@@ -491,7 +553,9 @@ function openStack(item, card) {
       armed = false;
       suppressClickUntil = Date.now() + 500;
       selfDragUntil = Date.now() + 60000;
-      invoke("drag_files", { paths: [p], mov: e.shiftKey }).catch((err) => toast(t("dragFail") + err))
+      const mov = moveHeld(e);
+      invoke("drag_files", { paths: [p], mov }).catch((err) => toast(String(err).includes("不存在") ? t("missing") : t("dragFail") + err))
+        .then(() => { if (mov && stackItem) { const it = stackItem; closeStack(); afterMove(it, [p]); } })
         .finally(() => { selfDragUntil = Date.now() + 400; });
     });
     d.addEventListener("pointerup", () => { armed = false; });
@@ -546,10 +610,11 @@ function attachDragOut(card, item) {
     }
     const paths = item.vis === "image" ? (item.path ? [item.path] : []) : (item.files || []);
     if (!paths.length) return;
-    const mov = e.shiftKey; // Windows: Shift = move, default = copy
+    const mov = moveHeld(e); // default Shift = move (Windows habit); configurable
     suppressClickUntil = Date.now() + 500;
     selfDragUntil = Date.now() + 60000;
     invoke("drag_files", { paths, mov }).catch((err) => toast(String(err).includes("不存在") ? t("missing") : t("dragFail") + err))
+      .then(() => { if (mov) afterMove(item, paths); })
       .finally(() => { selfDragUntil = Date.now() + 400; });
   });
   card.addEventListener("pointerup", () => { armed = false; });

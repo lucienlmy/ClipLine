@@ -346,3 +346,7 @@ html, body {
 .accent-sw { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; font-size: 11px; color: var(--ink-soft); }
 .accent-sw i { width: 30px; height: 30px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.12); }
 .accent-sw.on i { box-shadow: 0 0 0 2px var(--ink); }
+
+/* file whose original is gone */
+.card.missing .card-body { opacity: 0.55; filter: grayscale(0.6); }
+.sp-item.missing { opacity: 0.5; }

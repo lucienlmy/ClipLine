@@ -56,6 +56,7 @@ struct Settings {
     drop_to_hang: bool,            // dragging files to the top edge drops the line
     text_drag_ext: String,         // txt | md — file type when a text card is dragged to Explorer
     accent: String,                // terra | mint | sky | navy
+    move_mod: String,              // shift | alt | ctrl — held when a card drag starts = move
 }
 
 impl Default for Settings {
@@ -77,6 +78,7 @@ impl Default for Settings {
             drop_to_hang: true,
             text_drag_ext: "txt".into(),
             accent: "terra".into(),
+            move_mod: "shift".into(),
         }
     }
 }
@@ -476,6 +478,18 @@ async fn drag_text(app: AppHandle, text: String) -> Result<bool, String> {
     let r = rx.recv().map_err(|e| e.to_string())?;
     rollup_ex(false);
     r
+}
+
+/// For each path: [exists, is_dir].
+#[tauri::command]
+fn path_info(paths: Vec<String>) -> Vec<[bool; 2]> {
+    paths
+        .iter()
+        .map(|p| {
+            let m = std::fs::metadata(p);
+            [m.is_ok(), m.map(|m| m.is_dir()).unwrap_or(false)]
+        })
+        .collect()
 }
 
 /// Drag file / image cards out (copy, or move with Shift).
@@ -1152,6 +1166,7 @@ fn main() {
             set_passthrough,
             drag_text,
             drag_files,
+            path_info,
             dbg_log,
             rollup_now,
             toggle,

@@ -8,7 +8,7 @@ const I = {
   zh: {
     title: "设置", secHotkeys: "快捷键", hkClip: "剪贴板绳", hkNotes: "便签绳",
     hkHint: "点击后按下组合键录制", restoreDefault: "恢复默认",
-    secInvoke: "呼出方式", hoverOn: "顶边悬停呼出", dwell: "停顿时长", flip: "左右翻转修饰键", hangOn: "拖文件到屏幕顶部自动放绳", textExt: "文字卡片拖到文件夹时保存为",
+    secInvoke: "呼出方式", hoverOn: "顶边悬停呼出", dwell: "停顿时长", flip: "左右翻转修饰键", hangOn: "拖文件到屏幕顶部自动放绳", moveMod: "拖出卡片时「移动」用的按键", moveModSub: "开始拖动时按住即为移动（之后可松开）；不按为复制。默认 Shift，与 Windows 习惯一致", textExt: "文字卡片拖到文件夹时保存为",
     flipNone: "关闭", mShift: "Shift", mCtrl: "Ctrl", mAlt: "Alt",
     secClean: "自动清理", retention: "保留天数", days: "天",
     secGeneral: "常规", language: "语言", autostart: "开机自启动",
@@ -31,7 +31,7 @@ const I = {
   en: {
     title: "Settings", secHotkeys: "Hotkeys", hkClip: "Clipboard line", hkNotes: "Notes line",
     hkHint: "Click, then press a key combo", restoreDefault: "Restore defaults",
-    secInvoke: "Invoke", hoverOn: "Drop on top-edge hover", dwell: "Dwell", flip: "Flip modifier", hangOn: "Drag files to top edge to drop the line", textExt: "Text card dragged to a folder becomes",
+    secInvoke: "Invoke", hoverOn: "Drop on top-edge hover", dwell: "Dwell", flip: "Flip modifier", hangOn: "Drag files to top edge to drop the line", moveMod: "Key for moving when dragging a card out", moveModSub: "Hold it when the drag starts to move (you can let go afterwards); otherwise it copies. Default Shift, as in Windows", textExt: "Text card dragged to a folder becomes",
     flipNone: "Off", mShift: "Shift", mCtrl: "Ctrl", mAlt: "Alt",
     secClean: "Auto cleanup", retention: "Keep for", days: "days",
     secGeneral: "General", language: "Language", autostart: "Launch at startup",
@@ -143,6 +143,7 @@ function render() {
   s2.appendChild(row(t("dwell"), seg(draft.dwell_ms, [[150, "0.15s"], [250, "0.25s"], [400, "0.4s"]], (v) => draft.dwell_ms = parseInt(v, 10))));
   s2.appendChild(row(t("flip"), seg(draft.flip_mod, [["none", t("flipNone")], ["shift", t("mShift")], ["ctrl", t("mCtrl")], ["alt", t("mAlt")]], (v) => draft.flip_mod = v)));
   s2.appendChild(row(t("hangOn"), switchEl(draft.drop_to_hang, (v) => draft.drop_to_hang = v)));
+  s2.appendChild(row(t("moveMod"), seg(draft.move_mod || "shift", [["shift", "Shift"], ["alt", "Alt"], ["ctrl", "Ctrl"]], (v) => draft.move_mod = v), t("moveModSub")));
   s2.appendChild(row(t("textExt"), seg(draft.text_drag_ext, [["txt", ".txt"], ["md", ".md"]], (v) => draft.text_drag_ext = v)));
   body.appendChild(s2);
 
@@ -278,7 +279,7 @@ window.addEventListener("error", (e) => { const el = document.getElementById("se
 window.addEventListener("unhandledrejection", (e) => { const el = document.getElementById("setErr"); if (el) { const r = e.reason; el.textContent = "错误: " + (r && r.toString ? r.toString() : r); } });
 (async function boot() {
   try { const s = await invoke("get_settings"); if (s) cfg = JSON.parse(s); } catch (e) {}
-  draft = Object.assign({ hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"], drop_to_hang: true, text_drag_ext: "txt", accent: "terra" }, cfg);
+  draft = Object.assign({ hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "zh", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"], drop_to_hang: true, text_drag_ext: "txt", accent: "terra", move_mod: "shift" }, cfg);
   document.documentElement.dataset.accent = draft.accent || "terra";
   previewFont(draft.font_family);
   LANG = draft.lang === "en" ? "en" : "zh";
