@@ -1157,6 +1157,9 @@ function openEditorFor(note) {
   setTimeout(() => $("editorBody").focus(), 30);
 }
 function closeEditor() {
+  // A line dropped "sticky" for editing (reminder → open, OCR result, new note
+  // from the tray) returns to normal auto-retract once editing is done.
+  invoke("set_sticky", { on: false }).catch(() => {});
   if (!editing) { $("editor").hidden = true; return; }
   if (editing._clip) {
     const it = editing._clip, v = $("editorBody").value;
@@ -1537,7 +1540,9 @@ let pointerInCtx = false;
 document.addEventListener("pointerdown", (e) => {
   pointerInCtx = !!e.target.closest("#ctx");
   if (stage.classList.contains("up")) { pointerInsideLine = false; return; }
-  pointerInsideLine = !!(e.target.closest("#stage") || e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#ctx") || e.target.closest("#stackPop"));
+  // Only real UI counts as "inside": a click on empty rope / panel space closes the line.
+  pointerInsideLine = !!(e.target.closest(".card") || e.target.closest("#pill") || e.target.closest("#plus") || e.target.closest(".knot") ||
+    e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#ctx") || e.target.closest("#stackPop"));
 }, true);
 $("preview").addEventListener("click", (e) => { if (e.target.id === "preview") closePreview(); });
 $("spClose").addEventListener("click", closeStack);
