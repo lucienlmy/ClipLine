@@ -10,6 +10,7 @@
   - `shot.rs`：GDI 截全虚拟屏、Windows 自带 OCR（Windows.Media.Ocr）。
   - `display.rs`：显示器列表（Win32 `EnumDisplayMonitors` + `GetDpiForMonitor`，缓存 1 秒，插拔后自动更新）、系统界面语言。`main.rs` 里 `target_monitor` 按设置 `line_display`（`cursor` / `primary` / 设备名如 `\\.\DISPLAY2`）选屏，`fit_line_to` 按那块屏的缩放重算绳子尺寸，`place_window` 先移位再改尺寸再移位（跨缩放比例移动时 Windows 会先自动缩放一次）。提醒 / 更新卡片用 `place_corner_card` 放在同一块屏右下角。
   - `update.rs`：检查更新。用系统的 `URLDownloadToFileW` 访问 GitHub API（`releases/latest`）和下载安装文件，不引入 TLS 库，走系统代理；状态集中在 `STATUS`，每次变化由 `main.rs` 广播 `update:status`，`update.html` 负责显示。
+- `src/md.js`：小型 Markdown 渲染器（先整体转义再生成标记，链接只给 `data-href`，由页面自己 `invoke("open_url")`）。便签卡片、编辑器预览、提醒卡片共用；按行渲染，待办方框带 `data-idx`（源文本行号），打勾用 `MD.toggle`。待办写法兼容 `- [ ]` / `[ ]` / `[]`。提醒卡片里有一份同样的 Markdown 样式（`remind.html` 不加载 `styles.css`），改样式时两处一起改。
 - `src/`：前端静态页。`app.js` 主界面（绳子布局：收藏区 / 今天 / 日期叠、卡片、便签、提醒、整理），`settings.*`、`pin.html`、`shot.html`（截图选区）、`annotate.html`（标注）、`remind.html`（提醒卡片）、`update.html`（更新卡片）。
 
 ## 踩过的坑（务必遵守）
@@ -21,7 +22,8 @@
 6. 自动更新靠**发布文件名**找安装文件：便携版必须含 `_portable_`、安装版必须以 `-setup.exe` 结尾（Release 工作流现在就是这样命名，改工作流时别动）。程序判断自己是哪种版本的依据是 exe 旁边有没有 `uninstall.exe`。
 7. 便携版更新：运行中的 exe 可以改名但不能覆盖，所以先把自己改名为 `*.exe.old`，新文件放到原路径，再带 `--after-update <pid>` 启动新版（新版先等旧进程退出，再清理 `.old`）。安装版更新：运行 setup 带 `/P /UPDATE /R`（免打扰、保留自启动项、装完重新打开）。
 8. 语言设置 `lang` 可为 `auto`：`get_settings` / `update_settings` 返回的 JSON 额外带 `sys_lang`（zh / en），前端用 `pickLang` 解析；`Settings` 默认值是 `auto`，但已存的 settings.json 保留原值。
-9. 版本比较只看 `主.次.修订` 三段数字；发布时 `tauri.conf.json`、`Cargo.toml` 的版本号和标签必须一致，否则会反复提示更新。
+9. 提醒卡片 / 更新卡片自带中英文表：提醒卡片的语言由主窗口随数据传过来（`lang`），缺省时自己读设置；更新卡片读 `get_settings`。更新出错的文字来自 Rust（中文），`update.html` 的 `ERR_EN` 按前缀翻译——在 `update.rs` 新增或修改错误文字时，记得同步这张表。
+10. 版本比较只看 `主.次.修订` 三段数字；发布时 `tauri.conf.json`、`Cargo.toml` 的版本号和标签必须一致，否则会反复提示更新。
 
 ## 在 Linux 上检查 Windows 代码
 ```bash

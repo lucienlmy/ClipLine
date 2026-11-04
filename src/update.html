@@ -46,8 +46,8 @@
   <div id="card">
     <i id="peg"></i>
     <div id="drag"></div>
-    <button id="x" title="关闭">✕</button>
-    <div class="kicker"><span id="icon">⬆</span><span id="kick">ClipLine 更新</span></div>
+    <button id="x">✕</button>
+    <div class="kicker"><span id="icon">⬆</span><span id="kick"></span></div>
     <div id="title"></div>
     <div id="sub"></div>
     <div id="mid"></div>
@@ -59,6 +59,60 @@
   const $ = (id) => document.getElementById(id);
   const win = T.window.getCurrentWindow();
   let mode = "notify";
+  const L = {
+    zh: {
+      doc: "ClipLine 更新", kick: "ClipLine 更新", close: "关闭", installer: "安装版", portable: "便携版",
+      checking: "正在检查更新…", connecting: "正在连接 GitHub",
+      uptodate: "已是最新版本", uptodateSub: "当前 v{cur}（{kind}），GitHub 上最新为 v{latest}", releasePage: "查看发布页", ok: "好的",
+      found: "发现新版本 v{v}", current: "当前 v{v}", noNotes: "（这个版本没有写更新说明）",
+      skip: "跳过此版本", later: "以后再说", updateNow: "立即更新",
+      downloading: "正在下载 v{v}", downloadingDots: "正在下载…", background: "后台下载",
+      ready: "v{v} 已下载好", readyInst: "将以免打扰方式安装，完成后自动重新打开。",
+      readyPort: "将直接替换当前程序文件（文件名和位置不变），然后自动重新打开。", readyAuto: "选「稍后」的话，退出 ClipLine 时会自动安装。",
+      laterBtn: "稍后", restart: "重启并更新", installing: "正在更新…", installingSub: "ClipLine 会自动关闭并重新打开",
+      failed: "更新没有成功", unknown: "未知错误", manual: "打开发布页手动下载", retry: "重试",
+    },
+    en: {
+      doc: "ClipLine update", kick: "ClipLine update", close: "Close", installer: "installer", portable: "portable",
+      checking: "Checking for updates…", connecting: "Connecting to GitHub",
+      uptodate: "You're up to date", uptodateSub: "This is v{cur} ({kind}); the latest on GitHub is v{latest}", releasePage: "Release page", ok: "OK",
+      found: "New version v{v} available", current: "Current v{v}", noNotes: "(No release notes for this version)",
+      skip: "Skip this version", later: "Not now", updateNow: "Update now",
+      downloading: "Downloading v{v}", downloadingDots: "Downloading…", background: "Hide",
+      ready: "v{v} is ready", readyInst: "It installs quietly and reopens ClipLine when done.",
+      readyPort: "It replaces this program file in place (same name and folder), then reopens ClipLine.", readyAuto: " If you choose Later, it installs when you quit ClipLine.",
+      laterBtn: "Later", restart: "Restart & update", installing: "Updating…", installingSub: "ClipLine will close and reopen by itself",
+      failed: "The update didn't go through", unknown: "Unknown error", manual: "Download from the release page", retry: "Retry",
+    },
+  };
+  let lang = "zh";
+  const tr = (k, vars) => { let v = (L[lang] && L[lang][k]) || L.zh[k] || k; for (const n in vars || {}) v = v.split("{" + n + "}").join(vars[n]); return v; };
+  // Errors come from the Rust side in Chinese; translate the known ones.
+  const ERR_EN = [
+    [/^无法连接 GitHub：/, "Couldn't reach GitHub: "],
+    [/^GitHub 返回的内容无法识别$/, "GitHub sent back something unrecognisable"],
+    [/^没有找到已发布的版本$/, "No published release was found"],
+    [/^检查过于频繁.*$/, "Too many checks — GitHub is refusing for now; please try again later"],
+    [/^这个版本没有找到可用的安装文件.*$/, "This release has no usable download; please get it from the release page"],
+    [/^正在下载中$/, "Already downloading"],
+    [/^下载失败：/, "Download failed: "],
+    [/^下载的文件不完整.*$/, "The download is incomplete; please retry"],
+    [/^下载的文件无效.*$/, "The downloaded file is invalid; please retry"],
+    [/^还没有下载更新$/, "The update hasn't been downloaded yet"],
+    [/^更新文件不见了.*$/, "The update file is gone; please download it again"],
+    [/^无法启动安装程序：/, "Couldn't start the installer: "],
+    [/^无法写入程序所在的文件夹（(.*)），请到发布页手动下载$/, "Can't write to ClipLine's folder ($1); please download from the release page"],
+    [/^无法替换程序文件：/, "Couldn't replace the program file: "],
+    [/^新版本已就位，但没能自动启动：/, "The new version is in place but didn't start: "],
+    [/错误代码 /g, "error code "],
+    [/^没有收到文件$/, "No file was received"],
+    [/^仅支持 Windows$/, "Windows only"],
+  ];
+  const errText = (e) => { if (!e) return tr("unknown"); if (lang !== "en") return e; let s = e; ERR_EN.forEach(([re, to]) => { s = s.replace(re, to); }); return s; };
+  function applyLang() {
+    document.documentElement.lang = lang;
+    document.title = tr("doc"); $("kick").textContent = tr("kick"); $("x").title = tr("close");
+  }
   let st = { phase: "idle" };
 
   const close = () => { try { win.close(); } catch (e) {} };
@@ -83,7 +137,7 @@
       else if (l.trim()) out += "<p>" + inline(l) + "</p>";
     }
     if (inList) out += "</ul>";
-    return out || "<p>（这个版本没有写更新说明）</p>";
+    return out || "<p>" + esc(tr("noNotes")) + "</p>";
   }
 
   function btn(label, fn, cls) {
@@ -94,7 +148,7 @@
 
   function render() {
     const i = st.info || {};
-    const kind = i.kind === "installer" ? "安装版" : "便携版";
+    const kind = i.kind === "installer" ? tr("installer") : tr("portable");
     $("btns").innerHTML = "";
     $("icon").textContent = "⬆";
     $("sub").classList.remove("err");
@@ -104,61 +158,58 @@
       case "checking":
       case "idle":
         $("icon").innerHTML = '<span class="spin"></span>';
-        $("title").textContent = "正在检查更新…";
-        $("sub").textContent = "正在连接 GitHub";
-        btn("关闭", close, "push");
+        $("title").textContent = tr("checking");
+        $("sub").textContent = tr("connecting");
+        btn(tr("close"), close, "push");
         break;
       case "uptodate":
         $("icon").textContent = "✓";
-        $("title").textContent = "已是最新版本";
-        $("sub").textContent = `当前 v${i.current || ""}（${kind}），GitHub 上最新为 v${i.latest || ""}`;
-        btn("查看发布页", () => invoke("open_release_page"), "link");
-        btn("好的", close, "primary push");
+        $("title").textContent = tr("uptodate");
+        $("sub").textContent = tr("uptodateSub", { cur: i.current || "", kind, latest: i.latest || "" });
+        btn(tr("releasePage"), () => invoke("open_release_page"), "link");
+        btn(tr("ok"), close, "primary push");
         break;
       case "available": {
-        $("title").textContent = `发现新版本 v${i.latest}`;
-        $("sub").textContent = `当前 v${i.current} · ${kind}` + (i.size ? ` · ${mb(i.size)}` : "");
+        $("title").textContent = tr("found", { v: i.latest });
+        $("sub").textContent = tr("current", { v: i.current }) + ` · ${kind}` + (i.size ? ` · ${mb(i.size)}` : "");
         const notes = document.createElement("div"); notes.id = "notes"; notes.innerHTML = md(i.notes);
         mid.appendChild(notes);
-        btn("跳过此版本", () => invoke("skip_update", { version: i.latest }).catch(() => close()), "link");
-        btn("以后再说", close, "push");
-        btn("立即更新", () => invoke("download_update"), "primary");
+        btn(tr("skip"), () => invoke("skip_update", { version: i.latest }).catch(() => close()), "link");
+        btn(tr("later"), close, "push");
+        btn(tr("updateNow"), () => invoke("download_update"), "primary");
         break;
       }
       case "downloading": {
-        $("title").textContent = `正在下载 v${i.latest}`;
+        $("title").textContent = tr("downloading", { v: i.latest });
         const pct = st.total ? Math.min(100, Math.round((st.done / st.total) * 100)) : 0;
-        $("sub").textContent = st.total ? `${mb(st.done)} / ${mb(st.total)}（${pct}%）` : "正在下载…";
+        $("sub").textContent = st.total ? `${mb(st.done)} / ${mb(st.total)} (${pct}%)` : tr("downloadingDots");
         const bar = document.createElement("div"); bar.id = "bar"; if (!st.total) bar.className = "indet";
         const fill = document.createElement("div"); fill.id = "fill"; if (st.total) fill.style.width = pct + "%";
         bar.appendChild(fill); mid.appendChild(bar);
-        btn("后台下载", close, "push");
+        btn(tr("background"), close, "push");
         break;
       }
       case "ready":
         $("icon").textContent = "✓";
-        $("title").textContent = `v${i.latest} 已下载好`;
-        $("sub").textContent = (i.kind === "installer"
-          ? "将以免打扰方式安装，完成后自动重新打开。"
-          : "将直接替换当前程序文件（文件名和位置不变），然后自动重新打开。")
-          + (mode === "auto" ? "选「稍后」的话，退出 ClipLine 时会自动安装。" : "");
-        btn("稍后", close, "push");
-        btn("重启并更新", () => invoke("install_update").catch(() => {}), "primary");
+        $("title").textContent = tr("ready", { v: i.latest });
+        $("sub").textContent = (i.kind === "installer" ? tr("readyInst") : tr("readyPort")) + (mode === "auto" ? tr("readyAuto") : "");
+        btn(tr("laterBtn"), close, "push");
+        btn(tr("restart"), () => invoke("install_update").catch(() => {}), "primary");
         break;
       case "installing":
         $("icon").innerHTML = '<span class="spin"></span>';
-        $("title").textContent = "正在更新…";
-        $("sub").textContent = "ClipLine 会自动关闭并重新打开";
+        $("title").textContent = tr("installing");
+        $("sub").textContent = tr("installingSub");
         break;
       case "error":
       default:
         $("icon").textContent = "!";
-        $("title").textContent = "更新没有成功";
-        $("sub").textContent = st.error || "未知错误";
+        $("title").textContent = tr("failed");
+        $("sub").textContent = errText(st.error);
         $("sub").classList.add("err");
-        btn("打开发布页手动下载", () => invoke("open_release_page"), "link");
-        btn("关闭", close, "push");
-        btn("重试", () => (st.info && st.info.newer ? invoke("download_update") : invoke("check_update")), "primary");
+        btn(tr("manual"), () => invoke("open_release_page"), "link");
+        btn(tr("close"), close, "push");
+        btn(tr("retry"), () => (st.info && st.info.newer ? invoke("download_update") : invoke("check_update")), "primary");
         break;
     }
   }
@@ -167,7 +218,11 @@
   window.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
   T.event.listen("update:status", (e) => { st = e.payload || st; render(); });
   (async () => {
-    try { const s = JSON.parse(await invoke("get_settings")); mode = s.update_mode || "notify"; } catch (e) {}
+    try {
+      const s = JSON.parse(await invoke("get_settings")); mode = s.update_mode || "notify";
+      lang = (s.lang === "auto" ? s.sys_lang : s.lang) === "en" ? "en" : "zh";
+    } catch (e) {}
+    applyLang();
     try { st = (await invoke("update_status")) || st; } catch (e) {}
     render();
   })();

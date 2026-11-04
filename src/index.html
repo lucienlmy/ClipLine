@@ -46,7 +46,14 @@
         <div class="tints" id="tints"></div>
         <button class="editor-close" id="editorClose" title="保存并关闭 (Esc)">✕</button>
       </div>
-      <textarea id="editorBody" placeholder="写点什么…&#10;第一行是标题&#10;用 [] 开头的行会变成勾选项"></textarea>
+      <div class="editor-tools" id="edTools"></div>
+      <textarea id="editorBody" placeholder="写点什么…"></textarea>
+      <div id="editorPreview" class="md" hidden></div>
+      <div class="link-note" id="linkNoteRow" hidden>
+        <label for="linkNote" id="linkNoteLab">备注</label>
+        <input id="linkNote" type="text" maxlength="100" spellcheck="false" />
+        <span class="cnt" id="linkNoteCnt">0/100</span>
+      </div>
       <div class="editor-foot">
         <button id="bell" title="提醒">🔔 <span id="bellText">提醒</span></button>
         <span class="hint">Ctrl+S 保存 · Esc 关闭</span>
@@ -81,6 +88,7 @@
     </div>
   </div>
 
+  <script src="md.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

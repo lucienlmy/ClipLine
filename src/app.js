@@ -83,7 +83,10 @@ const I18N = {
     copy: "复制", copyImg: "复制图片", copyPath: "复制文件地址",
     pin: "收藏（钉住）", unpin: "取消收藏", favOn: "已收藏，不会被自动清理", favOff: "已取消收藏", noFav: "还没有收藏：鼠标移到卡片上，点右下角 ☆", reveal: "在资源管理器中显示", openIt: "打开",
     openLink: "在浏览器打开", saveDesktop: "保存到桌面", toNote: "转为便签",
-    editorPh: "写点什么…\n第一行是标题\n用 [] 开头的行会变成勾选项",
+    editorPh: "写点什么…\n第一行是标题，支持 Markdown（**粗体**、# 标题、- 列表）\n点上方 ☑ 或输入 - [ ] 加待办，卡片上点方框打勾",
+    nextPage: "下一屏", shotLabel: "截图", blankNote: "（空白便签）", todoProg: "待办完成进度",
+    tbTodo: "待办清单", tbBold: "粗体（Ctrl+B）", tbItalic: "斜体（Ctrl+I）", tbStrike: "删除线", tbHead: "标题", tbList: "列表", tbNum: "编号列表", tbQuote: "引用", tbCode: "代码", tbLink: "链接", tbPreview: "预览", tbEdit: "编辑", phText: "文字", phLink: "链接文字",
+    linkNote: "备注", linkNotePh: "给这个链接写个备注，例如「报销系统入口」", addNote: "添加备注", editNote: "编辑备注",
     editorHint: "Ctrl+S 保存 · Esc 关闭", save: "保存", remind: "提醒",
     r15: "15 分钟后", r1h: "1 小时后", rtm: "明天此时", rclr: "清除提醒",
     p_m5: "5 分钟后", p_m10: "10 分钟后", p_m15: "15 分钟后", p_m30: "30 分钟后", p_h1: "1 小时后", p_h2: "2 小时后", p_h3: "3 小时后", p_tonight: "今晚 20:00", p_tomorrow: "明天此时", p_tomorrow9: "明早 9:00", p_nextweek: "下周此时",
@@ -107,7 +110,7 @@ const I18N = {
       ["单击卡片", "复制到剪贴板。"],
       ["双击卡片", "粘贴回你刚才的应用（文字自动 Ctrl+V；图片为复制）。"],
       ["右键卡片", "复制、盯住、在资源管理器显示、保存到桌面、打开、转为便签等。"],
-      ["便签", "点绳中上方 + 新建；第一行为标题；[] 开头变勾选项；页脚 🔔 设提醒。"],
+      ["便签", "点绳中上方 + 新建；第一行为标题；支持 Markdown；☑ 按钮或 - [ ] 加待办，卡上点方框打勾；页脚 🔔 设提醒。"],
       ["截图", "按 PrintScreen 或 Win+Shift+S 截图会进剪贴板，自动挂上绳。"],
     ],
   },
@@ -121,7 +124,10 @@ const I18N = {
     copy: "Copy", copyImg: "Copy image", copyPath: "Copy file path",
     pin: "Favourite (pin)", unpin: "Remove favourite", favOn: "Favourited — kept from auto-cleanup", favOff: "Removed from favourites", noFav: "No favourites yet: hover a card and click ☆ at the bottom right", reveal: "Show in Explorer", openIt: "Open",
     openLink: "Open in browser", saveDesktop: "Save to Desktop", toNote: "Turn into note",
-    editorPh: "Write something…\nFirst line is the title\nLines starting with [] become checkboxes",
+    editorPh: "Write something…\nFirst line is the title; Markdown works (**bold**, # heading, - list)\nClick ☑ above or type - [ ] for a to-do, then tick it on the card",
+    nextPage: "Next", shotLabel: "Snip", blankNote: "(Blank note)", todoProg: "To-dos done",
+    tbTodo: "To-do list", tbBold: "Bold (Ctrl+B)", tbItalic: "Italic (Ctrl+I)", tbStrike: "Strikethrough", tbHead: "Heading", tbList: "Bullet list", tbNum: "Numbered list", tbQuote: "Quote", tbCode: "Code", tbLink: "Link", tbPreview: "Preview", tbEdit: "Edit", phText: "text", phLink: "link text",
+    linkNote: "Note", linkNotePh: "Add a note for this link, e.g. \"Expense system login\"", addNote: "Add note", editNote: "Edit note",
     editorHint: "Ctrl+S save · Esc close", save: "Save", remind: "Remind",
     r15: "In 15 min", r1h: "In 1 hour", rtm: "Tomorrow", rclr: "Clear reminder",
     p_m5: "In 5 min", p_m10: "In 10 min", p_m15: "In 15 min", p_m30: "In 30 min", p_h1: "In 1 hour", p_h2: "In 2 hours", p_h3: "In 3 hours", p_tonight: "Tonight 20:00", p_tomorrow: "Tomorrow, same time", p_tomorrow9: "Tomorrow 9:00", p_nextweek: "Next week",
@@ -145,7 +151,7 @@ const I18N = {
       ["Click card", "Copies to the clipboard."],
       ["Double-click", "Pastes into your previous app (text auto Ctrl+V; image = copy)."],
       ["Right-click", "Copy, pin, show in Explorer, save to Desktop, open, turn into note…"],
-      ["Notes", "Click + to add; first line is the title; [] starts a checkbox; 🔔 sets a reminder."],
+      ["Notes", "Click + to add; first line is the title; Markdown works; ☑ or - [ ] adds a to-do you tick on the card; 🔔 sets a reminder."],
       ["Screenshots", "PrintScreen or Win+Shift+S goes to the clipboard and hangs automatically."],
     ],
   },
@@ -281,7 +287,7 @@ function addClip(item) {
   // Same content already on the line → drop the old one and re-hang at front.
   const sig = clipSig(item);
   const idx = state.clips.findIndex((c) => clipSig(c) === sig);
-  if (idx >= 0) { item.pinned = state.clips[idx].pinned || false; state.clips.splice(idx, 1); }
+  if (idx >= 0) { item.pinned = state.clips[idx].pinned || false; if (state.clips[idx].note && !item.note) item.note = state.clips[idx].note; state.clips.splice(idx, 1); }
   else { item.pinned = false; }
   state.clips.unshift(item);
   cleanup(); save();
@@ -307,7 +313,7 @@ function visibleList() {
     else arr = arr.filter((c) => c.vis === ui.filter);
   }
   if (ui.pinnedOnly) arr = arr.filter((c) => c.pinned);
-  if (ui.search) { const q = ui.search.toLowerCase(); arr = arr.filter((c) => (c.text || "").toLowerCase().includes(q)); }
+  if (ui.search) { const q = ui.search.toLowerCase(); arr = arr.filter((c) => ((c.text || "") + "\n" + (c.note || "")).toLowerCase().includes(q)); }
   return arr.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 }
 
@@ -508,7 +514,7 @@ function buildTile(item) {
   } else if (item.vis === "color") {
     const v = (item.text || "").trim();
     d.innerHTML = `<div class="sp-ico"><i class="sp-sw" style="background:${escapeHtml(v)}"></i></div><div class="sp-name">${escapeHtml(v)}</div>`;
-  } else d.innerHTML = `<div class="sp-text${item.vis === "link" ? " link" : ""}">${escapeHtml((item.text || "").slice(0, 140))}</div>`;
+  } else d.innerHTML = `<div class="sp-text${item.vis === "link" ? " link" : ""}">${item.vis === "link" && item.note ? `<b class="sp-note">${escapeHtml(item.note)}</b>` : ""}${escapeHtml((item.text || "").slice(0, 140))}</div>`;
   const x = document.createElement("button"); x.className = "sp-x"; x.textContent = "✕"; x.title = t("take");
   x.addEventListener("click", (e) => { e.stopPropagation(); if (item.pinned) { toast(t("favKeep")); return; } removeItems([item], t("tookN")); });
   x.addEventListener("pointerdown", (e) => e.stopPropagation());
@@ -669,7 +675,9 @@ function buildClipCard(item) {
     const d = document.createElement("div"); d.className = "c-link";
     const url = (item.text || "").trim(); let host = url;
     try { host = new URL(url.startsWith("http") ? url : "http://" + url).host; } catch (e) {}
-    d.innerHTML = `<div class="u">${escapeHtml(url)}</div><div class="host">${escapeHtml(host)}</div>`;
+    const note = (item.note || "").trim();
+    if (note) { d.classList.add("has-note"); card.title = note; }
+    d.innerHTML = (note ? `<div class="ln">${escapeHtml(note)}</div>` : "") + `<div class="u">${escapeHtml(url)}</div><div class="host">${escapeHtml(host)}</div>`;
     body.appendChild(d);
   } else if (item.vis === "file") {
     const files = item.files || [];
@@ -729,20 +737,13 @@ function buildNoteCard(note) {
   body.style.setProperty("--note-ink", tt.ink);
 
   const inner = document.createElement("div"); inner.className = "note-inner";
-  const lines = (note.body || "").split("\n");
-  const title = lines.find((l) => l.trim()) || "（空白便签）";
-  const rest = lines.slice(lines.indexOf(title) + 1);
-
-  let html = `<div class="note-title">${escapeHtml(stripMark(title))}</div><div class="note-lines">`;
-  rest.forEach((ln) => {
-    const m = ln.match(/^\s*\[( |x|X)\]\s?(.*)$/);
-    if (m) {
-      const done = m[1].toLowerCase() === "x";
-      html += `<div class="note-line ${done ? "done" : ""}"><span class="box" data-idx="${lines.indexOf(ln)}">${done ? "✓" : ""}</span><span>${escapeHtml(m[2])}</span></div>`;
-    } else if (ln.trim()) {
-      html += `<div class="note-line"><span>${escapeHtml(ln)}</span></div>`;
-    }
-  });
+  // Markdown: the first non-empty line is the title, the rest renders as
+  // blocks; to-do boxes carry their source line index for ticking.
+  const tl = MD.titleOf(note.body);
+  const [pd, pt] = MD.progress(note.body, tl.index + 1);
+  const prog = pt ? `<span class="note-prog${pd === pt ? " all" : ""}" title="${t("todoProg")}">${pd === pt ? "✓ " : ""}${pd}/${pt}</span>` : "";
+  let html = `<div class="note-head"><div class="note-title">${tl.index < 0 ? escapeHtml(t("blankNote")) : MD.inline(tl.text)}</div>${prog}</div>`;
+  html += `<div class="note-lines md">${tl.index < 0 ? "" : MD.render(note.body, { from: tl.index + 1 })}`;
   const due = note.fired && !note.acked;
   // Reminder chip: "🔔 下次 11-04 09:00" on one line, the repeat (每天/每周/每月) on
   // the next; always visible when a reminder is set. Editing is the ✎ corner
@@ -758,6 +759,8 @@ function buildNoteCard(note) {
   body.appendChild(inner);
 
   inner.querySelectorAll(".box").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); toggleCheck(note, parseInt(b.dataset.idx, 10)); }));
+  inner.querySelectorAll(".box").forEach((b) => b.addEventListener("dblclick", (e) => e.stopPropagation()));
+  wireLinks(inner);
   inner.querySelector('[data-act="bell"]').addEventListener("click", (e) => { e.stopPropagation(); showReminderPanel(e, note, () => { save(); render(); }); });
   const ackBtn = inner.querySelector('[data-act="ack"]');
   if (ackBtn) ackBtn.addEventListener("click", (e) => { e.stopPropagation(); note.acked = true; note.fired = false; note.remindAt = null; save(); render(); });
@@ -768,14 +771,18 @@ function buildNoteCard(note) {
   return card;
 }
 
-function stripMark(s) { return s.replace(/^\s*\[( |x|X)\]\s?/, ""); }
 function toggleCheck(note, lineIdx) {
-  const lines = note.body.split("\n");
-  const m = lines[lineIdx] && lines[lineIdx].match(/^(\s*)\[( |x|X)\](\s?.*)$/);
-  if (!m) return;
-  lines[lineIdx] = `${m[1]}[${m[2].toLowerCase() === "x" ? " " : "x"}]${m[3]}`;
-  note.body = lines.join("\n"); note.ts = Date.now();
+  const nb = MD.toggle(note.body || "", lineIdx);
+  if (nb === note.body) return;
+  note.body = nb; note.ts = Date.now();
   save(); render();
+}
+/* Links inside rendered Markdown open in the browser (not on drag/double-click). */
+function wireLinks(root) {
+  root.querySelectorAll("a.md-a").forEach((a) => {
+    a.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); if (dragSuppressed()) return; invoke("open_url", { url: normUrl(a.dataset.href) }).catch(() => {}); });
+    a.addEventListener("dblclick", (e) => e.stopPropagation());
+  });
 }
 
 /* ---------- corners ---------- */
@@ -1076,7 +1083,10 @@ function showCtx(e, item, isNote) {
       add(t("copy"), () => invoke("copy_text", { text: item.text || "" }).catch(()=>{}));
       add(t("editText"), () => openClipEditor(item));
       add(t("pasteBack"), () => invoke("paste_text", { text: item.text || "" }).catch(()=>{}));
-      if (item.vis === "link") add(t("openLink"), () => invoke("open_url", { url: normUrl(item.text) }).catch(()=>{}));
+      if (item.vis === "link") {
+        add(t("openLink"), () => invoke("open_url", { url: normUrl(item.text) }).catch(()=>{}));
+        add(item.note ? t("editNote") : t("addNote"), () => openClipEditor(item, true));
+      }
       add(t("toNote"), () => convertToNote(item));
       add(t("saveDesktop"), () => saveDesktop(item));
     }
@@ -1126,7 +1136,7 @@ function openPreview(item) {
   inner.innerHTML = "";
   inner.classList.remove("is-image");
   const txt = (item.text || "").trim();
-  inner.textContent = txt || "（空）";
+  inner.textContent = (item.vis === "link" && item.note ? item.note.trim() + "\n\n" : "") + (txt || "（空）");
   $("preview").hidden = false; refreshModal();
 }
 function closePreview() { $("preview").hidden = true; refreshModal(); }
@@ -1139,11 +1149,16 @@ function newNote() {
 }
 function openEditor(note) { editing = note; openEditorFor(note); }
 /* Text clip cards open the same sheet in a larger, plain "clip" mode. */
-function openClipEditor(item) { editing = { _clip: item, body: item.text || "", tint: null }; openEditorFor(editing); }
+function openClipEditor(item, focusNote) { editing = { _clip: item, body: item.text || "", tint: null, _focusNote: !!focusNote }; openEditorFor(editing); }
 function openEditorFor(note) {
   const tt = tintOf(note.tint);
   const sheet = document.querySelector(".editor-sheet");
   sheet.classList.toggle("clip-mode", !!note._clip);
+  const isLink = !!(note._clip && note._clip.vis === "link");
+  sheet.classList.toggle("link-mode", isLink);
+  $("linkNoteRow").hidden = !isLink;
+  if (isLink) { $("linkNoteLab").textContent = t("linkNote"); $("linkNote").placeholder = t("linkNotePh"); $("linkNote").value = note._clip.note || ""; linkNoteCount(); }
+  buildTools(); setPreview(false);
   sheet.style.setProperty("--editor-bg", tt.bg); sheet.style.setProperty("--editor-ink", tt.ink);
   const ta = $("editorBody"); ta.value = note.body || ""; ta.placeholder = note._clip ? t("editorPhClip") : t("editorPh");
   $("bellText").textContent = note.remindAt ? fmtWhen(note.remindAt) : t("remind");
@@ -1156,16 +1171,23 @@ function openEditorFor(note) {
     tc.appendChild(d);
   });
   $("editor").hidden = false; refreshModal();
-  setTimeout(() => $("editorBody").focus(), 30);
+  setTimeout(() => (note._focusNote ? $("linkNote") : $("editorBody")).focus(), 30);
 }
 function closeEditor() {
   // A line dropped "sticky" for editing (reminder → open, OCR result, new note
   // from the tray) returns to normal auto-retract once editing is done.
   invoke("set_sticky", { on: false }).catch(() => {});
   if (!editing) { $("editor").hidden = true; return; }
+  setPreview(false);
   if (editing._clip) {
     const it = editing._clip, v = $("editorBody").value;
-    if (v.trim() && v !== it.text) { it.text = v; it.vis = classify(v); toast(t("savedEdit")); }
+    let changed = false;
+    if (it.vis === "link") {
+      const nv = $("linkNote").value.trim().slice(0, 100);
+      if (nv !== (it.note || "")) { if (nv) it.note = nv; else delete it.note; changed = true; }
+    }
+    if (v.trim() && v !== it.text) { it.text = v; it.vis = classify(v); changed = true; }
+    if (changed) toast(t("savedEdit"));
     editing = null; $("editor").hidden = true; refreshModal(); save(); render();
     return;
   }
@@ -1175,6 +1197,134 @@ function closeEditor() {
   else if (!has) { state.notes = state.notes.filter((n) => n.id !== editing.id); }
   editing = null; $("editor").hidden = true; refreshModal(); save(); render();
 }
+
+/* ---------- editor toolbar: Markdown helpers ---------- */
+const TOOLS = [["todo", "☑"], ["|"], ["bold", "B"], ["italic", "I"], ["strike", "S"], ["|"], ["head", "H"], ["list", "•"], ["num", "1."], ["quote", "❝"], ["code", "</>"], ["link", "🔗"], ["~"], ["preview", ""]];
+const TOOL_TIP = { todo: "tbTodo", bold: "tbBold", italic: "tbItalic", strike: "tbStrike", head: "tbHead", list: "tbList", num: "tbNum", quote: "tbQuote", code: "tbCode", link: "tbLink", preview: "tbPreview" };
+function buildTools() {
+  const box = $("edTools"); box.innerHTML = "";
+  TOOLS.forEach(([id, label]) => {
+    if (id === "|") { const i = document.createElement("i"); i.className = "tsep"; box.appendChild(i); return; }
+    if (id === "~") { const i = document.createElement("span"); i.className = "tgrow"; box.appendChild(i); return; }
+    const b = document.createElement("button"); b.type = "button"; b.className = "tb tb-" + id; b.dataset.tool = id;
+    b.textContent = id === "preview" ? "👁 " + t("tbPreview") : label; b.title = t(TOOL_TIP[id]);
+    if (id === "todo") b.innerHTML = `☑ <span>${escapeHtml(t("tbTodo"))}</span>`;
+    b.addEventListener("mousedown", (e) => e.preventDefault()); // keep the textarea's selection
+    b.addEventListener("click", () => runTool(id));
+    box.appendChild(b);
+  });
+}
+/* Replace a range through execCommand so Ctrl+Z still works. */
+function edReplace(start, end, text, selS, selE) {
+  const ta = $("editorBody"); ta.focus(); ta.setSelectionRange(start, end);
+  let ok = false;
+  try { ok = text ? document.execCommand("insertText", false, text) : document.execCommand("delete"); } catch (e) {}
+  if (!ok) ta.setRangeText(text, start, end, "end");
+  ta.setSelectionRange(selS, selE);
+}
+function edWrap(a, b, ph) {
+  const ta = $("editorBody"), v = ta.value, s = ta.selectionStart, e = ta.selectionEnd, sel = v.slice(s, e);
+  if (sel.length >= a.length + b.length && sel.startsWith(a) && sel.endsWith(b)) { const inn = sel.slice(a.length, sel.length - b.length); edReplace(s, e, inn, s, s + inn.length); return; }
+  if (v.slice(s - a.length, s) === a && v.slice(e, e + b.length) === b) { edReplace(s - a.length, e + b.length, sel, s - a.length, s - a.length + sel.length); return; }
+  const inn = sel || ph;
+  edReplace(s, e, a + inn + b, s + a.length, s + a.length + inn.length);
+}
+/* Apply fn(lines) to every line touched by the selection. */
+function edLines(fn) {
+  const ta = $("editorBody"), v = ta.value, s = ta.selectionStart, e = ta.selectionEnd;
+  const ls = v.lastIndexOf("\n", s - 1) + 1;
+  let le = v.indexOf("\n", e > s && v[e - 1] === "\n" ? e - 1 : e); if (le < 0) le = v.length;
+  const src = v.slice(ls, le), out = fn(src.split("\n")).join("\n");
+  if (out === src) return;
+  if (s === e) { const c = Math.max(ls, Math.min(ls + out.length, s + out.length - src.length)); edReplace(ls, le, out, c, c); }
+  else edReplace(ls, le, out, ls, ls + out.length);
+}
+const RE_TASK = /^(\s*)(?:[-*+]\s+)?\[( |x|X)?\]\s?/, RE_UL = /^(\s*)[-*+]\s+(?!\[( |x|X)?\])/, RE_OL = /^(\s*)\d{1,3}[.)]\s+/, RE_Q = /^(\s*)>\s?/, RE_H = /^(\s*)#{1,6}\s+/;
+const RE_ANYLIST = /^(\s*)(?:[-*+]\s+\[( |x|X)?\]\s?|\[( |x|X)?\]\s?|[-*+]\s+|\d{1,3}[.)]\s+)/;
+function toggleLines(re, make) {
+  edLines((lines) => {
+    const real = lines.filter((l) => l.trim());
+    const all = real.length > 0 && real.every((l) => re.test(l));
+    let n = 0;
+    return lines.map((l) => {
+      if (!l.trim() && lines.length > 1) return l;
+      if (all) return l.replace(re, "$1");
+      n++; return make(l, n);
+    });
+  });
+}
+function runTool(id) {
+  if (id === "preview") { setPreview(!edPreview); return; }
+  if (edPreview) setPreview(false);
+  const ta = $("editorBody");
+  switch (id) {
+    case "todo": toggleLines(RE_TASK, (l) => (RE_TASK.test(l) ? l : l.replace(RE_ANYLIST, "$1").replace(/^(\s*)/, "$1- [ ] "))); break;
+    case "list": toggleLines(RE_UL, (l) => l.replace(RE_ANYLIST, "$1").replace(/^(\s*)/, "$1- ")); break;
+    case "num": toggleLines(RE_OL, (l, n) => l.replace(RE_ANYLIST, "$1").replace(/^(\s*)/, `$1${n}. `)); break;
+    case "quote": toggleLines(RE_Q, (l) => l.replace(/^(\s*)/, "$1> ")); break;
+    case "head": toggleLines(RE_H, (l) => l.replace(/^(\s*)/, "$1## ")); break;
+    case "bold": edWrap("**", "**", t("phText")); break;
+    case "italic": edWrap("*", "*", t("phText")); break;
+    case "strike": edWrap("~~", "~~", t("phText")); break;
+    case "code": {
+      const sel = ta.value.slice(ta.selectionStart, ta.selectionEnd);
+      if (sel.includes("\n")) edWrap("```\n", "\n```", ""); else edWrap("`", "`", "code");
+      break;
+    }
+    case "link": {
+      const s = ta.selectionStart, e = ta.selectionEnd, sel = ta.value.slice(s, e);
+      if (/^(https?:\/\/|www\.)\S+$/i.test(sel.trim())) { const txt = t("phLink"), out = `[${txt}](${sel.trim()})`; edReplace(s, e, out, s + 1, s + 1 + txt.length); }
+      else { const txt = sel || t("phLink"), out = `[${txt}](https://)`; edReplace(s, e, out, s + txt.length + 3, s + txt.length + 11); }
+      break;
+    }
+  }
+}
+let edPreview = false;
+function setPreview(on) {
+  edPreview = !!on;
+  const ta = $("editorBody"), pv = $("editorPreview");
+  if (edPreview) {
+    const v = ta.value, tl = MD.titleOf(v);
+    pv.innerHTML = tl.index < 0 ? `<div class="md-p" style="opacity:.5">${escapeHtml(t("blankNote"))}</div>`
+      : `<div class="pv-title">${MD.inline(tl.text)}</div>` + MD.render(v, { from: tl.index + 1 });
+    pv.querySelectorAll(".box").forEach((b) => b.addEventListener("click", () => { ta.value = MD.toggle(ta.value, parseInt(b.dataset.idx, 10)); setPreview(true); }));
+    wireLinks(pv);
+  }
+  ta.hidden = edPreview; pv.hidden = !edPreview;
+  document.querySelectorAll("#edTools .tb").forEach((b) => { b.disabled = edPreview && b.dataset.tool !== "preview"; });
+  const pb = document.querySelector("#edTools .tb-preview");
+  if (pb) { pb.classList.toggle("on", edPreview); pb.textContent = edPreview ? "✎ " + t("tbEdit") : "👁 " + t("tbPreview"); }
+  if (!edPreview && !$("editor").hidden) ta.focus();
+}
+/* Lists continue on Enter (an empty item ends the list); Tab / Shift+Tab indent. */
+$("editorBody").addEventListener("keydown", (e) => {
+  if (!editing || editing._clip || e.isComposing || e.keyCode === 229) return;
+  const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
+  if (mod && !e.shiftKey && !e.altKey && (k === "b" || k === "i")) { e.preventDefault(); runTool(k === "b" ? "bold" : "italic"); return; }
+  const ta = e.target, v = ta.value, s = ta.selectionStart;
+  const ls = v.lastIndexOf("\n", s - 1) + 1;
+  if (e.key === "Tab" && !mod && !e.altKey) {
+    let le = v.indexOf("\n", s); if (le < 0) le = v.length;
+    if (!RE_ANYLIST.test(v.slice(ls, le)) && ta.selectionStart === ta.selectionEnd) return;
+    e.preventDefault();
+    edLines((lines) => lines.map((l) => (e.shiftKey ? l.replace(/^ {1,2}/, "") : (l.trim() ? "  " + l : l))));
+    return;
+  }
+  if (e.key !== "Enter" || e.shiftKey || mod || e.altKey || s !== ta.selectionEnd) return;
+  const line = v.slice(ls, s);
+  let m, prefix = null, empty = false;
+  if ((m = line.match(/^(\s*)([-*+]\s+)?\[( |x|X)?\]\s?(.*)$/))) { prefix = m[1] + (m[2] || "") + "[ ] "; empty = !m[4].trim(); }
+  else if ((m = line.match(/^(\s*)([-*+])\s+(.*)$/))) { prefix = m[1] + m[2] + " "; empty = !m[3].trim(); }
+  else if ((m = line.match(/^(\s*)(\d{1,3})([.)])\s+(.*)$/))) { prefix = m[1] + (+m[2] + 1) + m[3] + " "; empty = !m[4].trim(); }
+  else if ((m = line.match(/^(\s*>\s?)(.*)$/))) { prefix = m[1]; empty = !m[2].trim(); }
+  if (prefix === null) return;
+  e.preventDefault();
+  if (empty) edReplace(ls, s, "", ls, ls);
+  else edReplace(s, s, "\n" + prefix, s + 1 + prefix.length, s + 1 + prefix.length);
+});
+function linkNoteCount() { $("linkNoteCnt").textContent = `${$("linkNote").value.length}/100`; }
+$("linkNote").addEventListener("input", linkNoteCount);
+$("linkNote").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); closeEditor(); } });
 
 /* ---------- reminders ---------- */
 function fmtTime(ms) { const d = new Date(ms); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }
@@ -1252,14 +1402,15 @@ function showReminderPanel(e, note, after) {
 
 /* A due reminder pops up as its own card window (bottom-right, with a chime). */
 function popReminder(n) {
-  const lines = (n.body || "").split("\n").filter((l) => l.trim());
-  const title = stripMark(lines[0] || t("remind"));
-  const body = lines.slice(1, 5).map(stripMark).join("\n");
+  // The card renders Markdown itself (md.js); send the raw lines after the title.
+  const tl = MD.titleOf(n.body);
+  const title = tl.index < 0 ? t("remind") : tl.text;
+  const body = tl.index < 0 ? "" : (n.body || "").split("\n").slice(tl.index + 1).join("\n").replace(/^\s*\n/, "").trimEnd();
   const tt = tintOf(n.tint);
   const rep = { daily: t("rDaily"), weekly: t("rWeekly"), monthly: t("rMonthly") }[n.repeat] || "";
   const when = fmtWhen(n.remindAt) + (rep ? " · " + rep : "");
-  invoke("show_reminder", { data: { id: n.id, title, body, when, bg: tt.bg, ink: tt.ink, repeat: !!rep } })
-    .catch(() => { toast("🔔 " + title); });
+  invoke("show_reminder", { data: { id: n.id, title, body, when, bg: tt.bg, ink: tt.ink, repeat: !!rep, lang: LANG } })
+    .catch(() => { toast("🔔 " + MD.plainLine(title)); });
 }
 function onRemindAction(p) {
   const n = state.notes.find((x) => x.id === (p && p.id));
@@ -1486,9 +1637,9 @@ function applyLang() {
   $("plus").title = t("plus");
   $("gear").title = t("gear");
   $("prev").title = t("prev");
-  $("next").title = t("next");
+  $("next").title = t("nextPage");
   $("pinOnly").title = t("pinOnly");
-  $("shotBtn").title = t("shotTip"); $("tidy").title = t("tidyTip"); $("foldBtn").title = t("foldTip"); $("foldBtn").textContent = t("foldLabel");
+  $("shotBtn").title = t("shotTip"); $("shotBtn").textContent = "✂ " + t("shotLabel"); $("tidy").textContent = t("tidy"); $("tidy").title = t("tidyTip"); $("foldBtn").title = t("foldTip"); $("foldBtn").textContent = t("foldLabel");
   $("editorBody").placeholder = t("editorPh");
   $("bellText").textContent = t("remind");
   const hint = document.querySelector(".editor-foot .hint"); if (hint) hint.textContent = t("editorHint");
