@@ -74,6 +74,20 @@
     <div class="preview-inner" id="previewInner"></div>
   </div>
 
+  <!-- Reading view: a note in full (tick boxes, open links; no editing) -->
+  <div id="reader" hidden>
+    <div class="reader-sheet" id="readerSheet">
+      <div class="reader-head">
+        <div class="reader-title" id="readerTitle"></div>
+        <span class="note-prog" id="readerProg" hidden></span>
+        <button class="reader-edit" id="readerEdit">✎ 编辑</button>
+        <button class="editor-close" id="readerClose" title="关闭">✕</button>
+      </div>
+      <div class="reader-body md" id="readerBody"></div>
+      <div class="reader-foot" id="readerHint"></div>
+    </div>
+  </div>
+
   <!-- Context menu -->
   <div id="ctx" hidden></div>
 

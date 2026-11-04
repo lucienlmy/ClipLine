@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<title>ClipLine</title>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; user-select: none; -webkit-user-select: none; }
+  #card { position: absolute; inset: 8px; border-radius: 14px; background: #fffdf7; color: #2b2a27;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.06); padding: 16px 16px 12px; display: flex; flex-direction: column;
+    animation: swing 0.9s cubic-bezier(.3,1.4,.5,1) both; transform-origin: 50% -30px; }
+  @keyframes swing { 0% { transform: translateY(-30px) rotate(-6deg); opacity: 0; } 40% { opacity: 1; } 60% { transform: rotate(3deg); } 100% { transform: none; } }
+  #peg { position: absolute; top: -2px; left: 50%; width: 12px; height: 24px; margin-left: -6px; border-radius: 5px; background: linear-gradient(#e6a985, #d97757); }
+  #drag { position: absolute; inset: 0 40px auto 0; height: 34px; -webkit-app-region: drag; }
+  #x { position: absolute; top: 8px; right: 10px; width: 22px; height: 22px; padding: 0; border-radius: 50%; background: transparent; font-size: 12px; opacity: 0.55; }
+  #x:hover { opacity: 1; background: rgba(0,0,0,0.08); }
+  .kicker { font-size: 12px; opacity: 0.7; }
+  #title { font-size: 16px; font-weight: 650; margin: 6px 0 2px; }
+  #sub { font-size: 12px; opacity: 0.6; }
+  #notes { flex: 1; min-height: 0; overflow-y: auto; margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: rgba(0,0,0,0.035);
+    font-size: 12px; line-height: 1.6; user-select: text; -webkit-user-select: text; }
+  #notes::-webkit-scrollbar { width: 5px; } #notes::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 5px; }
+  /* Markdown blocks — same look as styles.css (this page doesn't load it) */
+  .md .md-h { font-weight: 650; margin: 8px 0 2px; font-size: 12.5px; } .md .md-h:first-child { margin-top: 0; }
+  .md .md-li { display: flex; gap: 6px; align-items: flex-start; }
+  .md .md-dot, .md .md-num { flex: none; opacity: 0.7; min-width: 8px; }
+  .md .md-tx { min-width: 0; }
+  .md .md-gap { height: 4px; }
+  .md .md-quote { border-left: 3px solid rgba(0,0,0,0.18); padding-left: 8px; opacity: 0.85; }
+  .md code { font: 11px Consolas, monospace; background: rgba(0,0,0,0.06); padding: 0 3px; border-radius: 3px; }
+  .md a.md-a { color: #b8593a; text-decoration: underline; cursor: pointer; }
+  .row { display: flex; gap: 6px; margin-top: 10px; align-items: center; }
+  button { border: none; border-radius: 999px; padding: 6px 12px; font-size: 12px; cursor: pointer; background: rgba(0,0,0,0.07); color: inherit; white-space: nowrap; }
+  button:hover { background: rgba(0,0,0,0.13); }
+  button.primary { background: #d97757; color: #fff; margin-left: auto; }
+  button.primary:hover { background: #c96646; }
+  button.link { background: transparent; padding: 6px 4px; opacity: 0.7; text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div id="card">
+    <i id="peg"></i>
+    <div id="drag"></div>
+    <button id="x">✕</button>
+    <div class="kicker" id="kick"></div>
+    <div id="title"></div>
+    <div id="sub"></div>
+    <div id="notes" class="md"></div>
+    <div class="row">
+      <button class="link" id="all"></button>
+      <button class="primary" id="ok"></button>
+    </div>
+  </div>
+<script src="md.js"></script>
+<script>
+  // One-off card after an update: "Updated to vX" + what changed (from the
+  // CHANGELOG compiled into the app). Shown by main.rs on the first start
+  // of a newer version.
+  const T = window.__TAURI__;
+  const invoke = T.core.invoke;
+  const $ = (id) => document.getElementById(id);
+  const win = T.window.getCurrentWindow();
+  const L = {
+    zh: { kick: "🎉 ClipLine 已更新", title: "已更新到 v{v}", none: "（这个版本没有写更新说明）", all: "全部更新历史", ok: "知道了", close: "关闭" },
+    en: { kick: "🎉 ClipLine updated", title: "Updated to v{v}", none: "(No notes for this version)", all: "Full update history", ok: "Got it", close: "Close" },
+  };
+  let lang = "zh";
+  const tr = (k, v) => (L[lang][k] || L.zh[k]).replace("{v}", v || "");
+  const close = () => { try { win.close(); } catch (e) {} };
+  $("x").onclick = close; $("ok").onclick = close;
+  $("all").onclick = () => invoke("open_changelog").catch(() => {}).finally(close);
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+  (async () => {
+    try {
+      const s = JSON.parse(await invoke("get_settings"));
+      lang = (s.lang === "auto" ? s.sys_lang : s.lang) === "en" ? "en" : "zh";
+    } catch (e) {}
+    let ver = "";
+    try { ver = await T.app.getVersion(); } catch (e) {}
+    document.documentElement.lang = lang;
+    $("kick").textContent = tr("kick"); $("title").textContent = tr("title", ver);
+    $("x").title = tr("close"); $("all").textContent = tr("all"); $("ok").textContent = tr("ok");
+    let rel = null;
+    try { rel = MD.releases(await invoke("get_changelog", { lang })).find((r) => r.version === ver); } catch (e) {}
+    $("sub").textContent = rel && rel.date ? rel.date : "";
+    $("notes").innerHTML = rel && rel.body ? MD.render(rel.body) : `<div>${MD.esc(tr("none"))}</div>`;
+    $("notes").querySelectorAll("a.md-a").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); invoke("open_url", { url: a.dataset.href }).catch(() => {}); }));
+  })();
+</script>
+</body>
+</html>

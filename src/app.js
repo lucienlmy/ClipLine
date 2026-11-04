@@ -67,7 +67,7 @@ const DRAG_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADgAAAA4CAYAAAC
 
 /* Keep the line from auto-rolling-up while a menu / overlay is open. */
 function refreshModal() {
-  const open = !$("ctx").hidden || !$("preview").hidden || !$("editor").hidden || !$("settings").hidden || !$("stackPop").hidden;
+  const open = !$("ctx").hidden || !$("preview").hidden || !$("reader").hidden || !$("editor").hidden || !$("settings").hidden || !$("stackPop").hidden;
   invoke("set_modal", { on: open }).catch(() => {});
 }
 
@@ -85,6 +85,7 @@ const I18N = {
     openLink: "在浏览器打开", saveDesktop: "保存到桌面", toNote: "转为便签",
     editorPh: "写点什么…\n第一行是标题，支持 Markdown（**粗体**、# 标题、- 列表）\n点上方 ☑ 或输入 - [ ] 加待办，卡片上点方框打勾",
     nextPage: "下一屏", shotLabel: "截图", blankNote: "（空白便签）", todoProg: "待办完成进度",
+    moreLines: "还有 {n} 行", moreTip: "滚轮查看其余内容 · 单击打开阅读视图", readEdit: "✎ 编辑", readEditTip: "编辑这张便签（也可以双击便签）", readHint: "Esc 或点空白处关闭 · 双击便签直接编辑",
     tbTodo: "待办清单", tbBold: "粗体（Ctrl+B）", tbItalic: "斜体（Ctrl+I）", tbStrike: "删除线", tbHead: "标题", tbList: "列表", tbNum: "编号列表", tbQuote: "引用", tbCode: "代码", tbLink: "链接", tbPreview: "预览", tbEdit: "编辑", phText: "文字", phLink: "链接文字",
     linkNote: "备注", linkNotePh: "给这个链接写个备注，例如「报销系统入口」", addNote: "添加备注", editNote: "编辑备注",
     editorHint: "Ctrl+S 保存 · Esc 关闭", save: "保存", remind: "提醒",
@@ -126,6 +127,7 @@ const I18N = {
     openLink: "Open in browser", saveDesktop: "Save to Desktop", toNote: "Turn into note",
     editorPh: "Write something…\nFirst line is the title; Markdown works (**bold**, # heading, - list)\nClick ☑ above or type - [ ] for a to-do, then tick it on the card",
     nextPage: "Next", shotLabel: "Snip", blankNote: "(Blank note)", todoProg: "To-dos done",
+    moreLines: "{n} more lines", moreTip: "Scroll for the rest · click to open the reading view", readEdit: "✎ Edit", readEditTip: "Edit this note (or double-click the note)", readHint: "Esc or click outside to close · double-click a note to edit it",
     tbTodo: "To-do list", tbBold: "Bold (Ctrl+B)", tbItalic: "Italic (Ctrl+I)", tbStrike: "Strikethrough", tbHead: "Heading", tbList: "Bullet list", tbNum: "Numbered list", tbQuote: "Quote", tbCode: "Code", tbLink: "Link", tbPreview: "Preview", tbEdit: "Edit", phText: "text", phLink: "link text",
     linkNote: "Note", linkNotePh: "Add a note for this link, e.g. \"Expense system login\"", addNote: "Add note", editNote: "Edit note",
     editorHint: "Ctrl+S save · Esc close", save: "Save", remind: "Remind",
@@ -640,6 +642,7 @@ function render() {
   $("prev").style.visibility = ui.page > 0 ? "visible" : "hidden";
   $("next").style.visibility = ui.page < pages - 1 ? "visible" : "hidden";
   renderFilters();
+  requestAnimationFrame(measureNotes);
 }
 
 function renderFilters() {
@@ -743,7 +746,7 @@ function buildNoteCard(note) {
   const [pd, pt] = MD.progress(note.body, tl.index + 1);
   const prog = pt ? `<span class="note-prog${pd === pt ? " all" : ""}" title="${t("todoProg")}">${pd === pt ? "✓ " : ""}${pd}/${pt}</span>` : "";
   let html = `<div class="note-head"><div class="note-title">${tl.index < 0 ? escapeHtml(t("blankNote")) : MD.inline(tl.text)}</div>${prog}</div>`;
-  html += `<div class="note-lines md">${tl.index < 0 ? "" : MD.render(note.body, { from: tl.index + 1 })}`;
+  html += `<div class="note-clip"><div class="note-lines md">${tl.index < 0 ? "" : MD.render(note.body, { from: tl.index + 1 })}</div><button class="note-more" hidden></button>`;
   const due = note.fired && !note.acked;
   // Reminder chip: "🔔 下次 11-04 09:00" on one line, the repeat (每天/每周/每月) on
   // the next; always visible when a reminder is set. Editing is the ✎ corner
@@ -765,11 +768,93 @@ function buildNoteCard(note) {
   const ackBtn = inner.querySelector('[data-act="ack"]');
   if (ackBtn) ackBtn.addEventListener("click", (e) => { e.stopPropagation(); note.acked = true; note.fired = false; note.remindAt = null; save(); render(); });
 
+  // Content taller than the card: fade + "N more lines"; the wheel scrolls it
+  // (see the window wheel handler); positions survive re-renders.
+  const lines = inner.querySelector(".note-lines"), more = inner.querySelector(".note-more");
+  lines.addEventListener("scroll", () => { noteScroll.set(note.id, lines.scrollTop); updateNoteMore(lines, more); }, { passive: true });
+  more.title = t("moreTip");
+  more.addEventListener("click", (e) => { e.stopPropagation(); clearTimeout(noteClickTimer); openReader(note); });
+  more.addEventListener("dblclick", (e) => e.stopPropagation());
+
   addCorners(card, body, note, true);
-  body.addEventListener("dblclick", () => openEditor(note));
+  // Single click = reading view, double click = editor. The single click
+  // waits a moment so the first click of a double-click doesn't open it.
+  body.addEventListener("click", (e) => {
+    if (e.target.closest(".corner, .box, a.md-a, .note-foot button, .note-more")) return;
+    if (dragSuppressed() || e.detail > 1) { clearTimeout(noteClickTimer); return; }
+    clearTimeout(noteClickTimer);
+    noteClickTimer = setTimeout(() => openReader(note), 250);
+  });
+  body.addEventListener("dblclick", () => { clearTimeout(noteClickTimer); openEditor(note); });
   card.addEventListener("contextmenu", (e) => showCtx(e, note, true));
   return card;
 }
+
+/* ---------- note overflow ---------- */
+let noteClickTimer = null;
+const noteScroll = new Map(); // note id -> scrollTop, kept while the line is down
+function measureNotes() {
+  document.querySelectorAll("#cards .card.note").forEach((card) => {
+    const lines = card.querySelector(".note-lines"), more = card.querySelector(".note-more");
+    if (!lines || !more) return;
+    lines.classList.remove("over");
+    if (lines.scrollHeight > lines.clientHeight + 2) {
+      lines.classList.add("over"); // thin scrollbar on the right (narrows the text, so measure after)
+      const top = noteScroll.get(card.dataset.id);
+      if (top) lines.scrollTop = top;
+    }
+    updateNoteMore(lines, more);
+  });
+}
+/* Count the rendered lines that are not fully visible below the fold. A
+ * wrapped paragraph is one line; a code block counts its own lines. */
+function updateNoteMore(lines, more) {
+  if (!lines.classList.contains("over")) { more.hidden = true; lines.classList.remove("fade"); return; }
+  const bottom = lines.scrollTop + lines.clientHeight + 1;
+  let n = 0;
+  for (const el of lines.children) {
+    if (el.classList.contains("md-gap")) continue;
+    if (el.offsetTop + el.offsetHeight > bottom) n += el.classList.contains("md-pre") ? (el.textContent.match(/\n/g) || []).length + 1 : 1;
+  }
+  more.hidden = n === 0;
+  lines.classList.toggle("fade", n > 0);
+  if (n) more.textContent = t("moreLines").replace("{n}", n);
+}
+
+/* ---------- reading view: the whole note, tickable, links live, no editing ---------- */
+let reading = null;
+function openReader(note) {
+  if (!note || !state.notes.includes(note)) return;
+  reading = note;
+  const tt = tintOf(note.tint);
+  const sheet = $("readerSheet");
+  sheet.style.setProperty("--reader-bg", tt.bg);
+  sheet.style.setProperty("--reader-ink", tt.ink);
+  $("readerEdit").textContent = t("readEdit"); $("readerEdit").title = t("readEditTip");
+  $("readerClose").title = t("close"); $("readerHint").textContent = t("readHint");
+  fillReader(true);
+  $("reader").hidden = false; refreshModal();
+}
+function fillReader(reset) {
+  const note = reading; if (!note) return;
+  const tl = MD.titleOf(note.body);
+  const [pd, pt] = MD.progress(note.body, tl.index + 1);
+  $("readerTitle").innerHTML = tl.index < 0 ? escapeHtml(t("blankNote")) : MD.inline(tl.text);
+  const pg = $("readerProg");
+  pg.hidden = !pt; pg.className = "note-prog" + (pt && pd === pt ? " all" : ""); pg.title = t("todoProg");
+  pg.textContent = pt ? (pd === pt ? "✓ " : "") + pd + "/" + pt : "";
+  const body = $("readerBody"), keep = reset ? 0 : body.scrollTop;
+  body.innerHTML = tl.index < 0 ? "" : MD.render(note.body, { from: tl.index + 1 });
+  body.scrollTop = keep;
+  body.querySelectorAll(".box").forEach((b) => b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleCheck(note, parseInt(b.dataset.idx, 10));
+    fillReader(false);
+  }));
+  wireLinks(body);
+  wireLinks($("readerTitle"));
+}
+function closeReader() { reading = null; $("reader").hidden = true; refreshModal(); }
 
 function toggleCheck(note, lineIdx) {
   const nb = MD.toggle(note.body || "", lineIdx);
@@ -1652,11 +1737,12 @@ function setDeck(deck) {
   stage.classList.toggle("deck-notes", deck === "notes");
   stage.classList.toggle("deck-clipboard", deck === "clipboard");
 }
-function onDrop(deck) { pathInfoCache.clear(); setDeck(deck); stage.classList.remove("up"); render(); }
+function onDrop(deck) { pathInfoCache.clear(); noteScroll.clear(); setDeck(deck); stage.classList.remove("up"); render(); }
 function onRollup() {
   closeStack();
   stopCatch();
-  hideCtx(); closePreview();
+  hideCtx(); closePreview(); clearTimeout(noteClickTimer);
+  if (!$("reader").hidden) closeReader();
   if (!$("editor").hidden) closeEditor();
   if (!$("settings").hidden) closeSettings();
   stage.classList.add("up");
@@ -1671,8 +1757,9 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (!$("settings").hidden) { closeSettings(); return; }
     if (!$("editor").hidden) { closeEditor(); return; }
-    if (!$("preview").hidden) { closePreview(); return; }
     if (!$("ctx").hidden) { hideCtx(); return; }
+    if (!$("reader").hidden) { closeReader(); return; }
+    if (!$("preview").hidden) { closePreview(); return; }
     if (!$("stackPop").hidden) { closeStack(); return; }
     invoke("rollup_now").catch(() => {});
   }
@@ -1682,7 +1769,7 @@ document.addEventListener("click", (e) => {
   if (!$("ctx").hidden && !pointerInCtx && !e.target.closest("#ctx")) hideCtx();
   if (pointerInsideLine) return;
   if (e.target.closest(".card") || e.target.closest("#pill") || e.target.closest("#plus") ||
-      e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#ctx") || e.target.closest("#settings")) return;
+      e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#reader") || e.target.closest("#ctx") || e.target.closest("#settings")) return;
   if (!stage.classList.contains("up")) invoke("rollup_now").catch(() => {});
 });
 // Track (at pointerdown, before any re-render detaches the target) whether the
@@ -1695,9 +1782,12 @@ document.addEventListener("pointerdown", (e) => {
   if (stage.classList.contains("up")) { pointerInsideLine = false; return; }
   // Only real UI counts as "inside": a click on empty rope / panel space closes the line.
   pointerInsideLine = !!(e.target.closest(".card") || e.target.closest("#pill") || e.target.closest("#plus") || e.target.closest(".knot") ||
-    e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#ctx") || e.target.closest("#stackPop"));
+    e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#reader") || e.target.closest("#ctx") || e.target.closest("#stackPop"));
 }, true);
 $("preview").addEventListener("click", (e) => { if (e.target.id === "preview") closePreview(); });
+$("reader").addEventListener("click", (e) => { if (e.target.id === "reader") closeReader(); });
+$("readerClose").addEventListener("click", closeReader);
+$("readerEdit").addEventListener("click", () => { const n = reading; closeReader(); if (n) openEditor(n); });
 $("spClose").addEventListener("click", closeStack);
 $("spSplit").addEventListener("click", () => {
   if (stackItem) { splitStack(); return; }
@@ -1737,7 +1827,12 @@ $("pinOnly").addEventListener("click", () => {
 $("searchInput").addEventListener("input", (e) => { ui.search = e.target.value; ui.page = 0; render(); });
 window.addEventListener("wheel", (e) => {
   if (stage.classList.contains("up")) return;
-  if (!$("settings").hidden || !$("preview").hidden || !$("editor").hidden || !$("ctx").hidden) return;
+  if (!$("settings").hidden || !$("preview").hidden || !$("reader").hidden || !$("editor").hidden || !$("ctx").hidden) return;
+  // Over a note whose content doesn't fit, the wheel scrolls that note (never
+  // flips the page, even at the end); everywhere else it flips as before.
+  const nc = e.target.closest && e.target.closest(".card.note");
+  const nl = nc && nc.querySelector(".note-lines.over");
+  if (nl) { if (!e.target.closest(".note-lines")) nl.scrollTop += e.deltaY; return; }
   if (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX > 0 : e.deltaY > 0) ui.page++; else ui.page--;
   render();
 }, { passive: true });

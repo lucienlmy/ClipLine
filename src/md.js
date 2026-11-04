@@ -118,5 +118,19 @@
       .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1$2");
   }
 
-  g.MD = { esc, inline, render, titleOf, plainLine, task, progress, toggle, plain };
+  /* CHANGELOG.md → [{ version: "1.7.0", date: "2026-11-04", body: "…" }], in
+   * file order (newest first). Each release starts with "## v1.7.0 · date";
+   * anything before the first one is the file's own preamble. */
+  function releases(src) {
+    const out = [];
+    let cur = null;
+    String(src || "").replace(/\r/g, "").split("\n").forEach((l) => {
+      const m = l.match(/^##\s+v?(\d+\.\d+\.\d+)\s*(?:[·\-–—]\s*(.*))?$/);
+      if (m) { cur = { version: m[1], date: (m[2] || "").trim(), lines: [] }; out.push(cur); return; }
+      if (cur) cur.lines.push(l);
+    });
+    return out.map((r) => ({ version: r.version, date: r.date, body: r.lines.join("\n").trim() }));
+  }
+
+  g.MD = { esc, inline, render, titleOf, plainLine, task, progress, toggle, plain, releases };
 })(window);

@@ -12,6 +12,22 @@
   #sfoot { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 20px; border-top: 1px solid rgba(0,0,0,0.07); }
   #sfoot button { border: none; border-radius: 999px; padding: 8px 18px; font-size: 13px; cursor: pointer; background: rgba(0,0,0,0.06); }
   #sfoot button.primary { background: var(--clay); color: #fff; }
+  /* update history panel */
+  #history { position: fixed; inset: 0; background: #fffdf9; display: flex; flex-direction: column; z-index: 50; }
+  #history[hidden] { display: none; }
+  #historyHead { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid rgba(0,0,0,0.07); }
+  #historyHead b { font-size: 16px; font-weight: 650; }
+  #historyBack { border: none; background: rgba(0,0,0,0.06); border-radius: 999px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
+  #historyBack:hover { background: rgba(0,0,0,0.12); }
+  #historyList { flex: 1; overflow-y: auto; padding: 6px 20px 20px; -webkit-user-select: text; user-select: text; }
+  .hist-rel { padding: 12px 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
+  .hist-rel:last-child { border-bottom: none; }
+  .hist-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .hist-head b { font-size: 15px; }
+  .hist-date { font-size: 12px; color: var(--ink-soft); }
+  .hist-cur { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: rgba(var(--clay-rgb),0.14); color: var(--clay); }
+  .hist-body { font-size: 13px; line-height: 1.65; }
+  .hist-body .md-h { margin: 8px 0 2px; font-size: 13.5px; }
 </style>
 </head>
 <body>
@@ -23,6 +39,11 @@
       <button id="saveBtn" class="primary">保存</button>
     </div>
   </div>
+  <div id="history" hidden>
+    <div id="historyHead"><button id="historyBack">‹</button><b id="historyTitle"></b></div>
+    <div id="historyList"></div>
+  </div>
+  <script src="md.js"></script>
   <script src="settings.js"></script>
 </body>
 </html>

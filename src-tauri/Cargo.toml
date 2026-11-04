@@ -1,6 +1,6 @@
 [package]
 name = "clipline"
-version = "1.6.0"
+version = "1.7.0"
 description = "ClipLine — a clothesline-themed clipboard manager and sticky-notes line"
 authors = ["ClipLine"]
 edition = "2021"

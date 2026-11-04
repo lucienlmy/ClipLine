@@ -66,6 +66,7 @@ struct Settings {
     update_mode: String,           // auto | notify | off — background check against GitHub Releases
     skipped_version: String,       // "Skip this version" — not offered again by the background check
     line_display: String,          // cursor | primary | a monitor device name (\\.\DISPLAY2)
+    seen_version: String,          // last version whose "updated to vX" card was shown ("" = before v1.7.0)
 }
 
 impl Default for Settings {
@@ -95,6 +96,7 @@ impl Default for Settings {
             update_mode: "notify".into(),
             skipped_version: String::new(),
             line_display: "cursor".into(),
+            seen_version: String::new(),
         }
     }
 }
@@ -797,6 +799,7 @@ fn update_settings(app: AppHandle, data: String) -> Result<String, String> {
     // Only the update card sets this; a settings window opened earlier must
     // not overwrite it with a stale copy.
     s.skipped_version = SETTINGS.lock().unwrap().skipped_version.clone();
+    s.seen_version = SETTINGS.lock().unwrap().seen_version.clone();
     // Persist FIRST so a hotkey/autostart hiccup can never lose the user's
     // settings (theme, watched folders, etc.).
     save_settings(&app, &s)?;
@@ -1418,6 +1421,81 @@ async fn show_update_window(app: &AppHandle, check: bool) -> Result<(), String> 
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Update history: CHANGELOG.md / CHANGELOG.en.md are compiled in (offline).
+// After an update, the first start pops a one-off "updated to vX" card.
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn get_changelog(lang: String) -> &'static str {
+    if lang == "en" {
+        include_str!("../../CHANGELOG.en.md")
+    } else {
+        include_str!("../../CHANGELOG.md")
+    }
+}
+
+/// Decide at startup whether this run is the first one after an update.
+/// `existed`: settings or data were already there (not a fresh install).
+/// Fresh installs and downgrades get no card; settings saved before v1.7.0
+/// have no `seen_version`, which counts as an update.
+fn note_version_seen(app: &AppHandle, existed: bool) -> bool {
+    let cur = update::current();
+    let seen = SETTINGS.lock().unwrap().seen_version.clone();
+    if seen == cur {
+        return false;
+    }
+    let show = existed && (seen.is_empty() || update::is_newer(cur, &seen));
+    let s = {
+        let mut g = SETTINGS.lock().unwrap();
+        g.seen_version = cur.to_string();
+        g.clone()
+    };
+    let _ = save_settings(app, &s);
+    show
+}
+
+async fn show_news_window(app: &AppHandle) -> Result<(), String> {
+    if app.get_webview_window("news").is_some() {
+        return Ok(());
+    }
+    let (lw, lh) = (380.0_f64, 360.0_f64);
+    let win = tauri::WebviewWindowBuilder::new(app, "news", tauri::WebviewUrl::App("news.html".into()))
+        .title("ClipLine")
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .resizable(false)
+        .shadow(false)
+        .visible(false)
+        .inner_size(lw, lh)
+        .build()
+        .map_err(|e| e.to_string())?;
+    place_corner_card(&win, lw, lh, 0.0);
+    let _ = win.show();
+    Ok(())
+}
+
+/// Page the Settings window should open at ("history"); taken once.
+static SETTINGS_GOTO: Lazy<Mutex<String>> = Lazy::new(|| Mutex::new(String::new()));
+
+#[tauri::command]
+fn settings_goto() -> String {
+    std::mem::take(&mut *SETTINGS_GOTO.lock().unwrap())
+}
+
+/// From the "updated" card: open Settings at the update history.
+#[tauri::command]
+async fn open_changelog(app: AppHandle) -> Result<(), String> {
+    if app.get_webview_window("settings").is_some() {
+        let _ = app.emit_to("settings", "settings:goto", "history");
+    } else {
+        *SETTINGS_GOTO.lock().unwrap() = "history".into();
+    }
+    create_settings_window(&app)
+}
+
 /// From the tray / settings: open the card and check right away.
 #[tauri::command]
 async fn open_update_window(app: AppHandle) -> Result<(), String> {
@@ -1928,6 +2006,9 @@ fn main() {
             skip_update,
             open_release_page,
             open_update_window,
+            get_changelog,
+            settings_goto,
+            open_changelog,
             quit
         ])
         .setup(|app| {
@@ -1941,6 +2022,9 @@ fn main() {
             }
 
             // Load settings and apply before anything else.
+            let existed = settings_path(&handle)
+                .map(|p| p.exists() || p.with_file_name("data.json").exists())
+                .unwrap_or(false);
             let settings = load_settings(&handle);
             apply_settings_to_state(&settings);
             *SETTINGS.lock().unwrap() = settings.clone();
@@ -1968,6 +2052,13 @@ fn main() {
             start_cursor_thread();
             start_folder_watch();
             start_update_thread(handle.clone());
+            if note_version_seen(&handle, existed) {
+                let h = handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio_sleep(2500).await;
+                    let _ = show_news_window(&h).await;
+                });
+            }
 
             Ok(())
         })

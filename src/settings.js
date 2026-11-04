@@ -20,14 +20,16 @@ const I = {
     secRemind: "提醒快捷项", remindHint: "勾选在便签提醒面板里显示的快捷时间",
     p_m5: "5 分钟后", p_m10: "10 分钟后", p_m15: "15 分钟后", p_m30: "30 分钟后", p_h1: "1 小时后", p_h2: "2 小时后", p_h3: "3 小时后", p_tonight: "今晚 20:00", p_tomorrow: "明天此时", p_tomorrow9: "明早 9:00", p_nextweek: "下周此时",
     secHelp: "使用说明", secAbout: "关于", save: "保存", cancel: "取消",
+    history: "更新历史", historySub: "历次版本更新了什么（打包在程序里，不联网也能看）", historyOpen: "查看", historyBack: "‹ 返回设置", historyCur: "当前版本",
     version: "当前版本", checkUpdate: "检查更新", updMode: "自动更新", updAuto: "自动下载", updNotify: "有新版时提醒", updOff: "关闭",
     updModeSub: "从 GitHub 发布页检查新版本。「自动下载」会在后台下好，提示一次后重启即可完成，不重启的话下次退出时自动安装；「有新版时提醒」只弹卡片，由你决定是否更新",
     help: [
       ["呼出", "鼠标顶到屏幕最上沿：左半剪贴板绳、右半便签绳；按住翻转键左右对调。或用快捷键。"],
-      ["单击/双击", "单击复制（卡上浮现「已复制」）；文字卡双击放大编辑，图片双击复制，文件双击打开。"],
-      ["钉住", "右键「钉住」的卡不参与自动清理（图钉标记）。"],
+      ["剪贴板卡", "单击复制（卡上浮现「已复制」）；文字卡双击放大编辑，图片双击复制，文件双击打开；右键看更多操作。"],
+      ["便签", "点绳上方 + 新建；单击便签打开阅读视图，双击编辑；内容显示不全时，鼠标停在便签上用滚轮滚动。"],
+      ["收藏", "悬停卡片点右下角 ☆：收藏的卡固定在左端，不参与自动清理。"],
       ["文件/拖拽", "复制文件自动上绳；按住卡片外拖=复制，Shift 拖=移动。文字卡拖到文件夹成 .txt/.md，拖到输入框即插入文字。把文件拖到屏幕最顶端，绳子会滑下来接住。"],
-      ["截图", "PrintScreen 或 Win+Shift+S 截图进剪贴板，自动上绳。"],
+      ["截图", "Ctrl+Alt+S 框选截图，可挂上绳、标注、识别文字或钉在桌面；PrintScreen / Win+Shift+S 截的图进剪贴板后也会自动上绳。"],
     ],
     about: "ClipLine · 晾衣绳主题剪贴板 / 便签。灵感来自 Tendedero (MIT) 与 Clothespeg (Apache-2.0)；独立重写，名称与图标均为原创。",
   },
@@ -46,14 +48,16 @@ const I = {
     secRemind: "Reminder presets", remindHint: "Pick the quick times shown in the note reminder popover",
     p_m5: "In 5 min", p_m10: "In 10 min", p_m15: "In 15 min", p_m30: "In 30 min", p_h1: "In 1 hour", p_h2: "In 2 hours", p_h3: "In 3 hours", p_tonight: "Tonight 20:00", p_tomorrow: "Tomorrow, same time", p_tomorrow9: "Tomorrow 9:00", p_nextweek: "Next week",
     secHelp: "How to use", secAbout: "About", save: "Save", cancel: "Cancel",
+    history: "Update history", historySub: "What changed in each version (built in, works offline)", historyOpen: "View", historyBack: "‹ Back to settings", historyCur: "this version",
     version: "Version", checkUpdate: "Check for updates", updMode: "Automatic updates", updAuto: "Download automatically", updNotify: "Notify me", updOff: "Off",
     updModeSub: "Checks the GitHub releases page. Download automatically fetches it in the background and installs on restart (or when you quit); Notify me only shows a card and lets you decide",
     help: [
       ["Invoke", "Top edge: left = clipboard, right = notes; hold the flip key to swap. Or hotkeys."],
-      ["Click", "Click copies; double-click pastes into your previous app."],
-      ["Pin", "Right-click Pin keeps a card from auto-cleanup."],
-      ["Files/drag", "Copied files hang; drag a card out = copy, Shift-drag = move."],
-      ["Screenshots", "PrintScreen / Win+Shift+S goes to the clipboard and hangs."],
+      ["Clips", "Click copies; double-click edits text, copies an image or opens a file; right-click for more."],
+      ["Notes", "+ above the line adds one; click a note to read it in full, double-click to edit; when it doesn't fit, scroll it with the wheel."],
+      ["Favourites", "Hover a card and click ☆: favourites stay at the left end and are kept from auto-cleanup."],
+      ["Files/drag", "Copied files hang; drag a card out = copy, Shift-drag = move; drag files to the top edge to drop them on the line."],
+      ["Screenshots", "Ctrl+Alt+S to snip a region, then hang, annotate, OCR or pin it; PrintScreen / Win+Shift+S also hang via the clipboard."],
     ],
     about: "ClipLine — a clothesline clipboard & notes app. Inspired by Tendedero (MIT) and Clothespeg (Apache-2.0); independent rewrite, original name and icon.",
   },
@@ -303,12 +307,39 @@ function render() {
   cu.onclick = () => invoke("open_update_window").catch((e) => { const el = $("setErr"); if (el) el.textContent = String(e); });
   verRow.appendChild(cu); s6.appendChild(verRow);
   try { T.app.getVersion().then((v) => { const el = $("verText"); if (el) el.textContent = "v" + v; }); } catch (e) {}
+  const hiRow = document.createElement("div"); hiRow.className = "set-row";
+  hiRow.innerHTML = `<div><div class="label">${t("history")}</div><div class="sub">${t("historySub")}</div></div>`;
+  const hb = document.createElement("button"); hb.className = "btn-mini"; hb.textContent = t("historyOpen");
+  hb.onclick = showHistory;
+  hiRow.appendChild(hb); s6.appendChild(hiRow);
   s6.appendChild(row(t("updMode"), seg(draft.update_mode || "notify", [["auto", t("updAuto")], ["notify", t("updNotify")], ["off", t("updOff")]], (v) => draft.update_mode = v), t("updModeSub")));
   body.appendChild(s6);
 
   $("cancelBtn").textContent = t("cancel");
   $("saveBtn").textContent = t("save");
 }
+
+/* Update history: every release from the CHANGELOG built into the app,
+ * newest first, in a panel over the settings. */
+async function showHistory() {
+  const box = $("history"), list = $("historyList");
+  $("historyBack").textContent = t("historyBack");
+  $("historyTitle").textContent = t("history");
+  let md = "", ver = "";
+  try { md = await invoke("get_changelog", { lang: LANG }); } catch (e) {}
+  try { ver = await T.app.getVersion(); } catch (e) {}
+  list.innerHTML = "";
+  MD.releases(md).forEach((r) => {
+    const sec = document.createElement("div"); sec.className = "hist-rel";
+    const head = document.createElement("div"); head.className = "hist-head";
+    head.innerHTML = `<b>v${MD.esc(r.version)}</b>${r.date ? `<span class="hist-date">${MD.esc(r.date)}</span>` : ""}${r.version === ver ? `<span class="hist-cur">${MD.esc(t("historyCur"))}</span>` : ""}`;
+    const body = document.createElement("div"); body.className = "hist-body md"; body.innerHTML = MD.render(r.body);
+    body.querySelectorAll("a.md-a").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); invoke("open_url", { url: a.dataset.href }).catch(() => {}); }));
+    sec.appendChild(head); sec.appendChild(body); list.appendChild(sec);
+  });
+  box.hidden = false; list.scrollTop = 0;
+}
+function hideHistory() { $("history").hidden = true; }
 
 function saveSettings() {
   invoke("update_settings", { data: JSON.stringify(draft) })
@@ -319,7 +350,9 @@ function cancelSettings() { emit("theme:preview", cfg.theme || "soft"); emit("ac
 
 $("saveBtn").addEventListener("click", saveSettings);
 $("cancelBtn").addEventListener("click", cancelSettings);
-window.addEventListener("keydown", (e) => { if (e.key === "Escape" && !capturing) cancelSettings(); });
+window.addEventListener("keydown", (e) => { if (e.key === "Escape" && !capturing) { if (!$("history").hidden) hideHistory(); else cancelSettings(); } });
+$("historyBack").addEventListener("click", hideHistory);
+try { T.event.listen("settings:goto", (ev) => { if (ev.payload === "history") showHistory(); }); } catch (e) {}
 
 window.addEventListener("error", (e) => { const el = document.getElementById("setErr"); if (el) el.textContent = "错误: " + (e.message || e.error || e); });
 window.addEventListener("unhandledrejection", (e) => { const el = document.getElementById("setErr"); if (el) { const r = e.reason; el.textContent = "错误: " + (r && r.toString ? r.toString() : r); } });
@@ -331,4 +364,5 @@ window.addEventListener("unhandledrejection", (e) => { const el = document.getEl
   previewFont(draft.font_family);
   LANG = pickLang(draft);
   render();
+  try { if ((await invoke("settings_goto")) === "history") showHistory(); } catch (e) {}
 })();
