@@ -76,8 +76,8 @@ const I18N = {
   zh: {
     cat_blue: "工作", cat_orange: "待办", cat_yellow: "灵感", cat_green: "生活", cat_cream: "资料", cat_black: "稍后看", cat_red: "要紧", catNone: "未分类",
     catNew: "＋ 新建分类", catManage: "管理分类…", catTitle: "便签分类", catNamePh: "新分类名称", catAdd: "添加", catDel: "删除分类", catDelAsk: "确认删除？", catFull: "颜色已经用完了，删掉一个分类才能再加", catHint: "改名直接在框里改；删除分类不会删除便签，只是改为未分类", catNotes: "{n} 张", catPick: "选个颜色",
-    basketTip: "篮子：已完成的便签", basketTitle: "已完成的便签", basketEmpty: "篮子是空的。\n便签上点 ✕（或「整理」）后，完成的便签会放进这里，按月统计。", monthDone: "本月完成 ", statN: "{n} 张", statK: "{k} 项", putBack: "↩ 放回绳上", delOne: "删除", clearBasket: "清空篮子", clearAsk: "确认清空？", keepDays: "保留 {n} 天，可在设置里改", keepForever: "永久保留，可在设置里改", toBasket: "已放进篮子", toBasketN: "已把 {n} 张放进篮子", restored: "已放回绳上", doneOn: "{d} 完成",
-    takeNote: "完成，放进篮子", deleteNote: "删除（不进篮子）", deletedNote: "已删除", noteTidyTip: "把待办全部打勾的便签放进篮子", confirmDone: "钉住的便签，确认放进篮子？",
+    basketTip: "收纳袋：已完成的便签", bagCap: "已完成", basketTitle: "已完成的便签", basketEmpty: "收纳袋是空的。\n便签上点 ✕（或「整理」）后，完成的便签会放进这里，按月统计。", monthDone: "本月完成 ", statN: "{n} 张", statK: "{k} 项", putBack: "↩ 放回绳上", delOne: "删除", clearBasket: "清空收纳袋", clearAsk: "确认清空？", keepDays: "保留 {n} 天，可在设置里改", keepForever: "永久保留，可在设置里改", toBasket: "已放进收纳袋", toBasketN: "已把 {n} 张放进收纳袋", restored: "已放回绳上", doneOn: "{d} 完成",
+    takeNote: "完成，放进收纳袋", deleteNote: "删除（不进收纳袋）", deletedNote: "已删除", noteTidyTip: "把待办全部打勾的便签放进收纳袋", confirmDone: "钉住的便签，确认放进收纳袋？",
     all: "全部", text: "文字", link: "链接", color: "颜色", image: "图片", file: "文件",
     search: "搜索…", copied: "已复制", editText: "编辑文字", annotate: "✎ 标注", ocr: "文 识别文字（OCR）", ocrRunning: "正在识别文字…", ocrFail: "识别失败：", ocrNone: "没有识别到文字", ocrDone: "已识别 {n} 个字，已复制，可在这里修改", shotTip: "截图上绳", favMore: "其余收藏", favZone: "左边是收藏区", g3: "三日内", g7: "一周内", gOld: "更早", cards: "张", total: "共", groupOpen: "展开这一叠", groupHint: "单击复制 · 拖出 · 双击编辑/打开 · 右键更多", takeAll: "全部取下", tookN: "已取下 {n} 张", undo: "撤销", favKeep: "收藏的卡片请先取消收藏", tidy: "整理", tidyTip: "取下原文件已不在的卡片", tidied: "已取下 {n} 张失效卡片", foldTip: "按日期折叠：今天散挂，更早的折成「三日内 / 一周内 / 更早」", foldOnT: "已按日期折叠", foldLabel: "按日期", foldOffT: "已全部散挂", moved: "已移动，卡片已取下", stackOpen: "展开这一叠", stackTitle: "这一叠共 {n} 个文件", stackSplit: "拆成单张", stackHint: "单击复制 · 拖出单个文件 · 双击打开", missing: "原文件已不在（被移动或删除了）", already: "已在绳上，已移到最前", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
     emptyClip: "绳上还空着 — 复制点什么试试",
@@ -123,8 +123,8 @@ const I18N = {
     all: "All", text: "Text", link: "Link", color: "Color", image: "Image", file: "File",
     cat_blue: "Work", cat_orange: "To-do", cat_yellow: "Ideas", cat_green: "Life", cat_cream: "Reference", cat_black: "Later", cat_red: "Urgent", catNone: "No category",
     catNew: "＋ New category", catManage: "Manage categories…", catTitle: "Note categories", catNamePh: "New category name", catAdd: "Add", catDel: "Delete", catDelAsk: "Sure?", catFull: "All colours are in use — delete a category to add another", catHint: "Rename in the box; deleting a category keeps its notes (they become uncategorised)", catNotes: "{n}", catPick: "Pick a colour",
-    basketTip: "Basket: finished notes", basketTitle: "Finished notes", basketEmpty: "The basket is empty.\nClick ✕ on a note (or Tidy) and finished notes land here, counted by month.", monthDone: "This month: ", statN: "{n} notes", statK: "{k} items", putBack: "↩ Put back", delOne: "Delete", clearBasket: "Empty basket", clearAsk: "Sure?", keepDays: "Kept {n} days — change in Settings", keepForever: "Kept forever — change in Settings", toBasket: "Put in the basket", toBasketN: "Put {n} in the basket", restored: "Put back on the line", doneOn: "Done {d}",
-    takeNote: "Done — into the basket", deleteNote: "Delete (skip the basket)", deletedNote: "Deleted", noteTidyTip: "Put notes whose to-dos are all ticked into the basket", confirmDone: "Pinned note — put it in the basket?",
+    basketTip: "Done bag: finished notes", bagCap: "DONE", basketTitle: "Finished notes", basketEmpty: "The bag is empty.\nClick ✕ on a note (or Tidy) and finished notes go in here, counted by month.", monthDone: "This month: ", statN: "{n} notes", statK: "{k} items", putBack: "↩ Put back", delOne: "Delete", clearBasket: "Empty the bag", clearAsk: "Sure?", keepDays: "Kept {n} days — change in Settings", keepForever: "Kept forever — change in Settings", toBasket: "Put in the bag", toBasketN: "Put {n} in the bag", restored: "Put back on the line", doneOn: "Done {d}",
+    takeNote: "Done — into the bag", deleteNote: "Delete (skip the bag)", deletedNote: "Deleted", noteTidyTip: "Put notes whose to-dos are all ticked into the bag", confirmDone: "Pinned note — put it in the bag?",
     search: "Search…", copied: "Copied", editText: "Edit text", annotate: "✎ Annotate", ocr: "Recognise text (OCR)", ocrRunning: "Recognising text…", ocrFail: "OCR failed: ", ocrNone: "No text found", ocrDone: "Recognised {n} characters — copied; edit here if needed", shotTip: "Screenshot to the line", favMore: "More favourites", favZone: "Favourites are on the left", g3: "Last 3 days", g7: "This week", gOld: "Older", cards: "", total: "Total", groupOpen: "Open this stack", groupHint: "Click to copy · drag out · double-click to edit/open · right-click for more", takeAll: "Take all down", tookN: "Took down {n}", undo: "Undo", favKeep: "Remove it from favourites first", tidy: "Tidy", tidyTip: "Take down cards whose files are gone", tidied: "Took down {n} broken card(s)", foldTip: "Fold by date: today loose, older folded into stacks", foldOnT: "Folded by date", foldLabel: "By date", foldOffT: "All cards loose", moved: "Moved — card taken down", stackOpen: "Open this stack", stackTitle: "{n} files in this stack", stackSplit: "Split into cards", stackHint: "Click to copy · drag one out · double-click to open", missing: "The original file is gone (moved or deleted)", already: "Already on the line — moved to front", pasteBack: "Paste into previous app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
     emptyClip: "The line is empty — copy something",
     emptyNotes: "No notes yet — click + above to write one",
@@ -762,12 +762,17 @@ function deleteNotes(notes) {
   save(); render();
   toastAction(t("deletedNote"), t("undo"), () => { state.notes = snap; save(); render(); }, 5000);
 }
+// The bag hangs on the rope at the right end; notes are laid out to its left.
+const BAG_ROOM = 180;
 function updateBasket() {
   const b = $("basket"), n = state.done.length;
-  const badge = b.querySelector(".bk-n");
-  badge.textContent = n > 99 ? "99+" : String(n);
-  badge.hidden = !n;
+  b.querySelector(".bk-n").textContent = n > 999 ? "999+" : String(n);
+  b.querySelector(".bk-cap").textContent = t("bagCap");
+  b.classList.toggle("empty", !n);
   b.title = t("basketTip");
+  const x = window.innerWidth - 96;
+  b.style.left = x - 79 + "px";
+  b.style.top = ropeY(x) - 6 + "px";
 }
 function bounceBasket() { const b = $("basket"); b.classList.remove("bounce"); void b.offsetWidth; b.classList.add("bounce"); }
 
@@ -876,13 +881,14 @@ function render() {
 
   const list = visibleList();
   const W = window.innerWidth;
-  const perPage = Math.max(1, Math.floor((W - 120) / pitch));
+  const room = isNotes ? BAG_ROOM : 0; // keep the bag's spot free
+  const perPage = Math.max(1, Math.floor((W - 120 - room) / pitch));
   const pages = Math.max(1, Math.ceil(list.length / perPage));
   if (ui.page >= pages) ui.page = pages - 1;
   if (ui.page < 0) ui.page = 0;
   const slice = list.slice(ui.page * perPage, ui.page * perPage + perPage);
   const count = slice.length;
-  const marginX = Math.max(70, (W - count * pitch) / 2);
+  const marginX = Math.max(70, (W - room - count * pitch) / 2);
   ui.layout = { marginX, pitch, cardW: isNotes ? 220 : 170, slice, start: ui.page * perPage, isNotes };
   cardsEl.classList.toggle("no-anim", !!ui.noAnim);
   ui.noAnim = false;

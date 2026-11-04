@@ -504,15 +504,20 @@ html, body {
 .cat-full[hidden] { display: none; }
 
 /* ---------- the basket ---------- */
-#basket { --bk-body: #d8bf93; --bk-rim: #c9a875; --bk-edge: #9a7a4c; --bk-handle: #b08c5a;
-  position: absolute; top: 46px; right: 20px; width: 46px; height: 42px; border: none; background: transparent; padding: 0; cursor: pointer; z-index: 20; display: none; }
+#basket { --bag-a: #f3ead9; --bag-b: #e2d3b8; --bag-in: #6b5940; --bag-stitch: #b49a72; --bag-patch: #fbf7ee;
+  position: absolute; width: 143px; height: 195px; border: none; background: transparent; padding: 0; cursor: pointer; z-index: 20; display: none;
+  transform-origin: 79px 5px; animation: bagSway 6s ease-in-out infinite; }
 #stage.deck-notes #basket { display: block; }
-#basket svg { display: block; margin: 0 auto; transition: transform 0.15s; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.18)); }
-#basket:hover svg { transform: translateY(-2px) rotate(-3deg); }
-#basket.bounce svg { animation: bkBounce 0.5s ease 0.35s; }
-@keyframes bkBounce { 0%,100% { transform: none; } 35% { transform: translateY(3px) scaleY(0.92); } 70% { transform: translateY(-2px); } }
-#basket .bk-n { position: absolute; top: 0; right: -2px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--clay); color: #fff; font-size: 10px; line-height: 17px; text-align: center; box-shadow: 0 0 0 2px #fff; }
-#basket .bk-n[hidden] { display: none; }
+#basket svg { display: block; filter: drop-shadow(0 6px 8px rgba(50,40,30,0.18)); }
+#basket:hover { animation: bagNudge 0.9s ease-in-out; }
+#basket.bounce { animation: bagCatch 0.7s ease 0.35s; }
+#basket.empty .bk-paper { display: none; }
+#basket .bk-label { position: absolute; left: 40px; top: 117px; width: 63px; height: 47px; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; color: #6b5940; line-height: 1.05; }
+#basket .bk-n { font-size: 21px; font-weight: 700; font-family: Georgia, "Times New Roman", serif; }
+#basket .bk-cap { font-style: normal; font-size: 11px; letter-spacing: 1px; opacity: 0.8; margin-top: 2px; white-space: nowrap; }
+@keyframes bagSway { 0%,100% { transform: rotate(-1.2deg); } 50% { transform: rotate(1.2deg); } }
+@keyframes bagNudge { 0%,100% { transform: rotate(0); } 30% { transform: rotate(4deg); } 65% { transform: rotate(-2.5deg); } }
+@keyframes bagCatch { 0%,100% { transform: rotate(0); } 25% { transform: translateY(5px) rotate(-3deg); } 60% { transform: translateY(-2px) rotate(2deg); } }
 #basketView { position: fixed; inset: 0; background: rgba(30,25,20,0.28); display: flex; align-items: center; justify-content: center; z-index: 205; }
 #basketView[hidden] { display: none; }
 .bk-sheet { width: 560px; max-width: 92vw; max-height: calc(100vh - 20px); background: #fffdf9; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); display: flex; flex-direction: column; overflow: hidden; }

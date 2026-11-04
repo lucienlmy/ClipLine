@@ -2,6 +2,24 @@
 
 Newest first. This file is built into the app and is what Settings → About → "Update history" shows; the Chinese version is `CHANGELOG.md` — keep the two in step.
 
+## v1.8.0 · 2026-11-04
+
+### 🏷 Note categories
+- Every note has one category, shown as its colour. Defaults: Work, To-do, Ideas, Life, Reference, Later, Urgent; anything else is "No category".
+- Pick one from the chip at the top left of the editor; "Manage categories…" renames, deletes and adds (four new colours — purple, pink, teal, brown — up to 11 categories). Deleting a category keeps its notes, uncategorised.
+- Notes you already coloured fall into the matching category.
+- With two or more categories in use, the notes line shows category filters in the bottom bar.
+
+### 🧺 The done bag
+- A linen bag hangs at the right end of the notes line, showing how many finished notes it holds.
+- ✕ on a note now means done: the note and its to-dos go into the bag with the date (undo for 5 s). To drop a note without a record, right-click → "Delete (skip the bag)".
+- Notes whose to-dos are all ticked can go in together with "Tidy N" in the bottom bar.
+- Click the bag to see this month's count (e.g. "12 notes · 47 items · Work 8"), then the notes grouped by month; put any back on the line, delete one, or empty the bag.
+- Kept 30 days by default; Settings → Auto cleanup offers 7 / 30 / 90 / 365 days or forever.
+
+### 🌐 Tray menu
+- The right-click menu now follows the app language instead of showing both; it switches as soon as you change the setting.
+
 ## v1.7.0 · 2026-11-04
 
 ### 📄 Notes that don't fit
