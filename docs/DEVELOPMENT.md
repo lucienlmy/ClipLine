@@ -41,6 +41,7 @@ RUSTC_BOOTSTRAP=1 cargo check -Zbuild-std=std,panic_abort --target x86_64-pc-win
 - 注意：在 Claude 会话里无法编辑或发布已有的 Release（GitHub 接口拒绝），草稿只能由仓库主人在网页上点「Publish release」。
 - 只改发布说明不用重新编译：运行 **Release notes** 工作流，填上标签即可。
 - 排查问题：在 exe 旁边放一个空的 `clipline-debug.log`，程序就会写诊断日志。
+- 截图：`使用说明.md` 用的配图在 `assets/guide-*.png`，界面改了要记得重截；README 首图是 `assets/screenshot.png`。
 
 ## 设计决定
 已经定下的取舍，改之前先想清楚当初为什么这样定。
