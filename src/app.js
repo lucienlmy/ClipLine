@@ -67,13 +67,17 @@ const DRAG_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADgAAAA4CAYAAAC
 
 /* Keep the line from auto-rolling-up while a menu / overlay is open. */
 function refreshModal() {
-  const open = !$("ctx").hidden || !$("preview").hidden || !$("reader").hidden || !$("editor").hidden || !$("settings").hidden || !$("stackPop").hidden;
+  const open = !$("ctx").hidden || !$("preview").hidden || !$("reader").hidden || !$("editor").hidden || !$("settings").hidden || !$("stackPop").hidden || !$("basketView").hidden || !$("catPop").hidden;
   invoke("set_modal", { on: open }).catch(() => {});
 }
 
 /* ---------- i18n ---------- */
 const I18N = {
   zh: {
+    cat_blue: "工作", cat_orange: "待办", cat_yellow: "灵感", cat_green: "生活", cat_cream: "资料", cat_black: "稍后看", cat_red: "要紧", catNone: "未分类",
+    catNew: "＋ 新建分类", catManage: "管理分类…", catTitle: "便签分类", catNamePh: "新分类名称", catAdd: "添加", catDel: "删除分类", catDelAsk: "确认删除？", catFull: "颜色已经用完了，删掉一个分类才能再加", catHint: "改名直接在框里改；删除分类不会删除便签，只是改为未分类", catNotes: "{n} 张", catPick: "选个颜色",
+    basketTip: "篮子：已完成的便签", basketTitle: "已完成的便签", basketEmpty: "篮子是空的。\n便签上点 ✕（或「整理」）后，完成的便签会放进这里，按月统计。", monthDone: "本月完成 ", statN: "{n} 张", statK: "{k} 项", putBack: "↩ 放回绳上", delOne: "删除", clearBasket: "清空篮子", clearAsk: "确认清空？", keepDays: "保留 {n} 天，可在设置里改", keepForever: "永久保留，可在设置里改", toBasket: "已放进篮子", toBasketN: "已把 {n} 张放进篮子", restored: "已放回绳上", doneOn: "{d} 完成",
+    takeNote: "完成，放进篮子", deleteNote: "删除（不进篮子）", deletedNote: "已删除", noteTidyTip: "把待办全部打勾的便签放进篮子", confirmDone: "钉住的便签，确认放进篮子？",
     all: "全部", text: "文字", link: "链接", color: "颜色", image: "图片", file: "文件",
     search: "搜索…", copied: "已复制", editText: "编辑文字", annotate: "✎ 标注", ocr: "文 识别文字（OCR）", ocrRunning: "正在识别文字…", ocrFail: "识别失败：", ocrNone: "没有识别到文字", ocrDone: "已识别 {n} 个字，已复制，可在这里修改", shotTip: "截图上绳", favMore: "其余收藏", favZone: "左边是收藏区", g3: "三日内", g7: "一周内", gOld: "更早", cards: "张", total: "共", groupOpen: "展开这一叠", groupHint: "单击复制 · 拖出 · 双击编辑/打开 · 右键更多", takeAll: "全部取下", tookN: "已取下 {n} 张", undo: "撤销", favKeep: "收藏的卡片请先取消收藏", tidy: "整理", tidyTip: "取下原文件已不在的卡片", tidied: "已取下 {n} 张失效卡片", foldTip: "按日期折叠：今天散挂，更早的折成「三日内 / 一周内 / 更早」", foldOnT: "已按日期折叠", foldLabel: "按日期", foldOffT: "已全部散挂", moved: "已移动，卡片已取下", stackOpen: "展开这一叠", stackTitle: "这一叠共 {n} 个文件", stackSplit: "拆成单张", stackHint: "单击复制 · 拖出单个文件 · 双击打开", missing: "原文件已不在（被移动或删除了）", already: "已在绳上，已移到最前", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
     emptyClip: "绳上还空着 — 复制点什么试试",
@@ -117,6 +121,10 @@ const I18N = {
   },
   en: {
     all: "All", text: "Text", link: "Link", color: "Color", image: "Image", file: "File",
+    cat_blue: "Work", cat_orange: "To-do", cat_yellow: "Ideas", cat_green: "Life", cat_cream: "Reference", cat_black: "Later", cat_red: "Urgent", catNone: "No category",
+    catNew: "＋ New category", catManage: "Manage categories…", catTitle: "Note categories", catNamePh: "New category name", catAdd: "Add", catDel: "Delete", catDelAsk: "Sure?", catFull: "All colours are in use — delete a category to add another", catHint: "Rename in the box; deleting a category keeps its notes (they become uncategorised)", catNotes: "{n}", catPick: "Pick a colour",
+    basketTip: "Basket: finished notes", basketTitle: "Finished notes", basketEmpty: "The basket is empty.\nClick ✕ on a note (or Tidy) and finished notes land here, counted by month.", monthDone: "This month: ", statN: "{n} notes", statK: "{k} items", putBack: "↩ Put back", delOne: "Delete", clearBasket: "Empty basket", clearAsk: "Sure?", keepDays: "Kept {n} days — change in Settings", keepForever: "Kept forever — change in Settings", toBasket: "Put in the basket", toBasketN: "Put {n} in the basket", restored: "Put back on the line", doneOn: "Done {d}",
+    takeNote: "Done — into the basket", deleteNote: "Delete (skip the basket)", deletedNote: "Deleted", noteTidyTip: "Put notes whose to-dos are all ticked into the basket", confirmDone: "Pinned note — put it in the basket?",
     search: "Search…", copied: "Copied", editText: "Edit text", annotate: "✎ Annotate", ocr: "Recognise text (OCR)", ocrRunning: "Recognising text…", ocrFail: "OCR failed: ", ocrNone: "No text found", ocrDone: "Recognised {n} characters — copied; edit here if needed", shotTip: "Screenshot to the line", favMore: "More favourites", favZone: "Favourites are on the left", g3: "Last 3 days", g7: "This week", gOld: "Older", cards: "", total: "Total", groupOpen: "Open this stack", groupHint: "Click to copy · drag out · double-click to edit/open · right-click for more", takeAll: "Take all down", tookN: "Took down {n}", undo: "Undo", favKeep: "Remove it from favourites first", tidy: "Tidy", tidyTip: "Take down cards whose files are gone", tidied: "Took down {n} broken card(s)", foldTip: "Fold by date: today loose, older folded into stacks", foldOnT: "Folded by date", foldLabel: "By date", foldOffT: "All cards loose", moved: "Moved — card taken down", stackOpen: "Open this stack", stackTitle: "{n} files in this stack", stackSplit: "Split into cards", stackHint: "Click to copy · drag one out · double-click to open", missing: "The original file is gone (moved or deleted)", already: "Already on the line — moved to front", pasteBack: "Paste into previous app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
     emptyClip: "The line is empty — copy something",
     emptyNotes: "No notes yet — click + above to write one",
@@ -173,12 +181,22 @@ const TINTS = [
   { key: "green",  bg: "#dce4d7", ink: "#292624" },
   { key: "blue",   bg: "#d3dce5", ink: "#292624" },
   { key: "black",  bg: "#c5c4c4", ink: "#292624" },
+  { key: "purple", bg: "#ddd5e6", ink: "#292624" },
+  { key: "pink",   bg: "#efd8df", ink: "#292624" },
+  { key: "teal",   bg: "#cfe4e1", ink: "#292624" },
+  { key: "brown",  bg: "#ddd0c0", ink: "#292624" },
 ];
+/* Note categories are named tints: one colour per category, so existing
+ * notes fall into a category by their colour and cards render unchanged. */
+const CAT_DEFAULTS = ["blue", "orange", "yellow", "green", "cream", "black", "red"];
+const catOf = (tint) => (tint ? state.cats.find((c) => c.tint === tint) || null : null);
+const catLabel = (c) => (c ? c.name || t("cat_" + c.tint) : t("catNone"));
+const catKey = (note) => (catOf(note.tint) ? note.tint : "none");
 const tintOf = (k) => TINTS.find((x) => x.key === k) || TINTS[0];
 
 /* ---------- state ---------- */
-let state = { clips: [], notes: [], ordered: true };
-let cfg = { hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "auto", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"] };
+let state = { clips: [], notes: [], done: [], cats: null, ordered: true };
+let cfg = { history_days: 30, hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "auto", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"] };
 const FONTS = {
   default: '-apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif',
   yahei: '"Microsoft YaHei", "Segoe UI", sans-serif',
@@ -211,7 +229,7 @@ const PRESETS = {
 };
 function applyTheme(name) { stage.dataset.theme = name || "soft"; }
 function applyAccent(name) { document.documentElement.dataset.accent = name || "terra"; }
-const ui = { deck: "clipboard", filter: "all", search: "", pinnedOnly: false, page: 0 };
+const ui = { deck: "clipboard", filter: "all", search: "", pinnedOnly: false, page: 0, cat: "" };
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -229,6 +247,8 @@ async function load() {
       const d = JSON.parse(raw);
       state.clips = Array.isArray(d.clips) ? d.clips : [];
       state.notes = Array.isArray(d.notes) ? d.notes : [];
+      state.done = Array.isArray(d.done) ? d.done : [];
+      state.cats = Array.isArray(d.cats) ? d.cats : null;
       state.ordered = !!d.ordered;
     }
   } catch (e) {}
@@ -237,6 +257,7 @@ async function load() {
     if (s) cfg = Object.assign(cfg, JSON.parse(s));
   } catch (e) {}
   LANG = pickLang(cfg);
+  if (!state.cats) state.cats = CAT_DEFAULTS.map((k) => ({ tint: k, name: "" }));
   // Every card needs a stable id (used for reordering / removal).
   state.clips.forEach((c, i) => { if (!c.id) c.id = "c" + Date.now() + "-" + i; });
   state.notes.forEach((n, i) => { if (!n.id) n.id = "n" + Date.now() + "-" + i; });
@@ -259,6 +280,9 @@ function cleanup() {
     const rest = state.clips.filter((c) => !c.pinned).slice(0, 300 - pinned.length);
     state.clips = pinned.concat(rest).sort((a, b) => b.ts - a.ts);
   }
+  // Finished notes stay in the basket for history_days (0 = forever).
+  const hd = cfg.history_days === undefined ? 30 : cfg.history_days;
+  if (hd > 0) state.done = state.done.filter((n) => now - (n.doneAt || now) < hd * 86400000);
 }
 
 /* ---------- classification ---------- */
@@ -306,6 +330,8 @@ function visibleList() {
   if (ui.deck === "notes") {
     let arr = state.notes.slice();
     if (ui.pinnedOnly) arr = arr.filter((n) => n.pinned);
+    if (ui.cat && !catFilterKeys().includes(ui.cat)) ui.cat = "";
+    if (ui.cat) arr = arr.filter((n) => catKey(n) === ui.cat);
     if (ui.search) { const q = ui.search.toLowerCase(); arr = arr.filter((n) => (n.body || "").toLowerCase().includes(q)); }
     return arr.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
   }
@@ -340,6 +366,7 @@ function clipZones(list) {
   return { favs: favShown, favStack, loose, stacks };
 }
 function renderClips() {
+  $("tidy").title = t("tidyTip");
   const cardsEl = $("cards");
   cardsEl.innerHTML = "";
   const list = visibleList();
@@ -593,11 +620,255 @@ function runTidy() {
   setTimeout(() => removeItems(items, t("tidied")), 420);
 }
 
+/* ---------- note categories: filter chips on the notes line ---------- */
+// Keys of the categories that have notes on the line ("none" = uncategorised).
+function catFilterKeys() {
+  const used = new Set(state.notes.map(catKey));
+  const keys = state.cats.map((c) => c.tint).filter((k) => used.has(k));
+  if (used.has("none")) keys.push("none");
+  return keys;
+}
+function catDot(tint) { return `<i class="cat-dot" style="background:${tintOf(tint).bg}"></i>`; }
+function renderCatFilters(el) {
+  el.innerHTML = "";
+  const keys = catFilterKeys();
+  if (keys.length < 2 && !ui.cat) return; // one colour only: nothing to filter
+  const mk = (key, html) => {
+    const b = document.createElement("button");
+    b.innerHTML = html;
+    if (ui.cat === key) b.classList.add("on");
+    b.onclick = () => { ui.cat = key; ui.page = 0; render(); };
+    b.addEventListener("contextmenu", (e) => { e.preventDefault(); e.stopPropagation(); openCatPop(); });
+    el.appendChild(b);
+  };
+  mk("", escapeHtml(t("all")));
+  keys.forEach((k) => mk(k, catDot(k === "none" ? null : k) + escapeHtml(catLabel(k === "none" ? null : catOf(k)))));
+}
+
+/* ---------- category picker in the editor ---------- */
+function applyEditorTint(note) {
+  const tt = tintOf(note.tint), sheet = document.querySelector(".editor-sheet");
+  sheet.style.setProperty("--editor-bg", tt.bg); sheet.style.setProperty("--editor-ink", tt.ink);
+}
+function renderCatChip(note) {
+  const tc = $("tints"); tc.innerHTML = "";
+  const b = document.createElement("button"); b.className = "cat-chip"; b.type = "button";
+  b.innerHTML = catDot(catOf(note.tint) ? note.tint : null) + `<span>${escapeHtml(catLabel(catOf(note.tint)))}</span><b>▾</b>`;
+  b.onclick = (e) => { e.stopPropagation(); showCatMenu(b, note); };
+  tc.appendChild(b);
+}
+function showCatMenu(anchor, note) {
+  const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind");
+  const cur = catOf(note.tint) ? note.tint : null;
+  const item = (tint, label) => {
+    const b = document.createElement("button");
+    b.innerHTML = catDot(tint) + escapeHtml(label) + (cur === tint ? ' <span class="cat-check">✓</span>' : "");
+    b.onclick = () => { hideCtx(); note.tint = tint; applyEditorTint(note); renderCatChip(note); };
+    ctx.appendChild(b);
+  };
+  item(null, t("catNone"));
+  state.cats.forEach((c) => item(c.tint, catLabel(c)));
+  const s = document.createElement("div"); s.className = "sep"; ctx.appendChild(s);
+  const m = document.createElement("button"); m.textContent = t("catManage");
+  m.onclick = () => { hideCtx(); openCatPop(); };
+  ctx.appendChild(m);
+  ctx.hidden = false; refreshModal();
+  const r = anchor.getBoundingClientRect(), h = ctx.offsetHeight;
+  ctx.style.left = Math.min(r.left, window.innerWidth - 180) + "px";
+  ctx.style.top = Math.max(4, Math.min(r.bottom + 4, window.innerHeight - h - 4)) + "px";
+}
+
+/* ---------- manage categories: rename, delete, add ---------- */
+let catNewTint = null, catDelArmed = null;
+function freeTints() { return TINTS.map((x) => x.key).filter((k) => k && !state.cats.some((c) => c.tint === k)); }
+function openCatPop() { catDelArmed = null; fillCatPop(); $("catPop").hidden = false; refreshModal(); }
+function closeCatPop() { $("catPop").hidden = true; refreshModal(); }
+function catsChanged() {
+  save(); render();
+  if (!$("editor").hidden && editing && !editing._clip) { applyEditorTint(editing); renderCatChip(editing); }
+}
+function fillCatPop() {
+  $("catTitle").textContent = t("catTitle");
+  $("catHint").textContent = t("catHint");
+  const list = $("catList"); list.innerHTML = "";
+  state.cats.forEach((c) => {
+    const row = document.createElement("div"); row.className = "cat-row";
+    const n = state.notes.filter((x) => x.tint === c.tint).length;
+    row.innerHTML = catDot(c.tint) + `<input type="text" maxlength="12" spellcheck="false"><span class="cat-n"></span><button class="cat-del"></button>`;
+    const inp = row.querySelector("input");
+    inp.value = catLabel(c);
+    inp.addEventListener("change", () => {
+      const v = inp.value.trim();
+      c.name = !v || v === t("cat_" + c.tint) ? "" : v;
+      inp.value = catLabel(c); catsChanged();
+    });
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") inp.blur(); e.stopPropagation(); });
+    row.querySelector(".cat-n").textContent = n ? t("catNotes").replace("{n}", n) : "";
+    const del = row.querySelector(".cat-del");
+    del.textContent = catDelArmed === c.tint ? t("catDelAsk") : t("catDel");
+    del.classList.toggle("armed", catDelArmed === c.tint);
+    del.onclick = () => {
+      if (catDelArmed !== c.tint) { catDelArmed = c.tint; fillCatPop(); return; }
+      catDelArmed = null;
+      state.cats = state.cats.filter((x) => x !== c);
+      state.notes.concat(state.done).forEach((x) => { if (x.tint === c.tint) x.tint = null; });
+      if (ui.cat === c.tint) ui.cat = "";
+      fillCatPop(); catsChanged();
+    };
+    list.appendChild(row);
+  });
+  const free = freeTints(), add = $("catAddRow");
+  $("catFull").textContent = t("catFull");
+  $("catFull").hidden = free.length > 0;
+  add.hidden = !free.length;
+  if (!free.length) return;
+  if (!free.includes(catNewTint)) catNewTint = free[0];
+  const dots = $("catAddDots"); dots.innerHTML = ""; dots.title = t("catPick");
+  free.forEach((k) => {
+    const d = document.createElement("button"); d.type = "button";
+    d.className = "tint" + (k === catNewTint ? " on" : ""); d.style.background = tintOf(k).bg;
+    d.onclick = () => { catNewTint = k; dots.querySelectorAll(".tint").forEach((z) => z.classList.toggle("on", z === d)); };
+    dots.appendChild(d);
+  });
+  $("catNewName").placeholder = t("catNamePh");
+  $("catAddBtn").textContent = t("catAdd");
+}
+function addCat() {
+  const v = $("catNewName").value.trim();
+  if (!v) { $("catNewName").focus(); return; }
+  if (!freeTints().includes(catNewTint)) return;
+  state.cats.push({ tint: catNewTint, name: v });
+  $("catNewName").value = "";
+  fillCatPop(); catsChanged();
+}
+
+/* ---------- the basket: finished notes, kept for a while, counted by month ---------- */
+function doneItems(n) { const tl = MD.titleOf(n.body); return MD.progress(n.body, tl.index + 1)[0]; }
+function toBasket(notes) {
+  if (!notes.length) return;
+  const ids = new Set(notes.map((n) => n.id));
+  const snapN = state.notes.slice(), snapD = state.done.slice();
+  const now = Date.now();
+  state.notes = state.notes.filter((n) => !ids.has(n.id));
+  // Pending reminders end with the note; the copy in the basket keeps the text.
+  notes.forEach((n) => { const c = Object.assign({}, n, { doneAt: now }); delete c.remindAt; delete c.fired; delete c.acked; state.done.unshift(c); });
+  save(); render(); bounceBasket();
+  const msg = notes.length > 1 ? t("toBasketN").replace("{n}", notes.length) : t("toBasket");
+  toastAction(msg, t("undo"), () => { state.notes = snapN; state.done = snapD; save(); render(); }, 5000);
+}
+function deleteNotes(notes) {
+  const ids = new Set(notes.map((n) => n.id)), snap = state.notes.slice();
+  state.notes = state.notes.filter((n) => !ids.has(n.id));
+  save(); render();
+  toastAction(t("deletedNote"), t("undo"), () => { state.notes = snap; save(); render(); }, 5000);
+}
+function updateBasket() {
+  const b = $("basket"), n = state.done.length;
+  const badge = b.querySelector(".bk-n");
+  badge.textContent = n > 99 ? "99+" : String(n);
+  badge.hidden = !n;
+  b.title = t("basketTip");
+}
+function bounceBasket() { const b = $("basket"); b.classList.remove("bounce"); void b.offsetWidth; b.classList.add("bounce"); }
+
+/* tidy on the notes line: notes whose to-dos are all ticked */
+let noteTidyList = [];
+function updateNoteTidy() {
+  noteTidyList = state.notes.filter((n) => { if (n.pinned) return false; const tl = MD.titleOf(n.body); const [d, tot] = MD.progress(n.body, tl.index + 1); return tot > 0 && d === tot; });
+  const btn = $("tidy");
+  btn.hidden = !noteTidyList.length;
+  btn.textContent = `${t("tidy")} ${noteTidyList.length}`;
+  btn.title = t("noteTidyTip");
+}
+function runNoteTidy() {
+  if (!noteTidyList.length) return;
+  const items = noteTidyList.slice(), ids = new Set(items.map((x) => x.id));
+  $("cards").querySelectorAll(".card").forEach((el) => { if (ids.has(el.dataset.id)) el.classList.add("falling"); });
+  setTimeout(() => toBasket(items), 420);
+}
+
+function monthKey(ts) { const d = new Date(ts); return d.getFullYear() * 100 + d.getMonth(); }
+function monthName(key) {
+  const y = Math.floor(key / 100), m = key % 100;
+  return LANG === "en" ? new Date(y, m, 1).toLocaleString("en-GB", { month: "short", year: "numeric" }) : `${y}年${m + 1}月`;
+}
+// "12 张 · 47 项 · 工作 8 · 生活 3" for a set of finished notes.
+function statParts(list, withCats) {
+  const k = list.reduce((s, n) => s + doneItems(n), 0);
+  const parts = [t("statN").replace("{n}", list.length)];
+  if (k) parts.push(t("statK").replace("{k}", k));
+  if (withCats) {
+    const m = new Map();
+    list.forEach((n) => { const c = catOf(n.tint); if (c) m.set(c, (m.get(c) || 0) + 1); });
+    [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).forEach(([c, v]) => parts.push(`${catLabel(c)} ${v}`));
+  }
+  return parts.join(" · ");
+}
+let basketClearArmed = false;
+function openBasket() { basketClearArmed = false; fillBasket(); $("basketView").hidden = false; refreshModal(); }
+function closeBasket() { $("basketView").hidden = true; refreshModal(); }
+function fillBasket() {
+  $("bkTitle").textContent = t("basketTitle");
+  $("bkClose").title = t("close");
+  const thisMonth = state.done.filter((n) => monthKey(n.doneAt) === monthKey(Date.now()));
+  $("bkStat").textContent = t("monthDone") + statParts(thisMonth, true);
+  const hd = cfg.history_days === undefined ? 30 : cfg.history_days;
+  $("bkKeep").textContent = hd > 0 ? t("keepDays").replace("{n}", hd) : t("keepForever");
+  const clr = $("bkClear");
+  clr.hidden = !state.done.length;
+  clr.textContent = basketClearArmed ? t("clearAsk") : t("clearBasket");
+  clr.classList.toggle("armed", basketClearArmed);
+  const body = $("bkBody"); body.innerHTML = "";
+  if (!state.done.length) { const e = document.createElement("div"); e.className = "bk-empty"; e.textContent = t("basketEmpty"); body.appendChild(e); return; }
+  const groups = new Map();
+  state.done.slice().sort((a, b) => b.doneAt - a.doneAt).forEach((n) => {
+    const k = monthKey(n.doneAt); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(n);
+  });
+  groups.forEach((list, k) => {
+    const h = document.createElement("div"); h.className = "bk-month";
+    h.innerHTML = `<b>${escapeHtml(monthName(k))}</b><span>${escapeHtml(statParts(list, true))}</span>`;
+    body.appendChild(h);
+    list.forEach((n) => {
+      const tl = MD.titleOf(n.body), [pd, pt] = MD.progress(n.body, tl.index + 1);
+      const c = catOf(n.tint), d = new Date(n.doneAt);
+      const when = `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const row = document.createElement("div"); row.className = "bk-item";
+      row.style.setProperty("--bk-bg", tintOf(n.tint).bg);
+      row.title = (n.body || "").slice(0, 400);
+      row.innerHTML = `<div class="bk-main"><div class="bk-t">${tl.index < 0 ? escapeHtml(t("blankNote")) : MD.inline(tl.text)}</div>
+        <div class="bk-meta">${c ? `<span class="bk-cat">${escapeHtml(catLabel(c))}</span>` : ""}${pt ? `<span>☑ ${pd}/${pt}</span>` : ""}<span>${escapeHtml(t("doneOn").replace("{d}", when))}</span></div></div>
+        <button class="bk-back"></button><button class="bk-del"></button>`;
+      row.querySelectorAll("a.md-a").forEach((a) => a.replaceWith(document.createTextNode(a.textContent)));
+      const back = row.querySelector(".bk-back"); back.textContent = t("putBack");
+      back.onclick = () => {
+        state.done = state.done.filter((x) => x !== n);
+        const r = Object.assign({}, n); delete r.doneAt; r.ts = Date.now();
+        state.notes.unshift(r); save(); render(); fillBasket(); toast(t("restored"));
+      };
+      const del = row.querySelector(".bk-del"); del.textContent = "✕"; del.title = t("delOne");
+      del.onclick = () => { state.done = state.done.filter((x) => x !== n); save(); updateBasket(); fillBasket(); };
+      body.appendChild(row);
+    });
+  });
+}
+function clearBasket() {
+  if (!basketClearArmed) { basketClearArmed = true; fillBasket(); return; }
+  basketClearArmed = false; state.done = []; save(); updateBasket(); fillBasket();
+}
+$("basket").addEventListener("click", (e) => { e.stopPropagation(); openBasket(); });
+$("bkClose").addEventListener("click", closeBasket);
+$("bkClear").addEventListener("click", clearBasket);
+$("basketView").addEventListener("click", (e) => { if (e.target.id === "basketView") closeBasket(); });
+$("catClose").addEventListener("click", closeCatPop);
+$("catPop").addEventListener("click", (e) => { if (e.target.id === "catPop") closeCatPop(); });
+$("catAddBtn").addEventListener("click", addCat);
+$("catNewName").addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Enter") addCat(); });
+
 /* ---------- render ---------- */
 function render() {
   drawRope();
   if (ui.deck !== "notes") { renderClips(); return; }
-  $("foldBtn").hidden = true; $("tidy").hidden = true;
+  $("foldBtn").hidden = true; updateNoteTidy(); updateBasket();
   const isNotes = ui.deck === "notes";
   const pitch = isNotes ? 240 : 188;
   const cardsEl = $("cards");
@@ -647,7 +918,7 @@ function render() {
 
 function renderFilters() {
   const el = $("filters");
-  if (ui.deck === "notes") { el.innerHTML = ""; return; }
+  if (ui.deck === "notes") { renderCatFilters(el); return; }
   const defs = [["all", t("all")], ["text", t("text")], ["link", t("link")], ["color", t("color")], ["image", t("image")], ["file", t("file")]];
   el.innerHTML = "";
   defs.forEach(([k, label]) => {
@@ -873,7 +1144,7 @@ function wireLinks(root) {
 /* ---------- corners ---------- */
 function addCorners(card, body, item, isNote) {
   const x = document.createElement("button");
-  x.className = "corner x"; x.textContent = "✕"; x.title = t("take");
+  x.className = "corner x"; x.textContent = "✕"; x.title = isNote ? t("takeNote") : t("take");
   x.addEventListener("click", (e) => { e.stopPropagation(); if (item.pinned) confirmRemove(e, item, isNote); else removeItem(item, isNote); });
   body.appendChild(x);
   const mag = document.createElement("button");
@@ -1133,7 +1404,7 @@ function confirmTrash(e, item) {
   ctx.style.top = Math.max(8, Math.min(e.clientY, window.innerHeight - h - 8)) + "px";
 }
 function removeItem(item, isNote) {
-  if (isNote) state.notes = state.notes.filter((n) => n.id !== item.id);
+  if (isNote) { toBasket([item]); return; }
   else { state.clips = state.clips.filter((c) => c.id !== item.id); if (item.path) invoke("delete_file", { path: item.path }).catch(()=>{}); }
   save(); render();
 }
@@ -1178,7 +1449,8 @@ function showCtx(e, item, isNote) {
   }
   add(item.pinned ? t("unpin") : t("pin"), () => { item.pinned = !item.pinned; save(); render(); });
   sep();
-  add(t("take"), () => removeItem(item, isNote));
+  add(isNote ? t("takeNote") : t("take"), () => removeItem(item, isNote));
+  if (isNote) { add(t("deleteNote"), () => deleteNotes([item])); ctx.lastChild.style.color = "#c0392b"; }
   if (!isNote && item.vis === "file" && (item.files || []).length) {
     add(t("takeDelete"), () => confirmTrash(e, item));
     ctx.lastChild.style.color = "#c0392b";
@@ -1198,7 +1470,7 @@ function saveDesktop(item) {
     .then(() => toast(t("savedTo"))).catch(() => {});
 }
 function convertToNote(item) {
-  const note = { id: "n" + Date.now() + "-" + Math.floor(Math.random() * 1e6), tint: "yellow", body: item.text || "", pinned: false, ts: Date.now(), remindAt: null, reminded: false };
+  const note = { id: "n" + Date.now() + "-" + Math.floor(Math.random() * 1e6), tint: null, body: item.text || "", pinned: false, ts: Date.now(), remindAt: null, reminded: false };
   state.notes.unshift(note); save();
   setDeck("notes"); render(); toast(t("toNote"));
 }
@@ -1247,14 +1519,7 @@ function openEditorFor(note) {
   sheet.style.setProperty("--editor-bg", tt.bg); sheet.style.setProperty("--editor-ink", tt.ink);
   const ta = $("editorBody"); ta.value = note.body || ""; ta.placeholder = note._clip ? t("editorPhClip") : t("editorPh");
   $("bellText").textContent = note.remindAt ? fmtWhen(note.remindAt) : t("remind");
-  const tc = $("tints"); tc.innerHTML = "";
-  TINTS.forEach((x) => {
-    const d = document.createElement("div");
-    d.className = "tint" + (note.tint === x.key ? " on" : "");
-    d.style.background = x.bg; d.title = x.key || "默认";
-    d.onclick = () => { note.tint = x.key; sheet.style.setProperty("--editor-bg", x.bg); sheet.style.setProperty("--editor-ink", x.ink); tc.querySelectorAll(".tint").forEach((z) => z.classList.remove("on")); d.classList.add("on"); };
-    tc.appendChild(d);
-  });
+  renderCatChip(note);
   $("editor").hidden = false; refreshModal();
   setTimeout(() => (note._focusNote ? $("linkNote") : $("editorBody")).focus(), 30);
 }
@@ -1725,6 +1990,7 @@ function applyLang() {
   $("next").title = t("nextPage");
   $("pinOnly").title = t("pinOnly");
   $("shotBtn").title = t("shotTip"); $("shotBtn").textContent = "✂ " + t("shotLabel"); $("tidy").textContent = t("tidy"); $("tidy").title = t("tidyTip"); $("foldBtn").title = t("foldTip"); $("foldBtn").textContent = t("foldLabel");
+  $("basket").title = t("basketTip");
   $("editorBody").placeholder = t("editorPh");
   $("bellText").textContent = t("remind");
   const hint = document.querySelector(".editor-foot .hint"); if (hint) hint.textContent = t("editorHint");
@@ -1737,12 +2003,14 @@ function setDeck(deck) {
   stage.classList.toggle("deck-notes", deck === "notes");
   stage.classList.toggle("deck-clipboard", deck === "clipboard");
 }
-function onDrop(deck) { pathInfoCache.clear(); noteScroll.clear(); setDeck(deck); stage.classList.remove("up"); render(); }
+function onDrop(deck) { pathInfoCache.clear(); noteScroll.clear(); cleanup(); setDeck(deck); stage.classList.remove("up"); render(); }
 function onRollup() {
   closeStack();
   stopCatch();
   hideCtx(); closePreview(); clearTimeout(noteClickTimer);
   if (!$("reader").hidden) closeReader();
+  if (!$("basketView").hidden) closeBasket();
+  if (!$("catPop").hidden) closeCatPop();
   if (!$("editor").hidden) closeEditor();
   if (!$("settings").hidden) closeSettings();
   stage.classList.add("up");
@@ -1755,9 +2023,11 @@ $("panel").addEventListener("transitionend", (ev) => {
 /* ---------- global input ---------- */
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
+    if (!$("catPop").hidden) { closeCatPop(); return; }
     if (!$("settings").hidden) { closeSettings(); return; }
     if (!$("editor").hidden) { closeEditor(); return; }
     if (!$("ctx").hidden) { hideCtx(); return; }
+    if (!$("basketView").hidden) { closeBasket(); return; }
     if (!$("reader").hidden) { closeReader(); return; }
     if (!$("preview").hidden) { closePreview(); return; }
     if (!$("stackPop").hidden) { closeStack(); return; }
@@ -1769,7 +2039,7 @@ document.addEventListener("click", (e) => {
   if (!$("ctx").hidden && !pointerInCtx && !e.target.closest("#ctx")) hideCtx();
   if (pointerInsideLine) return;
   if (e.target.closest(".card") || e.target.closest("#pill") || e.target.closest("#plus") ||
-      e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#reader") || e.target.closest("#ctx") || e.target.closest("#settings")) return;
+      e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#reader") || e.target.closest("#ctx") || e.target.closest("#settings") || e.target.closest("#basket") || e.target.closest("#basketView") || e.target.closest("#catPop")) return;
   if (!stage.classList.contains("up")) invoke("rollup_now").catch(() => {});
 });
 // Track (at pointerdown, before any re-render detaches the target) whether the
@@ -1782,7 +2052,8 @@ document.addEventListener("pointerdown", (e) => {
   if (stage.classList.contains("up")) { pointerInsideLine = false; return; }
   // Only real UI counts as "inside": a click on empty rope / panel space closes the line.
   pointerInsideLine = !!(e.target.closest(".card") || e.target.closest("#pill") || e.target.closest("#plus") || e.target.closest(".knot") ||
-    e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#reader") || e.target.closest("#ctx") || e.target.closest("#stackPop"));
+    e.target.closest("#editor") || e.target.closest("#preview") || e.target.closest("#reader") || e.target.closest("#ctx") || e.target.closest("#stackPop") ||
+    e.target.closest("#basket") || e.target.closest("#basketView") || e.target.closest("#catPop"));
 }, true);
 $("preview").addEventListener("click", (e) => { if (e.target.id === "preview") closePreview(); });
 $("reader").addEventListener("click", (e) => { if (e.target.id === "reader") closeReader(); });
@@ -1796,7 +2067,7 @@ $("spSplit").addEventListener("click", () => {
   const g = Z.stacks.find((x) => x.key === stackGroupKey);
   if (g) { closeStack(); removeItems(g.items.slice(), t("tookN")); }
 });
-$("tidy").addEventListener("click", runTidy);
+$("tidy").addEventListener("click", () => (ui.deck === "notes" ? runNoteTidy() : runTidy()));
 $("shotBtn").addEventListener("click", () => invoke("start_shot").catch((e) => toast(String(e))));
 $("foldBtn").addEventListener("click", async () => {
   cfg.fold_by_date = !foldOn(); ui.page = 0; render();

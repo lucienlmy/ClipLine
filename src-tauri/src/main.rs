@@ -49,6 +49,7 @@ struct Settings {
     dwell_ms: u64,
     flip_mod: String, // none | shift | ctrl | alt
     retention_days: u32,
+    history_days: u32, // finished notes kept in the basket; 0 = forever
     lang: String, // auto (follow Windows) | zh | en
     autostart: bool,
     theme: String, // soft | silver | linen | porcelain | graphite
@@ -78,6 +79,7 @@ impl Default for Settings {
             dwell_ms: 250,
             flip_mod: "shift".into(),
             retention_days: 30,
+            history_days: 30,
             // New installs follow Windows; a saved settings.json keeps its value.
             lang: "auto".into(),
             autostart: false,

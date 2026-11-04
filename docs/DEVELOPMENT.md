@@ -13,6 +13,9 @@
   - `update.rs`：检查更新。用系统的 `URLDownloadToFileW` 访问 GitHub API（`releases/latest`）和下载安装文件，不引入 TLS 库，走系统代理；状态集中在 `STATUS`，每次变化由 `main.rs` 广播 `update:status`，`update.html` 负责显示。
 - `src/md.js`：小型 Markdown 渲染器（先整体转义再生成标记，链接只给 `data-href`，由页面自己 `invoke("open_url")`）。便签卡片、阅读视图、编辑器预览、提醒卡片、更新历史共用；`MD.releases` 把 CHANGELOG 按 `## v1.2.3 · 日期` 切成各个版本；按行渲染，待办方框带 `data-idx`（源文本行号），打勾用 `MD.toggle`。待办写法兼容 `- [ ]` / `[ ]` / `[]`。提醒卡片和「已更新」卡片里各有一份同样的 Markdown 样式（`remind.html`、`news.html` 不加载 `styles.css`），改样式时几处一起改。
 - `src/`：前端静态页。`app.js` 主界面（绳子布局：收藏区 / 今天 / 日期叠、卡片、便签、提醒、整理），`settings.*`、`pin.html`、`shot.html`（截图选区）、`annotate.html`（标注）、`remind.html`（提醒卡片）、`update.html`（更新卡片）、`news.html`（「已更新到 vX」卡片）。
+  - 便签分类：分类就是「有名字的底色」，存在 `data.json` 的 `state.cats`（`[{tint, name}]`，`name` 为空时用默认名 `cat_<tint>` 翻译）；便签仍然只存 `tint`，`catOf(tint)` 查分类，不在 `cats` 里的算未分类。`TINTS` 共 12 色（含无色），所以最多 11 个分类。删除分类时把绳上和篮子里对应 `tint` 的便签改成 `null`。底部筛选用 `ui.cat`（`""` 全部 / tint / `"none"`），分类不到两种时不显示。
+  - 篮子：`state.done`，便签取下时复制一份加 `doneAt`（去掉提醒字段）。`cleanup` 按设置 `history_days`（默认 30，0 = 永久）清理。`#tidy` 按钮两边共用：剪贴板绳是「失效文件卡」，便签绳是「待办全部打勾的便签」（`updateNoteTidy` / `runNoteTidy`）。统计里的「项」是打勾的待办数（`MD.progress` 的第一个数）。
+  - 托盘菜单：`tray_menu(app, en)` 按 `lang` 生成，`update_settings` 里 `apply_tray_lang` 重建，所以改语言不用重启。
   - 便签卡片（`buildNoteCard`）：内容放在 `.note-clip > .note-lines`，渲染后 `measureNotes` 量高度，放不下就加 `.over`（可滚动、细滚动条）和 `.fade`（底部渐隐），`updateNoteMore` 数没完整露出来的块写进「还有 N 行」。滚动位置存在 `noteScroll`，打勾重绘后恢复，放下绳子时清空。窗口的 wheel 处理里，鼠标在 `.over` 的便签上就滚便签、不翻屏。单击便签等 250 ms 再开阅读视图（`#reader`，`openReader`），期间来了双击就取消、进编辑器。
 
 ## 踩过的坑（务必遵守）
@@ -53,6 +56,8 @@ RUSTC_BOOTSTRAP=1 cargo check -Zbuild-std=std,panic_abort --target x86_64-pc-win
 - **「还有 N 行」按显示出来的块计数**：一段自动折行的长文字算一行，代码块按它自己的行数算。数的是读者看到的「行」，不去算折行。
 - **单击便签 = 阅读视图，双击 = 编辑**：阅读视图能打勾、点链接，但不能改文字，免得看的时候误改。单击要等约 250 ms 确认不是双击，这点延迟是有意的。
 - **阅读视图是绳子窗口里的浮层，不是独立窗口**：不碰 Rust、不抢焦点，打勾直接改主窗口里的数据；代价是高度受绳子窗口限制（约 360px），长便签在里面滚动。
+- **便签分类 = 有名字的颜色，一张便签只属于一个分类**：不做多标签。多标签要做标签管理和组合筛选，对挂在绳上的便签太重；单分类像记账软件，选起来最省事，而且老便签按颜色自然归类，不用迁移。
+- **便签取下 = 完成，进篮子**：「取下」默认留记录，方便按月统计；真的不想留的走右键「删除（不进篮子）」。篮子只做计数，不做图表，免得变成另一个待办软件。
 - **更新历史打包进程序、只维护一份**：`CHANGELOG.md` / `CHANGELOG.en.md` 编译时嵌入，不联网也能看，也不必再维护一份网页或 JSON。
 - **「已更新」卡片每个版本只弹一次，新装和降级不弹**：新用户还没用过旧版，没有「更新了什么」可言；降级多半是在排查问题，不打扰。
 - **更新卡片里的说明来自 GitHub 发布页，「已更新」卡片的说明来自程序自带的 CHANGELOG**：前者是还没装上的新版本，只能联网取；后者是已经装上的版本，用自带的。
