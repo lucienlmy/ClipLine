@@ -808,6 +808,7 @@ fn update_settings(app: AppHandle, data: String) -> Result<String, String> {
     // Side effects are best-effort and must not fail the save.
     let _ = apply_hotkeys(&app, &s.hotkey_clip, &s.hotkey_notes, &s.hotkey_shot);
     apply_tray_icon(&app, &s.tray_icon);
+    apply_tray_lang(&app, &s);
     let _ = if s.autostart {
         app.autolaunch().enable()
     } else {
@@ -1840,26 +1841,56 @@ fn start_cursor_thread() {
     });
 }
 
-fn build_tray(app: &AppHandle) -> tauri::Result<()> {
-    let item_clip = MenuItemBuilder::with_id("clip", "剪贴板绳 / Clipboard").build(app)?;
-    let item_notes = MenuItemBuilder::with_id("notes", "便签绳 / Notes").build(app)?;
-    let item_new = MenuItemBuilder::with_id("newnote", "新建便签 / New note").build(app)?;
-    let item_mon = MenuItemBuilder::with_id("togglemon", "暂停 / 恢复监控").build(app)?;
-    let item_set = MenuItemBuilder::with_id("settings", "设置 / Settings").build(app)?;
-    let item_shot = MenuItemBuilder::with_id("shot", "截图上绳 / Screenshot").build(app)?;
-    let item_upd = MenuItemBuilder::with_id("update", "检查更新 / Check for updates").build(app)?;
-    let item_restart = MenuItemBuilder::with_id("restart", "重启 / Restart").build(app)?;
-    let item_quit = MenuItemBuilder::with_id("quit", "退出 / Quit").build(app)?;
-    let menu = MenuBuilder::new(app)
+/// Tray menu follows the app language (`lang`: zh / en / auto → Windows UI).
+fn tray_is_en(s: &Settings) -> bool {
+    match s.lang.as_str() {
+        "en" => true,
+        "auto" => !display::system_is_chinese(),
+        _ => false,
+    }
+}
+
+fn tray_menu(app: &AppHandle, en: bool) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    let l = |zh: &'static str, e: &'static str| if en { e } else { zh };
+    let item_clip = MenuItemBuilder::with_id("clip", l("剪贴板绳", "Clipboard")).build(app)?;
+    let item_notes = MenuItemBuilder::with_id("notes", l("便签绳", "Notes")).build(app)?;
+    let item_new = MenuItemBuilder::with_id("newnote", l("新建便签", "New note")).build(app)?;
+    let item_mon = MenuItemBuilder::with_id("togglemon", l("暂停 / 恢复监控", "Pause / resume monitoring")).build(app)?;
+    let item_set = MenuItemBuilder::with_id("settings", l("设置", "Settings")).build(app)?;
+    let item_shot = MenuItemBuilder::with_id("shot", l("截图上绳", "Screenshot")).build(app)?;
+    let item_upd = MenuItemBuilder::with_id("update", l("检查更新", "Check for updates")).build(app)?;
+    let item_restart = MenuItemBuilder::with_id("restart", l("重启", "Restart")).build(app)?;
+    let item_quit = MenuItemBuilder::with_id("quit", l("退出", "Quit")).build(app)?;
+    MenuBuilder::new(app)
         .items(&[&item_clip, &item_notes])
         .separator()
         .items(&[&item_shot, &item_new, &item_mon, &item_set])
         .separator()
         .items(&[&item_upd, &item_restart, &item_quit])
-        .build()?;
+        .build()
+}
+
+fn tray_tooltip(en: bool) -> &'static str {
+    if en { "ClipLine" } else { "ClipLine 晾衣绳" }
+}
+
+/// Rebuild the tray menu after the language setting changes.
+fn apply_tray_lang(app: &AppHandle, s: &Settings) {
+    let en = tray_is_en(s);
+    if let Some(tray) = app.tray_by_id("tray") {
+        if let Ok(menu) = tray_menu(app, en) {
+            let _ = tray.set_menu(Some(menu));
+        }
+        let _ = tray.set_tooltip(Some(tray_tooltip(en)));
+    }
+}
+
+fn build_tray(app: &AppHandle) -> tauri::Result<()> {
+    let en = tray_is_en(&SETTINGS.lock().unwrap().clone());
+    let menu = tray_menu(app, en)?;
 
     let mut builder = TrayIconBuilder::with_id("tray")
-        .tooltip("ClipLine 晾衣绳")
+        .tooltip(tray_tooltip(en))
         .menu(&menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "clip" => toggle_deck(Deck::Clipboard),
