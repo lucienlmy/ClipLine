@@ -1201,8 +1201,8 @@ fn create_settings_window(app: &AppHandle) -> Result<(), String> {
         tauri::WebviewUrl::App("settings.html".into()),
     )
     .title("ClipLine 设置")
-    .inner_size(580.0, 640.0)
-    .min_inner_size(440.0, 420.0)
+    .inner_size(720.0, 540.0)
+    .min_inner_size(600.0, 420.0)
     .resizable(true)
     .center()
     .build()

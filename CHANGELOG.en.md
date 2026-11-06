@@ -2,6 +2,28 @@
 
 Newest first. This file is built into the app and is what Settings → About → "Update history" shows; the Chinese version is `CHANGELOG.md` — keep the two in step.
 
+## v1.9.0 · 2026-11-06
+
+### ⚙ Settings, reorganised
+- A sidebar now splits Settings into General, Invoke & hotkeys, Clipboard, Notes, Appearance and About — each page fits on one screen. The window is wider (720×540).
+- Save / Cancel still cover every page; switching pages keeps unsaved changes.
+- The two "keep for" settings are now separate and labelled: "Keep clipboard cards" (favourites are kept) on Clipboard, "Keep notes in the done bag" (notes on the line are never cleaned) on Notes.
+
+### 🧺 Change the done bag's period from the bag
+- Click "Kept 30 days ▾" at the bottom of the bag to pick 7 / 30 / 90 / 365 days or forever right there; it applies at once and is saved to Settings.
+- If a shorter period would remove notes, it first asks "Remove N?" — click again to confirm.
+
+### 🔔 New reminder time picker
+- "Custom time…" opens ClipLine's own picker: a month calendar plus large hour : minute fields and an OK button — no more clicking elsewhere to close the system picker.
+- Scroll the wheel over hours or minutes (minutes step by 5, hold Shift for 1), click ▲▼, or type; 00 / 15 / 30 / 45 shortcuts below the minutes.
+- Enter confirms, Esc goes back; times in the past can't be picked.
+
+### 📋 "Copy text" on notes
+- Right-click a note → "Copy text" copies the whole note without opening it (Markdown source kept as-is).
+
+### Other
+- Esc in the reminder popover inside the editor now closes the popover first, not the editor.
+
 ## v1.8.0 · 2026-11-04
 
 ### 🏷 Note categories

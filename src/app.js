@@ -76,7 +76,7 @@ const I18N = {
   zh: {
     cat_blue: "工作", cat_orange: "待办", cat_yellow: "灵感", cat_green: "生活", cat_cream: "资料", cat_black: "稍后看", cat_red: "要紧", catNone: "未分类",
     catNew: "＋ 新建分类", catManage: "管理分类…", catTitle: "便签分类", catNamePh: "新分类名称", catAdd: "添加", catDel: "删除分类", catDelAsk: "确认删除？", catFull: "颜色已经用完了，删掉一个分类才能再加", catHint: "改名直接在框里改；删除分类不会删除便签，只是改为未分类", catNotes: "{n} 张", catPick: "选个颜色",
-    basketTip: "收纳袋：已完成的便签", bagCap: "已完成", basketTitle: "已完成的便签", basketEmpty: "收纳袋是空的。\n便签上点 ✕（或「整理」）后，完成的便签会放进这里，按月统计。", monthDone: "本月完成 ", statN: "{n} 张", statK: "{k} 项", putBack: "↩ 放回绳上", delOne: "删除", clearBasket: "清空收纳袋", clearAsk: "确认清空？", keepDays: "保留 {n} 天，可在设置里改", keepForever: "永久保留，可在设置里改", toBasket: "已放进收纳袋", toBasketN: "已把 {n} 张放进收纳袋", restored: "已放回绳上", doneOn: "{d} 完成",
+    basketTip: "收纳袋：已完成的便签", bagCap: "已完成", basketTitle: "已完成的便签", basketEmpty: "收纳袋是空的。\n便签上点 ✕（或「整理」）后，完成的便签会放进这里，按月统计。", monthDone: "本月完成 ", statN: "{n} 张", statK: "{k} 项", putBack: "↩ 放回绳上", delOne: "删除", clearBasket: "清空收纳袋", clearAsk: "确认清空？", keepDays: "保留 {n} 天", keepForever: "永久保留", keepTip: "点击修改收纳袋的保留天数", keepPick: "保留：", keepForeverOpt: "永久", keepPurge: "清理 {n} 张？", keepSet: "已改为保留 {n} 天", keepSetForever: "已改为永久保留", keepPurged: "，清理了 {n} 张", copyNote: "复制内容", toBasket: "已放进收纳袋", toBasketN: "已把 {n} 张放进收纳袋", restored: "已放回绳上", doneOn: "{d} 完成",
     takeNote: "完成，放进收纳袋", deleteNote: "删除（不进收纳袋）", deletedNote: "已删除", noteTidyTip: "把待办全部打勾的便签放进收纳袋", confirmDone: "钉住的便签，确认放进收纳袋？",
     all: "全部", text: "文字", link: "链接", color: "颜色", image: "图片", file: "文件",
     search: "搜索…", copied: "已复制", editText: "编辑文字", annotate: "✎ 标注", ocr: "文 识别文字（OCR）", ocrRunning: "正在识别文字…", ocrFail: "识别失败：", ocrNone: "没有识别到文字", ocrDone: "已识别 {n} 个字，已复制，可在这里修改", shotTip: "截图上绳", favMore: "其余收藏", favZone: "左边是收藏区", g3: "三日内", g7: "一周内", gOld: "更早", cards: "张", total: "共", groupOpen: "展开这一叠", groupHint: "单击复制 · 拖出 · 双击编辑/打开 · 右键更多", takeAll: "全部取下", tookN: "已取下 {n} 张", undo: "撤销", favKeep: "收藏的卡片请先取消收藏", tidy: "整理", tidyTip: "取下原文件已不在的卡片", tidied: "已取下 {n} 张失效卡片", foldTip: "按日期折叠：今天散挂，更早的折成「三日内 / 一周内 / 更早」", foldOnT: "已按日期折叠", foldLabel: "按日期", foldOffT: "已全部散挂", moved: "已移动，卡片已取下", stackOpen: "展开这一叠", stackTitle: "这一叠共 {n} 个文件", stackSplit: "拆成单张", stackHint: "单击复制 · 拖出单个文件 · 双击打开", missing: "原文件已不在（被移动或删除了）", already: "已在绳上，已移到最前", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
@@ -95,7 +95,7 @@ const I18N = {
     editorHint: "Ctrl+S 保存 · Esc 关闭", save: "保存", remind: "提醒",
     r15: "15 分钟后", r1h: "1 小时后", rtm: "明天此时", rclr: "清除提醒",
     p_m5: "5 分钟后", p_m10: "10 分钟后", p_m15: "15 分钟后", p_m30: "30 分钟后", p_h1: "1 小时后", p_h2: "2 小时后", p_h3: "3 小时后", p_tonight: "今晚 20:00", p_tomorrow: "明天此时", p_tomorrow9: "明早 9:00", p_nextweek: "下周此时",
-    pinDesktop: "钉到桌面", custom: "自定义时间", setTime: "设为提醒",
+    pinDesktop: "钉到桌面", custom: "自定义时间", setTime: "设为提醒", ok: "确定", tpPast: "这个时间已经过了",
     repeat: "重复", rNone: "不重复", rDaily: "每天", rWeekly: "每周", rMonthly: "每月",
     next: "下次", arrived: "提醒已到", gotit: "知道了",
     setTitle: "设置",
@@ -123,7 +123,7 @@ const I18N = {
     all: "All", text: "Text", link: "Link", color: "Color", image: "Image", file: "File",
     cat_blue: "Work", cat_orange: "To-do", cat_yellow: "Ideas", cat_green: "Life", cat_cream: "Reference", cat_black: "Later", cat_red: "Urgent", catNone: "No category",
     catNew: "＋ New category", catManage: "Manage categories…", catTitle: "Note categories", catNamePh: "New category name", catAdd: "Add", catDel: "Delete", catDelAsk: "Sure?", catFull: "All colours are in use — delete a category to add another", catHint: "Rename in the box; deleting a category keeps its notes (they become uncategorised)", catNotes: "{n}", catPick: "Pick a colour",
-    basketTip: "Done bag: finished notes", bagCap: "DONE", basketTitle: "Finished notes", basketEmpty: "The bag is empty.\nClick ✕ on a note (or Tidy) and finished notes go in here, counted by month.", monthDone: "This month: ", statN: "{n} notes", statK: "{k} items", putBack: "↩ Put back", delOne: "Delete", clearBasket: "Empty the bag", clearAsk: "Sure?", keepDays: "Kept {n} days — change in Settings", keepForever: "Kept forever — change in Settings", toBasket: "Put in the bag", toBasketN: "Put {n} in the bag", restored: "Put back on the line", doneOn: "Done {d}",
+    basketTip: "Done bag: finished notes", bagCap: "DONE", basketTitle: "Finished notes", basketEmpty: "The bag is empty.\nClick ✕ on a note (or Tidy) and finished notes go in here, counted by month.", monthDone: "This month: ", statN: "{n} notes", statK: "{k} items", putBack: "↩ Put back", delOne: "Delete", clearBasket: "Empty the bag", clearAsk: "Sure?", keepDays: "Kept {n} days", keepForever: "Kept forever", keepTip: "Click to change how long the bag keeps notes", keepPick: "Keep:", keepForeverOpt: "Forever", keepPurge: "Remove {n}?", keepSet: "Now kept {n} days", keepSetForever: "Now kept forever", keepPurged: "; removed {n}", copyNote: "Copy text", toBasket: "Put in the bag", toBasketN: "Put {n} in the bag", restored: "Put back on the line", doneOn: "Done {d}",
     takeNote: "Done — into the bag", deleteNote: "Delete (skip the bag)", deletedNote: "Deleted", noteTidyTip: "Put notes whose to-dos are all ticked into the bag", confirmDone: "Pinned note — put it in the bag?",
     search: "Search…", copied: "Copied", editText: "Edit text", annotate: "✎ Annotate", ocr: "Recognise text (OCR)", ocrRunning: "Recognising text…", ocrFail: "OCR failed: ", ocrNone: "No text found", ocrDone: "Recognised {n} characters — copied; edit here if needed", shotTip: "Screenshot to the line", favMore: "More favourites", favZone: "Favourites are on the left", g3: "Last 3 days", g7: "This week", gOld: "Older", cards: "", total: "Total", groupOpen: "Open this stack", groupHint: "Click to copy · drag out · double-click to edit/open · right-click for more", takeAll: "Take all down", tookN: "Took down {n}", undo: "Undo", favKeep: "Remove it from favourites first", tidy: "Tidy", tidyTip: "Take down cards whose files are gone", tidied: "Took down {n} broken card(s)", foldTip: "Fold by date: today loose, older folded into stacks", foldOnT: "Folded by date", foldLabel: "By date", foldOffT: "All cards loose", moved: "Moved — card taken down", stackOpen: "Open this stack", stackTitle: "{n} files in this stack", stackSplit: "Split into cards", stackHint: "Click to copy · drag one out · double-click to open", missing: "The original file is gone (moved or deleted)", already: "Already on the line — moved to front", pasteBack: "Paste into previous app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
     emptyClip: "The line is empty — copy something",
@@ -141,7 +141,7 @@ const I18N = {
     editorHint: "Ctrl+S save · Esc close", save: "Save", remind: "Remind",
     r15: "In 15 min", r1h: "In 1 hour", rtm: "Tomorrow", rclr: "Clear reminder",
     p_m5: "In 5 min", p_m10: "In 10 min", p_m15: "In 15 min", p_m30: "In 30 min", p_h1: "In 1 hour", p_h2: "In 2 hours", p_h3: "In 3 hours", p_tonight: "Tonight 20:00", p_tomorrow: "Tomorrow, same time", p_tomorrow9: "Tomorrow 9:00", p_nextweek: "Next week",
-    pinDesktop: "Pin to desktop", custom: "Custom time", setTime: "Set reminder",
+    pinDesktop: "Pin to desktop", custom: "Custom time", setTime: "Set reminder", ok: "OK", tpPast: "That time has passed",
     repeat: "Repeat", rNone: "Once", rDaily: "Daily", rWeekly: "Weekly", rMonthly: "Monthly",
     next: "Next", arrived: "Reminder due", gotit: "Got it",
     setTitle: "Settings",
@@ -493,7 +493,7 @@ function buildGroupCard(g) {
   card.querySelector(".card-body").addEventListener("click", () => openGroup(g, card));
   card.addEventListener("contextmenu", (e) => {
     e.preventDefault();
-    const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind");
+    const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind", "tp"); ctx.onkeydown = null;
     const add = (label, fn) => { const b = document.createElement("button"); b.textContent = label; b.onclick = () => { hideCtx(); fn(); }; ctx.appendChild(b); };
     add(t("groupOpen"), () => openGroup(g, card));
     if (!g.fav) { add(t("takeAll"), () => removeItems(g.items.slice(), t("tookN"))); ctx.lastChild.style.color = "#c0392b"; }
@@ -658,7 +658,7 @@ function renderCatChip(note) {
   tc.appendChild(b);
 }
 function showCatMenu(anchor, note) {
-  const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind");
+  const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind", "tp"); ctx.onkeydown = null;
   const cur = catOf(note.tint) ? note.tint : null;
   const item = (tint, label) => {
     const b = document.createElement("button");
@@ -810,15 +810,55 @@ function statParts(list, withCats) {
   return parts.join(" · ");
 }
 let basketClearArmed = false;
-function openBasket() { basketClearArmed = false; fillBasket(); $("basketView").hidden = false; refreshModal(); }
+/* The "kept N days" line at the bottom of the bag: click it to pick another
+ * period right here. A shorter period that would drop notes asks once. */
+let keepOpen = false, keepArmed = null;
+function fillBasketKeep() {
+  const foot = $("bkKeep"); foot.innerHTML = "";
+  const hd = cfg.history_days === undefined ? 30 : cfg.history_days;
+  if (!keepOpen) {
+    const b = document.createElement("button"); b.className = "bk-keep";
+    b.textContent = (hd > 0 ? t("keepDays").replace("{n}", hd) : t("keepForever")) + " ▾";
+    b.title = t("keepTip");
+    b.onclick = (e) => { e.stopPropagation(); keepOpen = true; keepArmed = null; fillBasketKeep(); };
+    foot.appendChild(b); return;
+  }
+  const lab = document.createElement("span"); lab.className = "bk-keep-lab"; lab.textContent = t("keepPick"); foot.appendChild(lab);
+  [7, 30, 90, 365, 0].forEach((v) => {
+    const b = document.createElement("button"); b.className = "bk-keep-opt" + (v === hd ? " on" : "");
+    const drop = v > 0 ? state.done.filter((n) => Date.now() - (n.doneAt || Date.now()) >= v * 86400000).length : 0;
+    if (keepArmed === v) { b.classList.add("armed"); b.textContent = t("keepPurge").replace("{n}", drop); }
+    else b.textContent = v > 0 ? String(v) : t("keepForeverOpt");
+    b.onclick = (e) => {
+      e.stopPropagation();
+      if (v === hd) { keepOpen = false; fillBasketKeep(); return; }
+      if (drop > 0 && keepArmed !== v) { keepArmed = v; fillBasketKeep(); return; }
+      setHistoryDays(v);
+    };
+    foot.appendChild(b);
+  });
+  const dl = document.createElement("span"); dl.className = "bk-keep-lab"; dl.textContent = t("days"); foot.insertBefore(dl, foot.lastChild);
+}
+async function setHistoryDays(v) {
+  const before = state.done.length;
+  cfg.history_days = v; keepOpen = false; keepArmed = null;
+  cleanup(); save(); updateBasket(); fillBasket();
+  const gone = before - state.done.length;
+  toast((v > 0 ? t("keepSet").replace("{n}", v) : t("keepSetForever")) + (gone > 0 ? t("keepPurged").replace("{n}", gone) : ""));
+  try {
+    const cur = JSON.parse((await invoke("get_settings")) || "{}");
+    cur.history_days = v;
+    await invoke("update_settings", { data: JSON.stringify(cur) });
+  } catch (e) {}
+}
+function openBasket() { basketClearArmed = false; keepOpen = false; keepArmed = null; fillBasket(); $("basketView").hidden = false; refreshModal(); }
 function closeBasket() { $("basketView").hidden = true; refreshModal(); }
 function fillBasket() {
   $("bkTitle").textContent = t("basketTitle");
   $("bkClose").title = t("close");
   const thisMonth = state.done.filter((n) => monthKey(n.doneAt) === monthKey(Date.now()));
   $("bkStat").textContent = t("monthDone") + statParts(thisMonth, true);
-  const hd = cfg.history_days === undefined ? 30 : cfg.history_days;
-  $("bkKeep").textContent = hd > 0 ? t("keepDays").replace("{n}", hd) : t("keepForever");
+  fillBasketKeep();
   const clr = $("bkClear");
   clr.hidden = !state.done.length;
   clr.textContent = basketClearArmed ? t("clearAsk") : t("clearBasket");
@@ -1377,7 +1417,7 @@ function flash(card) {
   card.appendChild(f); setTimeout(() => f.remove(), 1100);
 }
 function confirmRemove(e, item, isNote) {
-  const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind");
+  const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind", "tp"); ctx.onkeydown = null;
   const b = document.createElement("button");
   b.textContent = t("confirmTake"); b.style.color = "#c0392b";
   b.onclick = () => { hideCtx(); removeItem(item, isNote); };
@@ -1389,7 +1429,7 @@ function confirmRemove(e, item, isNote) {
 // "取下（删除原文件）": confirm, move the original files to the Recycle Bin,
 // then take the card down.
 function confirmTrash(e, item) {
-  const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind");
+  const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind", "tp"); ctx.onkeydown = null;
   const n = (item.files || []).length;
   const tip = document.createElement("div");
   tip.textContent = t("confirmTrash").replace("{n}", n);
@@ -1418,7 +1458,7 @@ function removeItem(item, isNote) {
 /* ---------- context menu ---------- */
 function showCtx(e, item, isNote) {
   e.preventDefault();
-  const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind");
+  const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind", "tp"); ctx.onkeydown = null;
   const add = (label, fn) => { const b = document.createElement("button"); b.textContent = label; b.onclick = () => { hideCtx(); fn(); }; ctx.appendChild(b); };
   const sep = () => { const s = document.createElement("div"); s.className = "sep"; ctx.appendChild(s); };
 
@@ -1453,6 +1493,7 @@ function showCtx(e, item, isNote) {
       add(t("saveDesktop"), () => saveDesktop(item));
     }
   }
+  if (isNote) add(t("copyNote"), () => { invoke("copy_text", { text: item.body || "" }).then(() => toast(t("copied"))).catch((err) => toast(String(err))); });
   add(item.pinned ? t("unpin") : t("pin"), () => { item.pinned = !item.pinned; save(); render(); });
   sep();
   add(isNote ? t("takeNote") : t("take"), () => removeItem(item, isNote));
@@ -1467,7 +1508,7 @@ function showCtx(e, item, isNote) {
   ctx.style.left = Math.min(e.clientX, window.innerWidth - w) + "px";
   ctx.style.top = Math.min(e.clientY, window.innerHeight - h) + "px";
 }
-function hideCtx() { const c = $("ctx"); c.hidden = true; c.classList.remove("remind"); refreshModal(); }
+function hideCtx() { const c = $("ctx"); c.hidden = true; c.classList.remove("remind", "tp"); c.onkeydown = null; refreshModal(); }
 function normUrl(u) { u = (u || "").trim(); return /^https?:\/\//i.test(u) ? u : "http://" + u; }
 
 function saveDesktop(item) {
@@ -1716,7 +1757,7 @@ function nextOccurrence(ms, repeat) {
 /* A small reminder popover reused by note cards and the editor. */
 function showReminderPanel(e, note, after) {
   if (!note.repeat) note.repeat = "none";
-  const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind");
+  const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind", "tp"); ctx.onkeydown = null;
   const commit = () => { save(); if (after) after(); };
 
   const btn = (label, fn) => { const b = document.createElement("button"); b.textContent = label; b.onclick = fn; return b; };
@@ -1727,14 +1768,10 @@ function showReminderPanel(e, note, after) {
     ctx.appendChild(btn(t("p_" + id), () => { setReminder(note, fn()); hideCtx(); commit(); }));
   });
 
-  // custom datetime
-  const cwrap = document.createElement("div"); cwrap.style.padding = "6px 10px";
-  const lab = document.createElement("div"); lab.textContent = t("custom"); lab.style.cssText = "font-size:11px;color:#8a847b;margin-bottom:4px;";
-  const inp = document.createElement("input"); inp.type = "datetime-local"; inp.className = "set-select"; inp.style.width = "100%";
-  const setBtn = document.createElement("button"); setBtn.className = "btn-mini"; setBtn.textContent = t("setTime"); setBtn.style.marginTop = "6px";
-  setBtn.onclick = () => { if (inp.value) { setReminder(note, new Date(inp.value).getTime()); hideCtx(); commit(); } };
-  cwrap.appendChild(lab); cwrap.appendChild(inp); cwrap.appendChild(setBtn);
-  ctx.appendChild(cwrap);
+  // custom date & time: opens our own picker in the same popover
+  const cb = btn("📅 " + t("custom") + "…", (ev) => { ev.stopPropagation(); openTimePicker(e, note, commit, () => showReminderPanel(e, note, after)); });
+  if (note.remindAt) { const sm = document.createElement("span"); sm.className = "tp-cur"; sm.textContent = fmtWhen(note.remindAt); cb.appendChild(sm); }
+  ctx.appendChild(cb);
 
   // repeat row
   const rrow = document.createElement("div"); rrow.style.padding = "4px 10px 8px";
@@ -1754,6 +1791,107 @@ function showReminderPanel(e, note, after) {
   const h = ctx.offsetHeight || 300;
   ctx.style.left = Math.min(e.clientX, window.innerWidth - 240) + "px";
   ctx.style.top = Math.max(8, Math.min(e.clientY, window.innerHeight - h - 8)) + "px";
+}
+
+/* Custom reminder time: a small month calendar plus hour : minute fields.
+ * Replaces the system datetime-local control, which has no OK button.
+ * Wheel / ▲▼ / typing set the time; Enter or 确定 confirms, Esc goes back. */
+function openTimePicker(e, note, commit, back) {
+  const ctx = $("ctx"); ctx.innerHTML = ""; ctx.classList.remove("remind", "tp"); ctx.classList.add("remind", "tp");
+  const now = new Date();
+  let base = note.remindAt && note.remindAt > Date.now() ? new Date(note.remindAt) : null;
+  if (!base) { base = new Date(Date.now() + 60 * 60000); base.setMinutes(Math.ceil(base.getMinutes() / 15) * 15, 0, 0); }
+  let sel = { y: base.getFullYear(), m: base.getMonth(), d: base.getDate() };
+  let view = { y: sel.y, m: sel.m };
+  let hh = base.getHours(), mm = base.getMinutes();
+  const pad = (n) => String(n).padStart(2, "0");
+  const el = (tag, cls, txt) => { const x = document.createElement(tag); if (cls) x.className = cls; if (txt !== undefined) x.textContent = txt; return x; };
+  const chosen = () => new Date(sel.y, sel.m, sel.d, hh, mm, 0, 0).getTime();
+
+  const wrap = el("div", "tp-wrap");
+  // calendar
+  const cal = el("div", "tp-cal");
+  const head = el("div", "tp-head");
+  const prev = el("button", "tp-nav", "‹"), next = el("button", "tp-nav", "›"), title = el("div", "tp-title");
+  head.append(prev, title, next);
+  const grid = el("div", "tp-grid");
+  cal.append(head, grid);
+  // time
+  const tm = el("div", "tp-time");
+  const mkField = (get, set, max, wheelStep) => {
+    const box = el("div", "tp-field");
+    const up = el("button", "tp-step", "▲"), dn = el("button", "tp-step", "▼");
+    up.tabIndex = -1; dn.tabIndex = -1;
+    const inp = el("input", "tp-num"); inp.maxLength = 2; inp.inputMode = "numeric";
+    const show = () => { inp.value = pad(get()); refresh(); };
+    const bump = (d) => { set((get() + d + max + 1) % (max + 1)); show(); };
+    up.onclick = (ev) => { ev.stopPropagation(); bump(1); };
+    dn.onclick = (ev) => { ev.stopPropagation(); bump(-1); };
+    box.addEventListener("wheel", (ev) => { ev.preventDefault(); ev.stopPropagation(); const st = ev.shiftKey ? 1 : wheelStep; const v = get(); const nv = ev.deltaY < 0 ? Math.floor(v / st) * st + st : Math.ceil(v / st) * st - st; set(((nv % (max + 1)) + max + 1) % (max + 1)); show(); }, { passive: false });
+    inp.addEventListener("focus", () => inp.select());
+    inp.addEventListener("input", () => { const v = parseInt(inp.value.replace(/\D/g, ""), 10); if (!isNaN(v) && v <= max) { set(v); refresh(); } });
+    inp.addEventListener("blur", show);
+    inp.addEventListener("keydown", (ev) => { if (ev.key === "ArrowUp") { ev.preventDefault(); bump(1); } else if (ev.key === "ArrowDown") { ev.preventDefault(); bump(-1); } });
+    box.append(up, inp, dn);
+    return { box, show, inp };
+  };
+  const fh = mkField(() => hh, (v) => hh = v, 23, 1);
+  const fm = mkField(() => mm, (v) => mm = v, 59, 5);
+  const hm = el("div", "tp-hm"); hm.append(fh.box, el("div", "tp-colon", ":"), fm.box);
+  const quick = el("div", "tp-quick");
+  [0, 15, 30, 45].forEach((q) => { const b = el("button", "tp-q", pad(q)); b.onclick = (ev) => { ev.stopPropagation(); mm = q; fm.show(); }; quick.appendChild(b); });
+  const when = el("div", "tp-when");
+  tm.append(hm, quick, when);
+  wrap.append(cal, tm);
+  // footer
+  const foot = el("div", "tp-foot");
+  const cancel = el("button", "tp-btn", t("cancel")), ok = el("button", "tp-btn primary", t("ok"));
+  foot.append(cancel, ok);
+  ctx.append(wrap, foot);
+
+  function drawCal() {
+    title.textContent = LANG === "en" ? new Date(view.y, view.m, 1).toLocaleDateString("en", { year: "numeric", month: "short" }) : `${view.y} 年 ${view.m + 1} 月`;
+    grid.innerHTML = "";
+    (LANG === "en" ? ["M", "T", "W", "T", "F", "S", "S"] : ["一", "二", "三", "四", "五", "六", "日"]).forEach((w) => grid.appendChild(el("div", "tp-wd", w)));
+    const first = new Date(view.y, view.m, 1);
+    const lead = (first.getDay() + 6) % 7; // Monday first
+    const days = new Date(view.y, view.m + 1, 0).getDate();
+    const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    for (let i = 0; i < lead; i++) grid.appendChild(el("div"));
+    for (let d = 1; d <= days; d++) {
+      const b = el("button", "tp-day", String(d));
+      const t0 = new Date(view.y, view.m, d).getTime();
+      if (t0 < today0) b.disabled = true;
+      if (t0 === today0) b.classList.add("today");
+      if (view.y === sel.y && view.m === sel.m && d === sel.d) b.classList.add("on");
+      b.onclick = (ev) => { ev.stopPropagation(); sel = { y: view.y, m: view.m, d }; drawCal(); refresh(); };
+      grid.appendChild(b);
+    }
+    prev.disabled = view.y === now.getFullYear() && view.m === now.getMonth();
+  }
+  function refresh() {
+    const ms = chosen(), past = ms <= Date.now();
+    when.textContent = past ? t("tpPast") : fmtWhen(ms);
+    when.classList.toggle("bad", past);
+    ok.disabled = past;
+  }
+  const confirm = () => { const ms = chosen(); if (ms <= Date.now()) { refresh(); return; } setReminder(note, ms); hideCtx(); commit(); };
+  prev.onclick = (ev) => { ev.stopPropagation(); view.m--; if (view.m < 0) { view.m = 11; view.y--; } drawCal(); };
+  next.onclick = (ev) => { ev.stopPropagation(); view.m++; if (view.m > 11) { view.m = 0; view.y++; } drawCal(); };
+  cancel.onclick = (ev) => { ev.stopPropagation(); back(); };
+  ok.onclick = (ev) => { ev.stopPropagation(); confirm(); };
+  ctx.onkeydown = (ev) => {
+    if (!ctx.classList.contains("tp")) return;
+    if (ev.key === "Enter") { ev.preventDefault(); ev.stopPropagation(); fh.inp.blur(); fm.inp.blur(); confirm(); }
+    else if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); back(); }
+  };
+  drawCal(); fh.show(); fm.show();
+  ctx.hidden = false; refreshModal();
+  const w = ctx.offsetWidth || 320, h = ctx.offsetHeight || 260;
+  const r = ctx.getBoundingClientRect();
+  ctx.style.left = Math.max(8, Math.min(r.left || e.clientX, window.innerWidth - w - 8)) + "px";
+  ctx.style.top = Math.max(8, Math.min(r.top || e.clientY, window.innerHeight - h - 8)) + "px";
+  setTimeout(() => fh.inp.focus(), 0);
 }
 
 /* A due reminder pops up as its own card window (bottom-right, with a chime). */
@@ -2029,10 +2167,10 @@ $("panel").addEventListener("transitionend", (ev) => {
 /* ---------- global input ---------- */
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
+    if (!$("ctx").hidden) { hideCtx(); return; }
     if (!$("catPop").hidden) { closeCatPop(); return; }
     if (!$("settings").hidden) { closeSettings(); return; }
     if (!$("editor").hidden) { closeEditor(); return; }
-    if (!$("ctx").hidden) { hideCtx(); return; }
     if (!$("basketView").hidden) { closeBasket(); return; }
     if (!$("reader").hidden) { closeReader(); return; }
     if (!$("preview").hidden) { closePreview(); return; }

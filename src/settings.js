@@ -6,11 +6,11 @@ const getCurrentWindow = T.window.getCurrentWindow;
 
 const I = {
   zh: {
-    title: "设置", secHotkeys: "快捷键", hkClip: "剪贴板绳", hkNotes: "便签绳", hkShot: "截图上绳", hkShotSub: "框选区域后可挂上绳、标注、识别文字或钉在桌面",
+    title: "设置", pgGeneral: "常规", pgInvoke: "呼出与快捷键", pgClip: "剪贴板", pgNotes: "便签", pgLook: "外观", pgAbout: "关于", secDrag: "拖出卡片", secBag: "收纳袋", secHotkeys: "快捷键", hkClip: "剪贴板绳", hkNotes: "便签绳", hkShot: "截图上绳", hkShotSub: "框选区域后可挂上绳、标注、识别文字或钉在桌面",
     hkHint: "点击后按下组合键录制", restoreDefault: "恢复默认",
     secInvoke: "呼出方式", hoverOn: "顶边悬停呼出", dwell: "停顿时长", flip: "左右翻转修饰键", hangOn: "拖文件到屏幕顶部自动放绳", moveMod: "拖出卡片时「移动」用的按键", foldDate: "按日期折叠", foldDateSub: "今天的卡片散挂；更早的自动折成「三日内 / 一周内 / 更早」三叠（底部「按日期」按钮也可切换）", moveModSub: "开始拖动时按住即为移动（之后可松开）；不按为复制。默认 Shift，与 Windows 习惯一致", textExt: "文字卡片拖到文件夹时保存为",
     flipNone: "关闭", mShift: "Shift", mCtrl: "Ctrl", mAlt: "Alt",
-    secClean: "自动清理", retention: "保留天数", days: "天", history: "收纳袋里的便签", forever: "永久", historySub: "已完成的便签在收纳袋里保留多少天",
+    secClean: "自动清理", retention: "剪贴板卡片保留", retentionSub: "超过天数的卡片自动取下（单位：天）；收藏的卡片不清理", days: "天", bagDays: "收纳袋便签保留", forever: "永久", bagDaysSub: "已完成的便签在收纳袋里保留多少天（单位：天）；绳上的便签不会被清理。收纳袋左下角也能直接改",
     secGeneral: "常规", language: "语言", langAuto: "跟随系统", autostart: "开机自启动",
     lineDisplay: "晾衣绳出现在", ldCursor: "跟随鼠标", ldPrimary: "主显示器", ldMon: "显示器", ldMain: "（主）", ldMissing: "（未连接）", ldSub: "跟随鼠标：在哪块屏幕顶边呼出就在哪块屏幕放下；选定的显示器未连接时改用主显示器。提醒和更新卡片也弹在这块屏幕上",
     secTheme: "主题", accent: "强调色", trBlue: "百事蓝", trRed: "徕卡红", trayIcon: "托盘图标", trayIconSub: "保存后立即生效；程序文件（exe）的图标固定为陶土橙", dataDir: "数据文件夹", openDataDir: "打开数据文件夹", aTerra: "陶土橙", aMint: "薄荷绿", aSky: "晴空蓝", aNavy: "深海蓝", tSoft: "柔彩日常", tSilver: "经典银灰", tLinen: "棉麻木夹", tPorcelain: "奶白轻盈", tGraphite: "石墨金属",
@@ -34,11 +34,11 @@ const I = {
     about: "ClipLine · 晾衣绳主题剪贴板 / 便签。灵感来自 Tendedero (MIT) 与 Clothespeg (Apache-2.0)；独立重写，名称与图标均为原创。",
   },
   en: {
-    title: "Settings", secHotkeys: "Hotkeys", hkClip: "Clipboard line", hkNotes: "Notes line", hkShot: "Screenshot", hkShotSub: "Select a region, then hang it, annotate, OCR or pin it",
+    title: "Settings", pgGeneral: "General", pgInvoke: "Invoke & hotkeys", pgClip: "Clipboard", pgNotes: "Notes", pgLook: "Appearance", pgAbout: "About", secDrag: "Dragging cards out", secBag: "Done bag", secHotkeys: "Hotkeys", hkClip: "Clipboard line", hkNotes: "Notes line", hkShot: "Screenshot", hkShotSub: "Select a region, then hang it, annotate, OCR or pin it",
     hkHint: "Click, then press a key combo", restoreDefault: "Restore defaults",
     secInvoke: "Invoke", hoverOn: "Drop on top-edge hover", dwell: "Dwell", flip: "Flip modifier", hangOn: "Drag files to top edge to drop the line", moveMod: "Key for moving when dragging a card out", foldDate: "Fold by date", foldDateSub: "Today's cards hang loose; older ones fold into Last 3 days / This week / Older (also via the By date button)", moveModSub: "Hold it when the drag starts to move (you can let go afterwards); otherwise it copies. Default Shift, as in Windows", textExt: "Text card dragged to a folder becomes",
     flipNone: "Off", mShift: "Shift", mCtrl: "Ctrl", mAlt: "Alt",
-    secClean: "Auto cleanup", retention: "Keep for", days: "days", history: "Done-bag notes", forever: "Forever", historySub: "Days finished notes stay in the done bag",
+    secClean: "Auto cleanup", retention: "Keep clipboard cards", retentionSub: "Cards older than this (days) are taken down; favourites are kept", days: "days", bagDays: "Keep notes in the done bag", forever: "Forever", bagDaysSub: "How many days finished notes stay in the done bag; notes on the line are never cleaned up. Also changeable from the bag itself",
     secGeneral: "General", language: "Language", langAuto: "Follow system", autostart: "Launch at startup",
     lineDisplay: "Line appears on", ldCursor: "Follow the mouse", ldPrimary: "Primary display", ldMon: "Display", ldMain: " (primary)", ldMissing: " (not connected)", ldSub: "Follow the mouse: it drops on whichever screen's top edge you use; a chosen display that is unplugged falls back to the primary one. Reminder and update cards appear on that screen too",
     secTheme: "Theme", accent: "Accent", trBlue: "Pepsi blue", trRed: "Leica red", trayIcon: "Tray icon", trayIconSub: "Applies on save; the exe icon itself stays terracotta", dataDir: "Data folder", openDataDir: "Open data folder", aTerra: "Terracotta", aMint: "Mint", aSky: "Sky", aNavy: "Navy", tSoft: "Soft color", tSilver: "Classic silver", tLinen: "Linen & wood", tPorcelain: "Porcelain", tGraphite: "Graphite",
@@ -82,7 +82,7 @@ let monitors = [];
 let capturing = null;
 const $ = (id) => document.getElementById(id);
 
-function section(title) { const s = document.createElement("div"); s.className = "set-section"; const h = document.createElement("h3"); h.textContent = title; s.appendChild(h); return s; }
+function section(title) { const s = document.createElement("div"); s.className = "set-section"; if (title) { const h = document.createElement("h3"); h.textContent = title; s.appendChild(h); } return s; }
 function row(label, control, sub) {
   const r = document.createElement("div"); r.className = "set-row";
   const l = document.createElement("div"); l.innerHTML = `<div class="label">${label}</div>${sub ? `<div class="sub">${sub}</div>` : ""}`;
@@ -128,11 +128,57 @@ document.addEventListener("keydown", (e) => {
   capturing = null;
 }, true);
 
-function render() {
-  $("shead").textContent = t("title");
-  const body = $("sbody"); body.innerHTML = "";
+const PAGES = [
+  ["general", "⚙", "pgGeneral"], ["invoke", "⌨", "pgInvoke"], ["clip", "📋", "pgClip"],
+  ["notes", "📝", "pgNotes"], ["look", "🎨", "pgLook"], ["about", "ℹ", "pgAbout"],
+];
+let page = "general";
+function goPage(p) { page = p; render(); $("sbody").scrollTop = 0; }
 
-  // Hotkeys
+function render() {
+  document.title = "ClipLine " + t("title");
+  const nav = $("snav"); nav.innerHTML = "";
+  const nt = document.createElement("div"); nt.className = "snav-title"; nt.textContent = t("title"); nav.appendChild(nt);
+  PAGES.forEach(([id, ic, key]) => {
+    const b = document.createElement("button"); b.className = "snav-item" + (page === id ? " on" : "");
+    b.innerHTML = `<i>${ic}</i><span></span>`; b.lastChild.textContent = t(key);
+    b.onclick = () => goPage(id);
+    nav.appendChild(b);
+  });
+  const body = $("sbody"); body.innerHTML = "";
+  const h = document.createElement("h2"); h.className = "spage-title"; h.textContent = t(PAGES.find((x) => x[0] === page)[2]); body.appendChild(h);
+  ({ general: pageGeneral, invoke: pageInvoke, clip: pageClip, notes: pageNotes, look: pageLook, about: pageAbout })[page](body);
+  $("cancelBtn").textContent = t("cancel");
+  $("saveBtn").textContent = t("save");
+}
+const setErr = (msg) => { const el = $("setErr"); if (el) el.textContent = msg || ""; };
+
+function pageGeneral(body) {
+  const s = section(null);
+  const langSel = document.createElement("select"); langSel.className = "set-select";
+  [["auto", t("langAuto")], ["zh", "中文"], ["en", "English"]].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; if (draft.lang === v) o.selected = true; langSel.appendChild(o); });
+  langSel.onchange = () => { draft.lang = langSel.value; LANG = pickLang(draft); render(); };
+  s.appendChild(row(t("language"), langSel));
+  s.appendChild(row(t("autostart"), switchEl(draft.autostart, (v) => draft.autostart = v)));
+  const ldSel = document.createElement("select"); ldSel.className = "set-select";
+  const ldOpts = [["cursor", t("ldCursor")], ["primary", t("ldPrimary")]];
+  monitors.forEach((m) => {
+    const num = (String(m.name).match(/(\d+)\s*$/) || [])[1] || "?";
+    ldOpts.push([m.name, `${t("ldMon")} ${num} · ${m.w}×${m.h} · ${Math.round(m.scale * 100)}%${m.primary ? t("ldMain") : ""}`]);
+  });
+  const ld = draft.line_display || "cursor";
+  if (!ldOpts.some(([v]) => v === ld)) {
+    const num = (String(ld).match(/(\d+)\s*$/) || [])[1] || "?";
+    ldOpts.push([ld, `${t("ldMon")} ${num}${t("ldMissing")}`]);
+  }
+  ldOpts.forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; if (ld === v) o.selected = true; ldSel.appendChild(o); });
+  ldSel.onchange = () => { draft.line_display = ldSel.value; };
+  s.appendChild(row(t("lineDisplay"), ldSel, t("ldSub")));
+  s.appendChild(row(t("updMode"), seg(draft.update_mode || "notify", [["auto", t("updAuto")], ["notify", t("updNotify")], ["off", t("updOff")]], (v) => draft.update_mode = v), t("updModeSub")));
+  body.appendChild(s);
+}
+
+function pageInvoke(body) {
   const s1 = section(t("secHotkeys"));
   const mkHk = (field) => {
     const inp = document.createElement("div"); inp.className = "hk-input"; inp.tabIndex = 0;
@@ -147,50 +193,82 @@ function render() {
   restore.onclick = () => { draft.hotkey_clip = "Ctrl+Alt+C"; draft.hotkey_notes = "Ctrl+Alt+N"; draft.hotkey_shot = "Ctrl+Alt+S"; render(); };
   const rr = document.createElement("div"); rr.className = "set-row"; rr.style.justifyContent = "flex-end"; rr.appendChild(restore);
   s1.appendChild(rr);
-  const err = document.createElement("div"); err.className = "set-err"; err.id = "setErr"; s1.appendChild(err);
   body.appendChild(s1);
 
-  // Invoke
   const s2 = section(t("secInvoke"));
   s2.appendChild(row(t("hoverOn"), switchEl(draft.hover_enabled, (v) => draft.hover_enabled = v)));
   s2.appendChild(row(t("dwell"), seg(draft.dwell_ms, [[150, "0.15s"], [250, "0.25s"], [400, "0.4s"]], (v) => draft.dwell_ms = parseInt(v, 10))));
   s2.appendChild(row(t("flip"), seg(draft.flip_mod, [["none", t("flipNone")], ["shift", t("mShift")], ["ctrl", t("mCtrl")], ["alt", t("mAlt")]], (v) => draft.flip_mod = v)));
   s2.appendChild(row(t("hangOn"), switchEl(draft.drop_to_hang, (v) => draft.drop_to_hang = v)));
-  s2.appendChild(row(t("foldDate"), switchEl(draft.fold_by_date !== false, (v) => draft.fold_by_date = v), t("foldDateSub")));
+  body.appendChild(s2);
+}
+
+function pageClip(body) {
+  const s1 = section(t("secClean"));
+  s1.appendChild(row(t("retention"), seg(draft.retention_days, [[7, "7"], [14, "14"], [30, "30"], [90, "90"]], (v) => draft.retention_days = parseInt(v, 10)), t("retentionSub")));
+  s1.appendChild(row(t("foldDate"), switchEl(draft.fold_by_date !== false, (v) => draft.fold_by_date = v), t("foldDateSub")));
+  body.appendChild(s1);
+
+  const s2 = section(t("secDrag"));
   s2.appendChild(row(t("moveMod"), seg(draft.move_mod || "shift", [["shift", "Shift"], ["alt", "Alt"], ["ctrl", "Ctrl"]], (v) => draft.move_mod = v), t("moveModSub")));
   s2.appendChild(row(t("textExt"), seg(draft.text_drag_ext, [["txt", ".txt"], ["md", ".md"]], (v) => draft.text_drag_ext = v)));
-  const ldSel = document.createElement("select"); ldSel.className = "set-select";
-  const ldOpts = [["cursor", t("ldCursor")], ["primary", t("ldPrimary")]];
-  monitors.forEach((m) => {
-    const num = (String(m.name).match(/(\d+)\s*$/) || [])[1] || "?";
-    ldOpts.push([m.name, `${t("ldMon")} ${num} · ${m.w}×${m.h} · ${Math.round(m.scale * 100)}%${m.primary ? t("ldMain") : ""}`]);
-  });
-  const ld = draft.line_display || "cursor";
-  if (!ldOpts.some(([v]) => v === ld)) {
-    const num = (String(ld).match(/(\d+)\s*$/) || [])[1] || "?";
-    ldOpts.push([ld, `${t("ldMon")} ${num}${t("ldMissing")}`]);
-  }
-  ldOpts.forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; if (ld === v) o.selected = true; ldSel.appendChild(o); });
-  ldSel.onchange = () => { draft.line_display = ldSel.value; };
-  s2.appendChild(row(t("lineDisplay"), ldSel, t("ldSub")));
   body.appendChild(s2);
 
-  // Cleanup
-  const s3 = section(t("secClean"));
-  s3.appendChild(row(t("retention"), seg(draft.retention_days, [[7, "7"], [14, "14"], [30, "30"], [90, "90"]], (v) => draft.retention_days = parseInt(v, 10)), t("days")));
-  s3.appendChild(row(t("history"), seg(draft.history_days, [[7, "7"], [30, "30"], [90, "90"], [365, "365"], [0, t("forever")]], (v) => draft.history_days = parseInt(v, 10)), t("historySub")));
-  body.appendChild(s3);
+  const sw = section(t("secWatch"));
+  const hint = document.createElement("div"); hint.className = "sub"; hint.style.marginBottom = "8px"; hint.textContent = t("watchHint");
+  sw.appendChild(hint);
+  const list = document.createElement("div");
+  const renderWatch = () => {
+    list.innerHTML = "";
+    const fs = draft.watch_folders || [];
+    if (!fs.length) { const e = document.createElement("div"); e.className = "sub"; e.textContent = t("noFolders"); list.appendChild(e); }
+    fs.forEach((f, i) => {
+      const r = document.createElement("div"); r.className = "set-row"; r.style.margin = "4px 0";
+      const p = document.createElement("div"); p.textContent = f; p.style.cssText = "font-size:12px;word-break:break-all;flex:1;";
+      const rm = document.createElement("button"); rm.className = "btn-mini"; rm.textContent = "✕";
+      rm.onclick = () => { draft.watch_folders.splice(i, 1); renderWatch(); };
+      r.appendChild(p); r.appendChild(rm); list.appendChild(r);
+    });
+  };
+  renderWatch();
+  sw.appendChild(list);
+  const addBtn = document.createElement("button"); addBtn.className = "btn-mini"; addBtn.textContent = "+ " + t("addFolder"); addBtn.style.marginTop = "8px";
+  addBtn.onclick = () => {
+    setErr("");
+    invoke("pick_folder")
+      .then((p) => { if (p) { draft.watch_folders = draft.watch_folders || []; if (!draft.watch_folders.includes(p)) draft.watch_folders.push(p); renderWatch(); } })
+      .catch((e) => setErr((LANG === "en" ? "Could not pick a folder: " : "选择文件夹失败: ") + e));
+  };
+  sw.appendChild(addBtn);
+  body.appendChild(sw);
+}
 
-  // General
-  const s4 = section(t("secGeneral"));
-  const langSel = document.createElement("select"); langSel.className = "set-select";
-  [["auto", t("langAuto")], ["zh", "中文"], ["en", "English"]].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; if (draft.lang === v) o.selected = true; langSel.appendChild(o); });
-  langSel.onchange = () => { draft.lang = langSel.value; LANG = pickLang(draft); render(); };
-  s4.appendChild(row(t("language"), langSel));
-  s4.appendChild(row(t("autostart"), switchEl(draft.autostart, (v) => draft.autostart = v)));
-  body.appendChild(s4);
+function pageNotes(body) {
+  const s1 = section(t("secBag"));
+  s1.appendChild(row(t("bagDays"), seg(draft.history_days, [[7, "7"], [30, "30"], [90, "90"], [365, "365"], [0, t("forever")]], (v) => draft.history_days = parseInt(v, 10)), t("bagDaysSub")));
+  body.appendChild(s1);
 
-  // Theme
+  const sr = section(t("secRemind"));
+  const rh = document.createElement("div"); rh.className = "sub"; rh.style.marginBottom = "8px"; rh.textContent = t("remindHint"); sr.appendChild(rh);
+  const cg = document.createElement("div"); cg.className = "check-grid";
+  const ALL = ["m5", "m10", "m15", "m30", "h1", "h2", "h3", "tonight", "tomorrow", "tomorrow9", "nextweek"];
+  draft.reminder_presets = Array.isArray(draft.reminder_presets) ? draft.reminder_presets : ["m15", "h1", "tomorrow"];
+  ALL.forEach((id) => {
+    const lab = document.createElement("label");
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = draft.reminder_presets.includes(id);
+    cb.onchange = () => {
+      const set = new Set(draft.reminder_presets);
+      if (cb.checked) set.add(id); else set.delete(id);
+      draft.reminder_presets = ALL.filter((x) => set.has(x)); // keep a stable order
+    };
+    lab.appendChild(cb); lab.appendChild(document.createTextNode(t("p_" + id)));
+    cg.appendChild(lab);
+  });
+  sr.appendChild(cg);
+  body.appendChild(sr);
+}
+
+function pageLook(body) {
   const st = section(t("secTheme"));
   const grid = document.createElement("div"); grid.className = "theme-grid";
   [["soft", t("tSoft")], ["silver", t("tSilver")], ["linen", t("tLinen")], ["porcelain", t("tPorcelain")], ["graphite", t("tGraphite")]].forEach(([v, name]) => {
@@ -226,7 +304,6 @@ function render() {
   st.appendChild(row(t("trayIcon"), tr, t("trayIconSub")));
   body.appendChild(st);
 
-  // Font
   const sf = section(t("secFont"));
   const fontSel = document.createElement("select"); fontSel.className = "set-select";
   [["default", t("fDefault")], ["yahei", t("fYahei")], ["dengxian", t("fDengxian")], ["source", t("fSource")], ["simsun", t("fSimsun")], ["kaiti", t("fKaiti")], ["fangsong", t("fFangsong")]].forEach(([v, l]) => {
@@ -236,76 +313,14 @@ function render() {
   sf.appendChild(row(t("fontFamily"), fontSel));
   sf.appendChild(row(t("fontSize"), seg(draft.font_size || "medium", [["small", t("fsSmall")], ["medium", t("fsMedium")], ["large", t("fsLarge")]], (v) => draft.font_size = v)));
   body.appendChild(sf);
+}
 
-  // Reminder presets
-  const sr = section(t("secRemind"));
-  const rh = document.createElement("div"); rh.className = "sub"; rh.style.marginBottom = "8px"; rh.textContent = t("remindHint"); sr.appendChild(rh);
-  const cg = document.createElement("div"); cg.className = "check-grid";
-  const ALL = ["m5", "m10", "m15", "m30", "h1", "h2", "h3", "tonight", "tomorrow", "tomorrow9", "nextweek"];
-  draft.reminder_presets = Array.isArray(draft.reminder_presets) ? draft.reminder_presets : ["m15", "h1", "tomorrow"];
-  ALL.forEach((id) => {
-    const lab = document.createElement("label");
-    const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = draft.reminder_presets.includes(id);
-    cb.onchange = () => {
-      const set = new Set(draft.reminder_presets);
-      if (cb.checked) set.add(id); else set.delete(id);
-      draft.reminder_presets = ALL.filter((x) => set.has(x)); // keep a stable order
-    };
-    lab.appendChild(cb); lab.appendChild(document.createTextNode(t("p_" + id)));
-    cg.appendChild(lab);
-  });
-  sr.appendChild(cg);
-  body.appendChild(sr);
-
-  // Watched folders
-  const sw = section(t("secWatch"));
-  const hint = document.createElement("div"); hint.className = "sub"; hint.style.marginBottom = "8px"; hint.textContent = t("watchHint");
-  sw.appendChild(hint);
-  const list = document.createElement("div");
-  const renderWatch = () => {
-    list.innerHTML = "";
-    const fs = draft.watch_folders || [];
-    if (!fs.length) { const e = document.createElement("div"); e.className = "sub"; e.textContent = t("noFolders"); list.appendChild(e); }
-    fs.forEach((f, i) => {
-      const r = document.createElement("div"); r.className = "set-row"; r.style.margin = "4px 0";
-      const p = document.createElement("div"); p.textContent = f; p.style.cssText = "font-size:12px;word-break:break-all;flex:1;";
-      const rm = document.createElement("button"); rm.className = "btn-mini"; rm.textContent = "✕";
-      rm.onclick = () => { draft.watch_folders.splice(i, 1); renderWatch(); };
-      r.appendChild(p); r.appendChild(rm); list.appendChild(r);
-    });
-  };
-  renderWatch();
-  sw.appendChild(list);
-  const addBtn = document.createElement("button"); addBtn.className = "btn-mini"; addBtn.textContent = "+ " + t("addFolder"); addBtn.style.marginTop = "8px";
-  addBtn.onclick = () => {
-    const err = $("setErr"); if (err) err.textContent = "";
-    invoke("pick_folder")
-      .then((p) => { if (p) { draft.watch_folders = draft.watch_folders || []; if (!draft.watch_folders.includes(p)) draft.watch_folders.push(p); renderWatch(); } })
-      .catch((e) => { if (err) err.textContent = "选择文件夹失败: " + e; });
-  };
-  sw.appendChild(addBtn);
-  body.appendChild(sw);
-
-  // Help
-  const s5 = section(t("secHelp"));
-  const help = document.createElement("div"); help.className = "set-help";
-  const g = document.createElement("div"); g.className = "g";
-  t("help").forEach(([k, v]) => { const kk = document.createElement("div"); kk.className = "k"; kk.textContent = k; const vv = document.createElement("div"); vv.textContent = v; g.appendChild(kk); g.appendChild(vv); });
-  help.appendChild(g); s5.appendChild(help); body.appendChild(s5);
-
-  // About
-  const s6 = section(t("secAbout"));
-  const ab = document.createElement("div"); ab.className = "set-about"; ab.textContent = t("about");
-  s6.appendChild(ab);
-  const dataRow = document.createElement("div"); dataRow.className = "set-row";
-  dataRow.innerHTML = `<div><div class="label">${t("dataDir")}</div><div class="sub">%APPDATA%\\com.clipline.app</div></div>`;
-  const ob = document.createElement("button"); ob.className = "btn-mini"; ob.textContent = t("openDataDir");
-  ob.onclick = () => invoke("open_data_dir").catch((e) => alert(e));
-  dataRow.appendChild(ob); s6.appendChild(dataRow);
+function pageAbout(body) {
+  const s6 = section(null);
   const verRow = document.createElement("div"); verRow.className = "set-row";
   verRow.innerHTML = `<div><div class="label">${t("version")}</div><div class="sub" id="verText">…</div></div>`;
   const cu = document.createElement("button"); cu.className = "btn-mini"; cu.textContent = t("checkUpdate");
-  cu.onclick = () => invoke("open_update_window").catch((e) => { const el = $("setErr"); if (el) el.textContent = String(e); });
+  cu.onclick = () => invoke("open_update_window").catch((e) => setErr(String(e)));
   verRow.appendChild(cu); s6.appendChild(verRow);
   try { T.app.getVersion().then((v) => { const el = $("verText"); if (el) el.textContent = "v" + v; }); } catch (e) {}
   const hiRow = document.createElement("div"); hiRow.className = "set-row";
@@ -313,16 +328,26 @@ function render() {
   const hb = document.createElement("button"); hb.className = "btn-mini"; hb.textContent = t("historyOpen");
   hb.onclick = showHistory;
   hiRow.appendChild(hb); s6.appendChild(hiRow);
-  s6.appendChild(row(t("updMode"), seg(draft.update_mode || "notify", [["auto", t("updAuto")], ["notify", t("updNotify")], ["off", t("updOff")]], (v) => draft.update_mode = v), t("updModeSub")));
+  const dataRow = document.createElement("div"); dataRow.className = "set-row";
+  dataRow.innerHTML = `<div><div class="label">${t("dataDir")}</div><div class="sub">%APPDATA%\\com.clipline.app</div></div>`;
+  const ob = document.createElement("button"); ob.className = "btn-mini"; ob.textContent = t("openDataDir");
+  ob.onclick = () => invoke("open_data_dir").catch((e) => setErr(String(e)));
+  dataRow.appendChild(ob); s6.appendChild(dataRow);
+  const ab = document.createElement("div"); ab.className = "set-about"; ab.style.marginTop = "10px"; ab.textContent = t("about");
+  s6.appendChild(ab);
   body.appendChild(s6);
 
-  $("cancelBtn").textContent = t("cancel");
-  $("saveBtn").textContent = t("save");
+  const s5 = section(t("secHelp"));
+  const help = document.createElement("div"); help.className = "set-help";
+  const g = document.createElement("div"); g.className = "g";
+  t("help").forEach(([k, v]) => { const kk = document.createElement("div"); kk.className = "k"; kk.textContent = k; const vv = document.createElement("div"); vv.textContent = v; g.appendChild(kk); g.appendChild(vv); });
+  help.appendChild(g); s5.appendChild(help); body.appendChild(s5);
 }
 
 /* Update history: every release from the CHANGELOG built into the app,
  * newest first, in a panel over the settings. */
 async function showHistory() {
+  if (page !== "about") goPage("about");
   const box = $("history"), list = $("historyList");
   $("historyBack").textContent = t("historyBack");
   $("historyTitle").textContent = t("history");
@@ -345,7 +370,7 @@ function hideHistory() { $("history").hidden = true; }
 function saveSettings() {
   invoke("update_settings", { data: JSON.stringify(draft) })
     .then((res) => { if (res) cfg = JSON.parse(res); emit("settings:changed"); try { getCurrentWindow().close(); } catch (e) {} })
-    .catch((err) => { const e = $("setErr"); if (e) e.textContent = String(err); });
+    .catch((err) => setErr(String(err)));
 }
 function cancelSettings() { emit("theme:preview", cfg.theme || "soft"); emit("accent:preview", cfg.accent || "terra"); try { getCurrentWindow().close(); } catch (e) {} }
 

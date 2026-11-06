@@ -12,9 +12,12 @@
   - 更新历史：`get_changelog(lang)` 用 `include_str!` 把仓库根目录的 `CHANGELOG.md` / `CHANGELOG.en.md` 编进 exe（离线可看，改了要重新编译）。启动时 `note_version_seen` 比较设置里的 `seen_version` 和当前版本：新装（没有 settings.json 也没有 data.json）不弹，降级不弹，`seen_version` 为空（v1.7.0 之前存的设置）算升级；需要弹时约 2.5 秒后开 `news.html`（标签 `news`，右下角）。「全部更新历史」走 `open_changelog`：设置窗口已开就发 `settings:goto`，没开就先记在 `SETTINGS_GOTO`，`settings.js` 启动时用 `settings_goto` 取走。
   - `update.rs`：检查更新。用系统的 `URLDownloadToFileW` 访问 GitHub API（`releases/latest`）和下载安装文件，不引入 TLS 库，走系统代理；状态集中在 `STATUS`，每次变化由 `main.rs` 广播 `update:status`，`update.html` 负责显示。
 - `src/md.js`：小型 Markdown 渲染器（先整体转义再生成标记，链接只给 `data-href`，由页面自己 `invoke("open_url")`）。便签卡片、阅读视图、编辑器预览、提醒卡片、更新历史共用；`MD.releases` 把 CHANGELOG 按 `## v1.2.3 · 日期` 切成各个版本；按行渲染，待办方框带 `data-idx`（源文本行号），打勾用 `MD.toggle`。待办写法兼容 `- [ ]` / `[ ]` / `[]`。提醒卡片和「已更新」卡片里各有一份同样的 Markdown 样式（`remind.html`、`news.html` 不加载 `styles.css`），改样式时几处一起改。
+- 设置窗口（`settings.html` / `settings.js`）：左侧分类栏 + 右侧单页，`PAGES` 列出六页（general / invoke / clip / notes / look / about），每页一个 `pageXxx(body)` 函数，`goPage` 切页后整页重绘。所有页共用一份 `draft`，「保存」一次提交；错误提示统一写在底部的 `#setErr`（`setErr()`）。打开「更新历史」时会先切到「关于」页。新增设置项时放进对应的页函数，别再加新的长区块。窗口尺寸在 `create_settings_window`（720×540，最小 600×420）。
 - `src/`：前端静态页。`app.js` 主界面（绳子布局：收藏区 / 今天 / 日期叠、卡片、便签、提醒、整理），`settings.*`、`pin.html`、`shot.html`（截图选区）、`annotate.html`（标注）、`remind.html`（提醒卡片）、`update.html`（更新卡片）、`news.html`（「已更新到 vX」卡片）。
   - 便签分类：分类就是「有名字的底色」，存在 `data.json` 的 `state.cats`（`[{tint, name}]`，`name` 为空时用默认名 `cat_<tint>` 翻译）；便签仍然只存 `tint`，`catOf(tint)` 查分类，不在 `cats` 里的算未分类。`TINTS` 共 12 色（含无色），所以最多 11 个分类。删除分类时把绳上和收纳袋里对应 `tint` 的便签改成 `null`。底部筛选用 `ui.cat`（`""` 全部 / tint / `"none"`），分类不到两种时不显示。
   - 收纳袋：挂在绳子右端（`updateBasket` 按 `ropeY` 定位），便签布局时右侧留出 `BAG_ROOM`。数据在 `state.done`，便签取下时复制一份加 `doneAt`（去掉提醒字段）。`cleanup` 按设置 `history_days`（默认 30，0 = 永久）清理。`#tidy` 按钮两边共用：剪贴板绳是「失效文件卡」，便签绳是「待办全部打勾的便签」（`updateNoteTidy` / `runNoteTidy`）。统计里的「项」是打勾的待办数（`MD.progress` 的第一个数）。
+  - 收纳袋保留天数：收纳袋底部的「保留 N 天 ▾」由 `fillBasketKeep` 生成，点开就地选天数；改短会删掉便签时先显示「清理 N 张？」（`keepArmed`），确认后 `setHistoryDays` 先 `cleanup()`，再按 `get_settings` → 改 `history_days` → `update_settings` 写回（与「按日期」按钮同一做法）。
+  - 提醒时间选择器：`showReminderPanel` 里的「自定义时间…」打开 `openTimePicker`，在同一个 `#ctx` 浮层里换成月历 + 时分（`#ctx.tp`，样式在 `styles.css` 的 `.tp-*`），不用系统的 `datetime-local`（WebView2 的弹窗没有确定按钮）。浮层里按钮的点击都要 `stopPropagation`：点击后浮层内容会重建，事件冒泡到 document 时 `closest("#ctx")` 已找不到，会被当成点在外面。Esc 由浮层自己的 `onkeydown` 处理（返回提醒面板）；全局 Esc 也改为先关 `#ctx`，再关编辑器。
   - 托盘菜单：`tray_menu(app, en)` 按 `lang` 生成，`update_settings` 里 `apply_tray_lang` 重建，所以改语言不用重启。
   - 便签卡片（`buildNoteCard`）：内容放在 `.note-clip > .note-lines`，渲染后 `measureNotes` 量高度，放不下就加 `.over`（可滚动、细滚动条）和 `.fade`（底部渐隐），`updateNoteMore` 数没完整露出来的块写进「还有 N 行」。滚动位置存在 `noteScroll`，打勾重绘后恢复，放下绳子时清空。窗口的 wheel 处理里，鼠标在 `.over` 的便签上就滚便签、不翻屏。单击便签等 250 ms 再开阅读视图（`#reader`，`openReader`），期间来了双击就取消、进编辑器。
 
@@ -60,4 +63,7 @@ RUSTC_BOOTSTRAP=1 cargo check -Zbuild-std=std,panic_abort --target x86_64-pc-win
 - **便签取下 = 完成，进收纳袋**：「取下」默认留记录，方便按月统计；真的不想留的走右键「删除（不进收纳袋）」。收纳袋只做计数，不做图表，免得变成另一个待办软件。
 - **更新历史打包进程序、只维护一份**：`CHANGELOG.md` / `CHANGELOG.en.md` 编译时嵌入，不联网也能看，也不必再维护一份网页或 JSON。
 - **「已更新」卡片每个版本只弹一次，新装和降级不弹**：新用户还没用过旧版，没有「更新了什么」可言；降级多半是在排查问题，不打扰。
+- **设置用分类栏而不是一长页**：设置项越来越多，一长页要一路往下拖；分类栏每页一屏，和 Windows 自己的设置一致。
+- **提醒时间用月历 + 数字，不用表盘**：表盘要分两步拨（先时后分），鼠标操作比滚轮或直接输入慢，而且绳子窗口只有约 360px 高，放不下够大的表盘。
+- **便签「复制内容」复制 Markdown 原文**：粘回便签还是原样；要纯文本的话打开阅读视图选中复制。
 - **更新卡片里的说明来自 GitHub 发布页，「已更新」卡片的说明来自程序自带的 CHANGELOG**：前者是还没装上的新版本，只能联网取；后者是已经装上的版本，用自带的。
