@@ -48,7 +48,8 @@ RUSTC_BOOTSTRAP=1 cargo check -Zbuild-std=std,panic_abort --target x86_64-pc-win
 - 只改发布说明不用重新编译：运行 **Release notes** 工作流，填上标签即可。
 - 排查问题：在 exe 旁边放一个空的 `clipline-debug.log`，程序就会写诊断日志。
 - 截图：`使用说明.md` 用的配图在 `assets/guide-*.png`，界面改了要记得重截；README 首图是 `assets/screenshot.png`。
-- 图标：全部由 `tools/make_icons.py` 从一份 SVG 模板生成（需要 `rsvg-convert` 和 Pillow）：`assets/icon.svg`、`src-tauri/icons/` 下的 png / ico、五种托盘图标（`src-tauri/icons/tray/` 和设置页预览用的 `src/img/tray-*.png`）。改图标只改脚本里的模板或颜色表，再运行一次。
+- 图标：全部由 `tools/make_icons.py` 从一份 SVG 模板生成（需要 `rsvg-convert` 和 Pillow）：`assets/icon.svg`、`src-tauri/icons/` 下的 png / ico、五种托盘图标（`src-tauri/icons/tray/` 和设置页预览用的 `src/img/tray-*.png`）。托盘图标和 ico 里 32 像素及以下的帧用简化画法 `svg_small`（16 像素下取景框和细线会糊成一片），48 像素起用完整画法。改图标只改脚本里的模板或颜色表，再运行一次。
+- 外观页的托盘图标按强调色的顺序排（陶土橙、薄荷绿、晴空蓝、深海蓝、徕卡红），设置里存的 id（a–e）不变。
 
 ## 设计决定
 已经定下的取舍，改之前先想清楚当初为什么这样定。

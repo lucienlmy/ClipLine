@@ -2,6 +2,17 @@
 
 Newest first. This file is built into the app and is what Settings → About → "Update history" shows; the Chinese version is `CHANGELOG.md` — keep the two in step.
 
+## v1.10.1 · 2026-11-07
+
+### 🖼 Small icons redrawn
+- The tray icon and the 16 / 24 / 32 px frames of the app icon use a simplified drawing — no corner marks, bolder lines, bigger cards — so they read clearly in the taskbar and tray.
+
+### 🎨 Appearance
+- Tray icon colours are listed in the same order as the accents (Terracotta, Mint, Sky, Navy, Leica red), so the two rows line up.
+
+### 📘 Docs
+- The guide shows the new screenshot bar.
+
 ## v1.10.0 · 2026-11-07
 
 ### 🖼 A new icon

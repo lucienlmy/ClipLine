@@ -43,24 +43,49 @@ def svg(top, bot, peg):
 </svg>
 '''
 
+def svg_small(top, bot, peg):
+    """Simplified drawing for 16–32 px (tray, small ico frames): no corner
+    marks, fewer and bolder strokes, laid out on a 32-unit grid."""
+    return f'''<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{top}"/><stop offset="1" stop-color="{bot}"/></linearGradient></defs>
+<rect x="0.5" y="0.5" width="31" height="31" rx="7" fill="url(#bg)"/>
+<path d="M 2.5 8 Q 16 11 29.5 8" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+<g transform="rotate(-5 10 17)"><rect x="3.5" y="9.5" width="12" height="16" rx="1.6" fill="#ffffff"/>
+<rect x="5" y="11.5" width="9" height="8" rx="0.8" fill="{top}" fill-opacity="0.35"/>
+<path d="M 5 19.5 L 8.4 14 L 11 17 L 12.4 15.6 L 14 17.4 L 14 19.5 Z" fill="{peg}" fill-opacity="0.85"/></g>
+<g transform="rotate(5 22 17)"><rect x="16.5" y="10" width="12" height="15.5" rx="1.6" fill="#fdf8f2"/>
+<path d="M 18.8 14 H 26.2 M 18.8 17.5 H 26.2 M 18.8 21 H 23.4" stroke="{bot}" stroke-opacity="0.85" stroke-width="2" stroke-linecap="round"/></g>
+<rect x="8.6" y="6.2" width="2.4" height="6" rx="0.9" fill="{peg}"/><rect x="20.6" y="6.8" width="2.4" height="6" rx="0.9" fill="{peg}"/>
+</svg>
+'''
+
 def render(src, size, out):
     subprocess.run(["rsvg-convert", "-w", str(size), "-h", str(size), src, "-o", out], check=True)
 
 def main():
     tmp = tempfile.mkdtemp()
     for k, c in COLORS.items():
-        s = svg(*c)
         p = os.path.join(tmp, f"{k}.svg")
-        open(p, "w").write(s)
+        open(p, "w").write(svg(*c))
+        ps = os.path.join(tmp, f"{k}-small.svg")
+        open(ps, "w").write(svg_small(*c))
+        # the tray shows at 16–32 px, so it uses the simplified drawing
         for d in ("src-tauri/icons/tray", "src/img"):
-            render(p, 64, os.path.join(ROOT, d, f"tray-{k}.png"))
+            render(ps, 64, os.path.join(ROOT, d, f"tray-{k}.png"))
         if k == "a":
-            open(os.path.join(ROOT, "assets/icon.svg"), "w").write(s)
+            open(os.path.join(ROOT, "assets/icon.svg"), "w").write(svg(*c))
             ic = os.path.join(ROOT, "src-tauri/icons")
-            for size, name in ((32, "32x32.png"), (128, "128x128.png"), (256, "128x128@2x.png"), (512, "icon.png")):
+            render(ps, 32, os.path.join(ic, "32x32.png"))
+            for size, name in ((128, "128x128.png"), (256, "128x128@2x.png"), (512, "icon.png")):
                 render(p, size, os.path.join(ic, name))
-            big = os.path.join(tmp, "big.png"); render(p, 256, big)
-            Image.open(big).save(os.path.join(ic, "icon.ico"), sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+            # .ico: simplified frames up to 32 px, the full drawing from 48 px
+            frames = []
+            for size in (16, 24, 32, 48, 64, 128, 256):
+                f = os.path.join(tmp, f"ico{size}.png")
+                render(ps if size <= 32 else p, size, f)
+                frames.append(Image.open(f).convert("RGBA"))
+            frames[-1].save(os.path.join(ic, "icon.ico"), format="ICO",
+                            sizes=[im.size for im in frames], append_images=frames[:-1])
 
 if __name__ == "__main__":
     main()

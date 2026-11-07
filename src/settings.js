@@ -295,7 +295,7 @@ function pageLook(body) {
   st.appendChild(row(t("accent"), ar));
   // Tray icon colour (the exe icon is fixed; the tray one can change)
   const tr = document.createElement("div"); tr.className = "accent-row";
-  [["a", t("aTerra")], ["b", t("trBlue")], ["c", t("trRed")], ["d", t("aSky")], ["e", t("aMint")]].forEach(([v, name]) => {
+  [["a", t("aTerra")], ["e", t("aMint")], ["d", t("aSky")], ["b", t("trBlue")], ["c", t("trRed")]].forEach(([v, name]) => {
     const sw = document.createElement("div"); sw.className = "accent-sw tray-sw" + ((draft.tray_icon || "a") === v ? " on" : "");
     sw.innerHTML = `<img src="img/tray-${v}.png" width="30" height="30" alt=""><span>${name}</span>`;
     sw.onclick = () => { draft.tray_icon = v; tr.querySelectorAll(".accent-sw").forEach((z) => z.classList.remove("on")); sw.classList.add("on"); };
