@@ -909,6 +909,10 @@ fn set_sticky(on: bool) {
 // ---------------------------------------------------------------------------
 
 static SHOT: Lazy<Mutex<Option<shot::Capture>>> = Lazy::new(|| Mutex::new(None));
+/// Lock the capture; a panic elsewhere must never wedge the overlay.
+fn shot_lock() -> std::sync::MutexGuard<'static, Option<shot::Capture>> {
+    SHOT.lock().unwrap_or_else(|e| e.into_inner())
+}
 /// A screenshot overlay is open: no hover-drop / drag-catch meanwhile.
 static SHOOTING: AtomicBool = AtomicBool::new(false);
 
@@ -929,7 +933,7 @@ async fn start_shot(app: AppHandle) -> Result<(), String> {
         Err(e) => { SHOOTING.store(false, Ordering::Relaxed); return Err(e.to_string()); }
     };
     let (x, y, w, h) = (cap.x, cap.y, cap.img.width(), cap.img.height());
-    *SHOT.lock().unwrap() = Some(cap);
+    *shot_lock() = Some(cap);
     let win = tauri::WebviewWindowBuilder::new(&app, "shot", tauri::WebviewUrl::App("shot.html".into()))
         .title("ClipLine 截图")
         .decorations(false)
@@ -956,9 +960,9 @@ async fn tokio_sleep(ms: u64) {
 async fn get_shot_image() -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(|| {
         use base64::Engine;
-        let guard = SHOT.lock().unwrap();
-        let cap = guard.as_ref().ok_or("没有截图")?;
-        let rgb = image::DynamicImage::ImageRgba8(cap.img.clone()).to_rgb8();
+        // copy the pixels and let go of the lock before the slow encode
+        let img = shot_lock().as_ref().map(|c| c.img.clone()).ok_or("没有截图")?;
+        let rgb = image::DynamicImage::ImageRgba8(img).to_rgb8();
         let mut buf = Vec::new();
         image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 88)
             .encode_image(&rgb)
@@ -975,27 +979,39 @@ async fn get_shot_image() -> Result<String, String> {
 /// Where to snap in the overlay, in overlay image pixels: the windows that
 /// were visible (front first), then each monitor (the desktop behind them).
 #[tauri::command]
-fn get_shot_windows() -> Vec<[i32; 4]> {
-    let guard = SHOT.lock().unwrap();
-    let Some(cap) = guard.as_ref() else { return Vec::new() };
-    let (ox, oy) = (cap.x, cap.y);
-    let (iw, ih) = (cap.img.width() as i32, cap.img.height() as i32);
+async fn get_shot_windows() -> Vec<[i32; 4]> {
+    // async: runs off the main thread, so waiting for the capture lock (held
+    // while the background JPEG is encoded) can never freeze the overlay.
+    // Copy what we need and drop the lock before asking for the monitors.
+    let (ox, oy, iw, ih, wins) = {
+        let guard = shot_lock();
+        let Some(cap) = guard.as_ref() else { return Vec::new() };
+        (cap.x, cap.y, cap.img.width() as i32, cap.img.height() as i32, cap.wins.clone())
+    };
     let clip = |r: [i32; 4]| -> Option<[i32; 4]> {
         let (x0, y0) = ((r[0] - ox).max(0), (r[1] - oy).max(0));
         let (x1, y1) = ((r[0] - ox + r[2]).min(iw), (r[1] - oy + r[3]).min(ih));
         (x1 - x0 >= 8 && y1 - y0 >= 8).then_some([x0, y0, x1 - x0, y1 - y0])
     };
-    let mut out: Vec<[i32; 4]> = cap.wins.iter().filter_map(|r| clip(*r)).collect();
+    let mut out: Vec<[i32; 4]> = wins.iter().filter_map(|r| clip(*r)).collect();
     out.extend(display::list().iter().filter_map(|m| clip([m.x, m.y, m.w, m.h])));
+    winx::dlog(&format!("shot: {} snap targets, origin ({ox},{oy}) size {iw}x{ih}", out.len()));
     out
+}
+
+/// Diagnostics from the screenshot overlay (only written when
+/// clipline-debug.log exists next to the exe).
+#[tauri::command]
+async fn shot_log(msg: String) {
+    winx::dlog(&format!("shot.html: {msg}"));
 }
 
 /// Exact pixels around (x, y) for the colour picker's loupe: a square of
 /// side 2r+1, row by row, RGB triplets (outside the screen = 0).
 #[tauri::command]
-fn shot_patch(x: i32, y: i32, r: i32) -> Vec<u8> {
+async fn shot_patch(x: i32, y: i32, r: i32) -> Vec<u8> {
     let r = r.clamp(1, 12);
-    let guard = SHOT.lock().unwrap();
+    let guard = shot_lock();
     let mut out = Vec::with_capacity(((2 * r + 1) * (2 * r + 1) * 3) as usize);
     let Some(cap) = guard.as_ref() else { return out };
     let (iw, ih) = (cap.img.width() as i32, cap.img.height() as i32);
@@ -1015,7 +1031,7 @@ fn shot_patch(x: i32, y: i32, r: i32) -> Vec<u8> {
 /// Colour picked in the overlay: copy `#RRGGBB` and hang it as a colour card.
 #[tauri::command]
 async fn finish_color(app: AppHandle, hex: String) -> Result<(), String> {
-    *SHOT.lock().unwrap() = None;
+    *shot_lock() = None;
     SHOOTING.store(false, Ordering::Relaxed);
     if let Some(w) = app.get_webview_window("shot") {
         let _ = w.close();
@@ -1029,7 +1045,7 @@ async fn finish_color(app: AppHandle, hex: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn cancel_shot(app: AppHandle) -> Result<(), String> {
-    *SHOT.lock().unwrap() = None;
+    *shot_lock() = None;
     SHOOTING.store(false, Ordering::Relaxed);
     if let Some(w) = app.get_webview_window("shot") {
         let _ = w.close();
@@ -1042,7 +1058,7 @@ async fn cancel_shot(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 async fn finish_shot(app: AppHandle, x: u32, y: u32, w: u32, h: u32, action: String) -> Result<(), String> {
     // take the capture BEFORE closing the overlay (its destroy handler clears it)
-    let cap = SHOT.lock().unwrap().take();
+    let cap = shot_lock().take();
     SHOOTING.store(false, Ordering::Relaxed);
     if let Some(win) = app.get_webview_window("shot") {
         let _ = win.close();
@@ -2007,7 +2023,7 @@ fn main() {
             if let tauri::WindowEvent::Destroyed = e {
                 if w.label() == "shot" {
                     SHOOTING.store(false, Ordering::Relaxed);
-                    *SHOT.lock().unwrap() = None;
+                    *shot_lock() = None;
                 }
             }
             if let tauri::WindowEvent::DragDrop(d) = e {
@@ -2053,6 +2069,7 @@ fn main() {
             start_shot,
             get_shot_image,
             get_shot_windows,
+            shot_log,
             shot_patch,
             finish_color,
             cancel_shot,

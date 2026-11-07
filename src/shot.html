@@ -69,6 +69,11 @@
       hang: "Hang on the line (Enter / double-click)", annotate: "Annotate", ocr: "Recognise text", pin: "Pin to desktop", color: "Pick a colour (copies the HEX)", reselect: "Select again", cancel: "Cancel",
       colorSub: "Click to copy and hang" },
   };
+  // Diagnostics go to clipline-debug.log (only if that file exists next to the exe).
+  const log = (m) => { try { invoke("shot_log", { msg: String(m) }).catch(() => {}); } catch (e) {} };
+  window.addEventListener("error", (e) => log("error: " + e.message + " @" + e.lineno));
+  window.addEventListener("unhandledrejection", (e) => log("rejection: " + (e.reason && e.reason.message || e.reason)));
+  log(`open ${window.innerWidth}x${window.innerHeight} dpr=${window.devicePixelRatio}`);
   let lang = "zh";
   const t = (k) => (L[lang] || L.zh)[k] || k;
   const ACCENTS = { terra: "#d97757", mint: "#58b980", sky: "#5db2fc", navy: "#193584", leica: "#d41f26" };
@@ -241,7 +246,7 @@
   }
   const CURSOR = { n: "ns-resize", s: "ns-resize", e: "ew-resize", w: "ew-resize", ne: "nesw-resize", sw: "nesw-resize", nw: "nwse-resize", se: "nwse-resize" };
 
-  document.addEventListener("mousedown", (e) => {
+  document.addEventListener("pointerdown", (e) => {
     if (e.target.closest("#bar")) return;
     if (e.button === 2) {
       e.preventDefault();
@@ -258,9 +263,12 @@
     if (handle) { mode = "resize"; orig = { ...rect }; }
     else if (inside(rect, e.clientX, e.clientY)) { mode = "move"; orig = { ...rect }; }
     else mode = "pending";
+    // keep receiving moves / the release even if the pointer leaves the page
+    try { document.body.setPointerCapture(e.pointerId); } catch (err) {}
+    log(`down ${mode}${handle ? "/" + handle : ""} at ${e.clientX},${e.clientY}`);
     hideBar(); drawHover();
   });
-  document.addEventListener("mousemove", (e) => {
+  document.addEventListener("pointermove", (e) => {
     mouse = { x: e.clientX, y: e.clientY };
     if (picking) { placeLoupe(); readPatch(); return; }
     if (!mode) {
@@ -285,9 +293,11 @@
     }
     draw();
   });
-  document.addEventListener("mouseup", (e) => {
+  function endPointer(e) {
+    try { document.body.releasePointerCapture(e.pointerId); } catch (err) {}
     if (!mode) return;
     const m = mode; mode = null;
+    log(`${e.type} ${m}` + (rect ? ` rect ${Math.round(rect.x)},${Math.round(rect.y)} ${Math.round(rect.w)}x${Math.round(rect.h)}` : ""));
     if (m === "pending") {
       // a click without a drag: take the window under the cursor
       if (hovered) setSelection({ ...hovered });
@@ -296,7 +306,10 @@
     }
     if (!rect || rect.w < 3 || rect.h < 3) { setSelection(null); return; }
     setSelection(rect);
-  });
+  }
+  document.addEventListener("pointerup", endPointer);
+  document.addEventListener("pointercancel", endPointer);
+  document.addEventListener("lostpointercapture", (e) => { if (mode) endPointer(e); });
   document.addEventListener("dblclick", (e) => { if (!e.target.closest("#bar") && !picking && inside(rect, e.clientX, e.clientY)) act("hang"); });
   document.addEventListener("contextmenu", (e) => e.preventDefault());
   document.addEventListener("dragstart", (e) => e.preventDefault());
@@ -304,6 +317,7 @@
 
   /* ---------- keyboard ---------- */
   document.addEventListener("keydown", (e) => {
+    if (["Escape", "Enter"].includes(e.key)) log("key " + e.key);
     if (e.key === "Escape") { if (picking) setPicking(false); else cancel(); return; }
     if (picking) { if (e.key === "Enter") pickNow(); return; }
     if (e.key === "Enter") { act("hang"); return; }

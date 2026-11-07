@@ -31,7 +31,8 @@
 7. 便携版更新：运行中的 exe 可以改名但不能覆盖，所以先把自己改名为 `*.exe.old`，新文件放到原路径，再带 `--after-update <pid>` 启动新版（新版先等旧进程退出，再清理 `.old`）。安装版更新：运行 setup 带 `/P /UPDATE /R`（免打扰、保留自启动项、装完重新打开）。
 8. 语言设置 `lang` 可为 `auto`：`get_settings` / `update_settings` 返回的 JSON 额外带 `sys_lang`（zh / en），前端用 `pickLang` 解析；`Settings` 默认值是 `auto`，但已存的 settings.json 保留原值。
 9. 提醒卡片 / 更新卡片自带中英文表：提醒卡片的语言由主窗口随数据传过来（`lang`），缺省时自己读设置；更新卡片读 `get_settings`。更新出错的文字来自 Rust（中文），`update.html` 的 `ERR_EN` 按前缀翻译——在 `update.rs` 新增或修改错误文字时，记得同步这张表。
-10. 版本比较只看 `主.次.修订` 三段数字；发布时 `tauri.conf.json`、`Cargo.toml` 的版本号和标签必须一致，否则会反复提示更新。
+10. **截图界面调用的命令一律 `async`**：同步命令跑在主线程上，等 `SHOT` 锁（背景 JPEG 编码时被占着）会把全屏置顶的截图窗口冻住，表现为鼠标能动、什么都点不了。拿 `SHOT` 用 `shot_lock()`（锁中毒也能取回），拷出数据就放锁，别在锁里做慢活。截图页的诊断写进 `clipline-debug.log`（`shot_log`）。
+11. 版本比较只看 `主.次.修订` 三段数字；发布时 `tauri.conf.json`、`Cargo.toml` 的版本号和标签必须一致，否则会反复提示更新。
 
 ## 在 Linux 上检查 Windows 代码
 ```bash

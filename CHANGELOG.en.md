@@ -10,6 +10,9 @@ Newest first. This file is built into the app and is what Settings → About →
 ### 🎨 Appearance
 - Tray icon colours are listed in the same order as the accents (Terracotta, Mint, Sky, Navy, Leica red), so the two rows line up.
 
+### 🐞 Fixed
+- Screenshots: after a frame was drawn the overlay could stop responding (seen on a second monitor) — the pointer moved but nothing could be dragged or clicked. The overlay's background calls no longer run on the main thread, and drags use pointer capture so a release is never lost.
+
 ### 📘 Docs
 - The guide shows the new screenshot bar.
 
