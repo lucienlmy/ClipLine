@@ -79,7 +79,7 @@ const I18N = {
     basketTip: "收纳袋：已完成的便签", bagCap: "已完成", basketTitle: "已完成的便签", basketEmpty: "收纳袋是空的。\n便签上点 ✕（或「整理」）后，完成的便签会放进这里，按月统计。", monthDone: "本月完成 ", statN: "{n} 张", statK: "{k} 项", putBack: "↩ 放回绳上", delOne: "删除", clearBasket: "清空收纳袋", clearAsk: "确认清空？", keepDays: "保留 {n} 天", keepForever: "永久保留", keepTip: "点击修改收纳袋的保留天数", keepPick: "保留：", keepForeverOpt: "永久", keepPurge: "清理 {n} 张？", keepSet: "已改为保留 {n} 天", keepSetForever: "已改为永久保留", keepPurged: "，清理了 {n} 张", copyNote: "复制内容", toBasket: "已放进收纳袋", toBasketN: "已把 {n} 张放进收纳袋", restored: "已放回绳上", doneOn: "{d} 完成",
     takeNote: "完成，放进收纳袋", deleteNote: "删除（不进收纳袋）", deletedNote: "已删除", noteTidyTip: "把待办全部打勾的便签放进收纳袋", confirmDone: "钉住的便签，确认放进收纳袋？",
     all: "全部", text: "文字", link: "链接", color: "颜色", image: "图片", file: "文件",
-    search: "搜索…", copied: "已复制", editText: "编辑文字", annotate: "✎ 标注", ocr: "文 识别文字（OCR）", ocrRunning: "正在识别文字…", ocrFail: "识别失败：", ocrNone: "没有识别到文字", ocrDone: "已识别 {n} 个字，已复制，可在这里修改", shotTip: "截图上绳", favMore: "其余收藏", favZone: "左边是收藏区", g3: "三日内", g7: "一周内", gOld: "更早", cards: "张", total: "共", groupOpen: "展开这一叠", groupHint: "单击复制 · 拖出 · 双击编辑/打开 · 右键更多", takeAll: "全部取下", tookN: "已取下 {n} 张", undo: "撤销", favKeep: "收藏的卡片请先取消收藏", tidy: "整理", tidyTip: "取下原文件已不在的卡片", tidied: "已取下 {n} 张失效卡片", foldTip: "按日期折叠：今天散挂，更早的折成「三日内 / 一周内 / 更早」", foldOnT: "已按日期折叠", foldLabel: "按日期", foldOffT: "已全部散挂", moved: "已移动，卡片已取下", stackOpen: "展开这一叠", stackTitle: "这一叠共 {n} 个文件", stackSplit: "拆成单张", stackHint: "单击复制 · 拖出单个文件 · 双击打开", missing: "原文件已不在（被移动或删除了）", already: "已在绳上，已移到最前", pasteBack: "粘贴到原应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
+    search: "搜索…", copied: "已复制", editText: "编辑文字", annotate: "✎ 标注", ocr: "文 识别文字（OCR）", ocrRunning: "正在识别文字…", ocrFail: "识别失败：", ocrNone: "没有识别到文字", ocrDone: "已识别 {n}，已复制，可在这里修改", cntZi: "{n} 字", cntWord: "{n} 词", shotTip: "截图上绳", favMore: "其余收藏", favZone: "左边是收藏区", g3: "三日内", g7: "一周内", gOld: "更早", cards: "张", total: "共", groupOpen: "展开这一叠", groupHint: "单击复制 · 拖出 · 双击编辑/打开 · 右键更多", takeAll: "全部取下", tookN: "已取下 {n} 张", undo: "撤销", favKeep: "收藏的卡片请先取消收藏", tidy: "整理", tidyTip: "取下原文件已不在的卡片", tidied: "已取下 {n} 张失效卡片", foldTip: "按日期折叠：今天散挂，更早的折成「三日内 / 一周内 / 更早」", foldOnT: "已按日期折叠", foldLabel: "按日期", foldOffT: "已全部散挂", moved: "已移动，卡片已取下", stackOpen: "展开这一叠", stackTitle: "这一叠共 {n} 个文件", stackSplit: "拆成单张", stackHint: "单击复制 · 拖出单个文件 · 双击打开", missing: "原文件已不在（被移动或删除了）", already: "已在绳上，已移到最前", pasteBack: "粘贴到当前应用", savedEdit: "已保存修改", dragFail: "拖出失败: ", catchHint: "松手挂上绳", editorPhClip: "编辑这段文字…", savedTo: "已保存到桌面", hung: "已挂上绳",
     emptyClip: "绳上还空着 — 复制点什么试试",
     emptyNotes: "绳上还没有便签 — 点上方的 + 写一张",
     plus: "新建便签", gear: "设置", prev: "上一屏", next: "下一屏", pinOnly: "只看收藏（钉住）的卡片",
@@ -125,7 +125,7 @@ const I18N = {
     catNew: "＋ New category", catManage: "Manage categories…", catTitle: "Note categories", catNamePh: "New category name", catAdd: "Add", catDel: "Delete", catDelAsk: "Sure?", catFull: "All colours are in use — delete a category to add another", catHint: "Rename in the box; deleting a category keeps its notes (they become uncategorised)", catNotes: "{n}", catPick: "Pick a colour",
     basketTip: "Done bag: finished notes", bagCap: "DONE", basketTitle: "Finished notes", basketEmpty: "The bag is empty.\nClick ✕ on a note (or Tidy) and finished notes go in here, counted by month.", monthDone: "This month: ", statN: "{n} notes", statK: "{k} items", putBack: "↩ Put back", delOne: "Delete", clearBasket: "Empty the bag", clearAsk: "Sure?", keepDays: "Kept {n} days", keepForever: "Kept forever", keepTip: "Click to change how long the bag keeps notes", keepPick: "Keep:", keepForeverOpt: "Forever", keepPurge: "Remove {n}?", keepSet: "Now kept {n} days", keepSetForever: "Now kept forever", keepPurged: "; removed {n}", copyNote: "Copy text", toBasket: "Put in the bag", toBasketN: "Put {n} in the bag", restored: "Put back on the line", doneOn: "Done {d}",
     takeNote: "Done — into the bag", deleteNote: "Delete (skip the bag)", deletedNote: "Deleted", noteTidyTip: "Put notes whose to-dos are all ticked into the bag", confirmDone: "Pinned note — put it in the bag?",
-    search: "Search…", copied: "Copied", editText: "Edit text", annotate: "✎ Annotate", ocr: "Recognise text (OCR)", ocrRunning: "Recognising text…", ocrFail: "OCR failed: ", ocrNone: "No text found", ocrDone: "Recognised {n} characters — copied; edit here if needed", shotTip: "Screenshot to the line", favMore: "More favourites", favZone: "Favourites are on the left", g3: "Last 3 days", g7: "This week", gOld: "Older", cards: "", total: "Total", groupOpen: "Open this stack", groupHint: "Click to copy · drag out · double-click to edit/open · right-click for more", takeAll: "Take all down", tookN: "Took down {n}", undo: "Undo", favKeep: "Remove it from favourites first", tidy: "Tidy", tidyTip: "Take down cards whose files are gone", tidied: "Took down {n} broken card(s)", foldTip: "Fold by date: today loose, older folded into stacks", foldOnT: "Folded by date", foldLabel: "By date", foldOffT: "All cards loose", moved: "Moved — card taken down", stackOpen: "Open this stack", stackTitle: "{n} files in this stack", stackSplit: "Split into cards", stackHint: "Click to copy · drag one out · double-click to open", missing: "The original file is gone (moved or deleted)", already: "Already on the line — moved to front", pasteBack: "Paste into previous app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
+    search: "Search…", copied: "Copied", editText: "Edit text", annotate: "✎ Annotate", ocr: "Recognise text (OCR)", ocrRunning: "Recognising text…", ocrFail: "OCR failed: ", ocrNone: "No text found", ocrDone: "Recognised {n} — copied; edit here if needed", cntZi: "{n} CJK characters", cntWord: "{n} words", shotTip: "Screenshot to the line", favMore: "More favourites", favZone: "Favourites are on the left", g3: "Last 3 days", g7: "This week", gOld: "Older", cards: "", total: "Total", groupOpen: "Open this stack", groupHint: "Click to copy · drag out · double-click to edit/open · right-click for more", takeAll: "Take all down", tookN: "Took down {n}", undo: "Undo", favKeep: "Remove it from favourites first", tidy: "Tidy", tidyTip: "Take down cards whose files are gone", tidied: "Took down {n} broken card(s)", foldTip: "Fold by date: today loose, older folded into stacks", foldOnT: "Folded by date", foldLabel: "By date", foldOffT: "All cards loose", moved: "Moved — card taken down", stackOpen: "Open this stack", stackTitle: "{n} files in this stack", stackSplit: "Split into cards", stackHint: "Click to copy · drag one out · double-click to open", missing: "The original file is gone (moved or deleted)", already: "Already on the line — moved to front", pasteBack: "Paste into the current app", savedEdit: "Changes saved", dragFail: "Drag failed: ", catchHint: "Release to hang it", editorPhClip: "Edit this text…", savedTo: "Saved to Desktop", hung: "Hung on the line",
     emptyClip: "The line is empty — copy something",
     emptyNotes: "No notes yet — click + above to write one",
     plus: "New note", gear: "Settings", prev: "Previous", next: "Next", pinOnly: "Favourites (pinned) only",
@@ -1483,8 +1483,8 @@ function showCtx(e, item, isNote) {
       add(t("copyPath"), () => { invoke("copy_text", { text: (item.files || []).join("\n") }).catch(()=>{}); toast(t("copied")); });
     } else {
       add(t("copy"), () => invoke("copy_text", { text: item.text || "" }).catch(()=>{}));
-      add(t("editText"), () => openClipEditor(item));
       add(t("pasteBack"), () => invoke("paste_text", { text: item.text || "" }).catch(()=>{}));
+      add(t("editText"), () => openClipEditor(item));
       if (item.vis === "link") {
         add(t("openLink"), () => invoke("open_url", { url: normUrl(item.text) }).catch(()=>{}));
         add(item.note ? t("editNote") : t("addNote"), () => openClipEditor(item, true));
@@ -1493,7 +1493,10 @@ function showCtx(e, item, isNote) {
       add(t("saveDesktop"), () => saveDesktop(item));
     }
   }
-  if (isNote) add(t("copyNote"), () => { invoke("copy_text", { text: item.body || "" }).then(() => toast(t("copied"))).catch((err) => toast(String(err))); });
+  if (isNote) {
+    add(t("copyNote"), () => { invoke("copy_text", { text: item.body || "" }).then(() => toast(t("copied"))).catch((err) => toast(String(err))); });
+    add(t("pasteBack"), () => invoke("paste_text", { text: item.body || "" }).catch(()=>{}));
+  }
   add(item.pinned ? t("unpin") : t("pin"), () => { item.pinned = !item.pinned; save(); render(); });
   sep();
   add(isNote ? t("takeNote") : t("take"), () => removeItem(item, isNote));
@@ -2267,7 +2270,17 @@ function onOcrDone(p) {
   invoke("copy_text", { text }).catch(() => {});
   setDeck("clipboard"); stage.classList.remove("up"); render();
   // let the user check / correct what was recognised
-  setTimeout(() => { openClipEditor(item); toast(t("ocrDone").replace("{n}", text.replace(/\s/g, "").length)); }, 120);
+  setTimeout(() => { openClipEditor(item); toast(t("ocrDone").replace("{n}", countText(text))); }, 120);
+}
+/* Count the way each script is read: CJK by character (字), everything else by word (词). */
+function countText(text) {
+  const CJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/g;
+  const zi = (text.match(CJK) || []).length;
+  const words = (text.replace(CJK, " ").match(/[\p{L}\p{N}]+(?:['’.\-][\p{L}\p{N}]+)*/gu) || []).length;
+  const parts = [];
+  if (zi) parts.push(t("cntZi").replace("{n}", zi));
+  if (words || !zi) parts.push(t("cntWord").replace("{n}", words));
+  return parts.join(" · ");
 }
 
 /* ---------- drag files to the top edge: the line comes down to catch them ----------

@@ -2,6 +2,37 @@
 
 Newest first. This file is built into the app and is what Settings → About → "Update history" shows; the Chinese version is `CHANGELOG.md` — keep the two in step.
 
+## v1.10.0 · 2026-11-07
+
+### 🖼 A new icon
+- Two cards on the line — a picture and a page of words — inside a camera's corner marks: screenshots, clipboard and notes, visible at a glance. The app icon and all five tray colours are redrawn.
+
+### ✂ Screenshots: choose first, then take
+- A drag or a click only selects; Enter, a double click on the frame or the ✓ at the right end of the bar takes the picture. A wrong frame can be fixed before it counts.
+- Windows light up under the pointer — **click to select a whole window**; over the empty desktop it selects the whole monitor.
+- The frame can be adjusted: drag its 8 handles to resize, drag inside to move; arrow keys move it 1 px (Shift: 10), Ctrl+arrows change its size.
+
+### 🧰 The screenshot bar is icons now
+- Annotate `E` · Recognise text `W` · Pin `P` · Pick colour `C` · Select again `A` · Cancel `Esc` · Hang `Enter` — keys in each icon's corner, descriptions in the tooltips.
+- The bar follows the theme and accent: dark under Graphite, no longer a hard-coded white strip.
+
+### 💧 Colour picker
+- Press `C` (or click the dropper) while capturing: a loupe follows the pointer; click to copy `#RRGGBB` and hang a colour card — no image file is saved.
+- It reads the screen's real pixels, so the colour is exact.
+
+### 📋 Paste into the current app
+- Notes get "Paste into the current app" too (pastes the Markdown source); text, link and colour cards already had it — it now sits right under "Copy" with the same name everywhere.
+
+### 🎨 Appearance
+- New accent: **Leica red**.
+- The "Pepsi blue" tray icon is now **Navy**.
+
+### ☕ A Tip jar page in Settings
+- WeChat Pay and Alipay codes. Entirely optional; unlocks nothing.
+
+### Other
+- OCR results are counted per script: characters for Chinese, words for English and other languages.
+
 ## v1.9.0 · 2026-11-06
 
 ### ⚙ Settings, reorganised

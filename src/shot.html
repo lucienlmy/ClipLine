@@ -4,109 +4,337 @@
 <meta charset="UTF-8" />
 <title>ClipLine 截图</title>
 <style>
+  :root { --accent: #d97757; --bar: #ffffff; --ink: #2b2a27; --soft: #8a867f; --hover: rgba(0,0,0,0.07); --kbd: rgba(0,0,0,0.38); }
+  html.dark { --bar: #2b2e34; --ink: #eceae6; --soft: #9a9ea6; --hover: rgba(255,255,255,0.09); --kbd: rgba(255,255,255,0.42); }
   html, body { margin: 0; height: 100%; overflow: hidden; cursor: crosshair; user-select: none; -webkit-user-select: none;
     font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #000; }
   #bg { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; pointer-events: none; -webkit-user-drag: none; }
-  #mask { position: fixed; inset: 0; pointer-events: none; }
-  #sel { position: fixed; border: 1.5px solid #5db2fc; box-shadow: 0 0 0 9999px rgba(0,0,0,0.45); display: none; pointer-events: none; }
   #dim { position: fixed; inset: 0; background: rgba(0,0,0,0.45); pointer-events: none; }
-  #size { position: fixed; background: rgba(20,20,20,0.85); color: #fff; font-size: 12px; padding: 2px 7px; border-radius: 4px; display: none; pointer-events: none; }
+  #sel, #hov { position: fixed; display: none; pointer-events: none; box-sizing: border-box; }
+  #sel { border: 1.5px solid var(--accent); box-shadow: 0 0 0 9999px rgba(0,0,0,0.45); }
+  #sel i { position: absolute; width: 8px; height: 8px; background: #fff; border: 1.5px solid var(--accent); border-radius: 2px; box-sizing: border-box; }
+  #hov { border: 2px solid var(--accent); }
+  #hov.mask { box-shadow: 0 0 0 9999px rgba(0,0,0,0.45); }
+  #hov:not(.mask) { border-style: dashed; }
+  #size { position: fixed; background: rgba(20,20,20,0.85); color: #fff; font-size: 12px; padding: 2px 7px; border-radius: 4px; display: none; pointer-events: none; white-space: nowrap; }
   #hint { position: fixed; top: 18px; left: 50%; transform: translateX(-50%); background: rgba(20,20,20,0.8); color: #fff;
-    font-size: 13px; padding: 6px 14px; border-radius: 999px; pointer-events: none; }
-  #bar { position: fixed; display: none; gap: 4px; background: #fff; border-radius: 10px; padding: 5px; box-shadow: 0 6px 20px rgba(0,0,0,0.35); cursor: default; }
-  #bar button { border: none; background: transparent; border-radius: 7px; padding: 6px 10px; font-size: 13px; cursor: pointer; color: #2b2a27; white-space: nowrap; }
-  #bar button:hover { background: rgba(0,0,0,0.07); }
-  #bar button.primary { background: #d97757; color: #fff; }
-  #bar button.primary:hover { filter: brightness(1.05); }
+    font-size: 13px; padding: 6px 14px; border-radius: 999px; pointer-events: none; white-space: nowrap; }
+  #bar { position: fixed; display: none; align-items: center; gap: 2px; background: var(--bar); border-radius: 10px; padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,0.35); cursor: default; }
+  #bar button { position: relative; width: 36px; height: 34px; border: none; background: transparent; border-radius: 7px; cursor: pointer; color: var(--ink); display: grid; place-items: center; padding: 0; }
+  #bar button:hover { background: var(--hover); }
+  #bar button.on { background: var(--hover); color: var(--accent); }
+  #bar button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  #bar button kbd { position: absolute; right: 2px; bottom: 1px; font: 600 8.5px/1 "Segoe UI", sans-serif; color: var(--kbd); }
+  #bar button.primary { background: var(--accent); color: #fff; }
+  #bar button.primary kbd { color: rgba(255,255,255,0.75); }
+  #bar button.primary:hover { filter: brightness(1.06); }
+  #bar .sep { width: 1px; height: 20px; background: var(--hover); margin: 0 3px; }
+  #tip { position: fixed; display: none; background: rgba(20,20,20,0.9); color: #fff; font-size: 12px; padding: 4px 9px; border-radius: 5px; pointer-events: none; white-space: nowrap; }
+  #loupe { position: fixed; display: none; pointer-events: none; background: var(--bar); color: var(--ink); border-radius: 10px; padding: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
+  #loupe canvas { display: block; width: 135px; height: 135px; image-rendering: pixelated; border-radius: 6px; }
+  #loupe .row { display: flex; align-items: center; gap: 6px; margin-top: 6px; font: 600 12px/1 Consolas, "Segoe UI", monospace; }
+  #loupe .sw { width: 14px; height: 14px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2); }
+  #loupe .sub { font: 11px/1.2 "Segoe UI", "Microsoft YaHei", sans-serif; color: var(--soft); margin-top: 4px; }
 </style>
 </head>
 <body>
   <img id="bg" alt="" draggable="false" />
   <div id="dim"></div>
-  <div id="sel"></div>
+  <div id="hov"></div>
+  <div id="sel"><i data-h="nw"></i><i data-h="n"></i><i data-h="ne"></i><i data-h="e"></i><i data-h="se"></i><i data-h="s"></i><i data-h="sw"></i><i data-h="w"></i></div>
   <div id="size"></div>
-  <div id="hint">拖动框选区域 · Esc 或右键取消</div>
+  <div id="hint"></div>
   <div id="bar">
-    <button data-a="hang" class="primary" title="Enter / 双击">✓ 挂上绳</button>
-    <button data-a="annotate">✎ 标注</button>
-    <button data-a="ocr">文 识别文字</button>
-    <button data-a="pin">📌 钉在桌面</button>
-    <button data-a="cancel">✕</button>
+    <button data-a="annotate"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg><kbd>E</kbd></button>
+    <button data-a="ocr"><svg viewBox="0 0 24 24"><path d="M4 7V5h10v2M9 5v12M7 17h4"/><path d="M15 12h5M15 16h5M15 20h5M4 20h7"/></svg><kbd>W</kbd></button>
+    <button data-a="pin"><svg viewBox="0 0 24 24"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z"/><path d="M12 14v6"/></svg><kbd>P</kbd></button>
+    <button data-a="color"><svg viewBox="0 0 24 24"><path d="M14.5 5.5l4 4"/><path d="M16.5 3.5a2.1 2.1 0 013 3l-2 2-3-3z"/><path d="M14.5 7.5L6 16l-1 3 3-1 8.5-8.5"/></svg><kbd>C</kbd></button>
+    <button data-a="reselect"><svg viewBox="0 0 24 24"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/><path d="M9 12h6"/></svg><kbd>A</kbd></button>
+    <span class="sep"></span>
+    <button data-a="cancel"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg><kbd>Esc</kbd></button>
+    <button data-a="hang" class="primary"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><kbd>↵</kbd></button>
   </div>
+  <div id="tip"></div>
+  <div id="loupe"><canvas id="lc" width="15" height="15"></canvas><div class="row"><span class="sw" id="lsw"></span><span id="lhex">#000000</span></div><div class="sub" id="lsub"></div></div>
 <script>
   const { invoke } = window.__TAURI__.core;
   const $ = (id) => document.getElementById(id);
-  const bg = $("bg"), sel = $("sel"), dim = $("dim"), size = $("size"), bar = $("bar"), hint = $("hint");
+  const bg = $("bg"), sel = $("sel"), hov = $("hov"), dim = $("dim"), size = $("size"), bar = $("bar"), hint = $("hint"), tip = $("tip"), loupe = $("loupe");
+
+  const L = {
+    zh: { hint: "拖动框选，或点击选中窗口 · 回车完成 · Esc 取消", hintColor: "点击取色 · Esc 返回", fail: "截图失败：", err: "失败：",
+      hang: "挂上绳（回车 / 双击选区）", annotate: "标注", ocr: "识别文字", pin: "钉在桌面", color: "取色（复制 HEX 并挂上绳）", reselect: "重新框选", cancel: "取消",
+      colorSub: "点击复制并挂上绳" },
+    en: { hint: "Drag to select, or click a window · Enter to finish · Esc to cancel", hintColor: "Click to pick · Esc to go back", fail: "Capture failed: ", err: "Failed: ",
+      hang: "Hang on the line (Enter / double-click)", annotate: "Annotate", ocr: "Recognise text", pin: "Pin to desktop", color: "Pick a colour (copies the HEX)", reselect: "Select again", cancel: "Cancel",
+      colorSub: "Click to copy and hang" },
+  };
+  let lang = "zh";
+  const t = (k) => (L[lang] || L.zh)[k] || k;
+  const ACCENTS = { terra: "#d97757", mint: "#58b980", sky: "#5db2fc", navy: "#193584", leica: "#d41f26" };
+  const KEYS = { annotate: "E", ocr: "W", pin: "P", color: "C", reselect: "A", cancel: "Esc", hang: "Enter" };
+
+  function applyLang() {
+    hint.textContent = t("hint");
+    bar.querySelectorAll("button").forEach((b) => { b.dataset.tip = `${t(b.dataset.a)}  ${KEYS[b.dataset.a] || ""}`.trim(); });
+  }
+  applyLang();
+  invoke("get_settings").then((raw) => {
+    const s = JSON.parse(raw || "{}");
+    lang = (s.lang === "auto" ? s.sys_lang : s.lang) === "en" ? "en" : "zh";
+    document.documentElement.classList.toggle("dark", s.theme === "graphite");
+    document.documentElement.style.setProperty("--accent", ACCENTS[s.accent] || ACCENTS.terra);
+    applyLang();
+  }).catch(() => {});
+
   let natW = 0, natH = 0;
-  let start = null, rect = null, dragging = false, done = false;
+  let wins = [];        // snap targets, image pixels, front first
+  let rect = null;      // the selection, CSS pixels {x,y,w,h}
+  let mode = null;      // null | "pending" | "new" | "move" | "resize"
+  let start = null, orig = null, handle = "";
+  let hovered = null;   // window under the cursor (CSS rect)
+  let picking = false, done = false;
+  let mouse = { x: -1, y: -1 };
 
   invoke("get_shot_image").then((src) => {
-    bg.onload = () => { natW = bg.naturalWidth; natH = bg.naturalHeight; };
+    bg.onload = () => { natW = bg.naturalWidth; natH = bg.naturalHeight; updateHover(); };
     bg.src = src;
-  }).catch((e) => { hint.textContent = "截图失败：" + e; setTimeout(cancel, 1500); });
+  }).catch((e) => { hint.textContent = t("fail") + e; setTimeout(cancel, 1500); });
+  invoke("get_shot_windows").then((w) => { wins = w || []; updateHover(); }).catch(() => {});
 
-  // CSS pixels → image pixels (the image fills the window exactly)
-  const toImg = (r) => {
-    const sx = (natW || window.innerWidth) / window.innerWidth, sy = (natH || window.innerHeight) / window.innerHeight;
-    return { x: Math.round(r.x * sx), y: Math.round(r.y * sy), w: Math.round(r.w * sx), h: Math.round(r.h * sy) };
-  };
+  const sx = () => (natW || window.innerWidth) / window.innerWidth;
+  const sy = () => (natH || window.innerHeight) / window.innerHeight;
+  const toImg = (r) => ({ x: Math.round(r.x * sx()), y: Math.round(r.y * sy()), w: Math.round(r.w * sx()), h: Math.round(r.h * sy()) });
+  const fromImg = (r) => ({ x: r[0] / sx(), y: r[1] / sy(), w: r[2] / sx(), h: r[3] / sy() });
+  const inside = (r, x, y) => r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+  const W = () => window.innerWidth, H = () => window.innerHeight;
+  function clampRect(r) {
+    const w = Math.min(r.w, W()), h = Math.min(r.h, H());
+    return { x: Math.max(0, Math.min(r.x, W() - w)), y: Math.max(0, Math.min(r.y, H() - h)), w, h };
+  }
+
+  /* ---------- drawing ---------- */
   function draw() {
-    if (!rect || rect.w < 1 || rect.h < 1) { sel.style.display = "none"; size.style.display = "none"; dim.style.display = "block"; return; }
-    dim.style.display = "none";
-    Object.assign(sel.style, { display: "block", left: rect.x + "px", top: rect.y + "px", width: rect.w + "px", height: rect.h + "px" });
-    const p = toImg(rect);
-    size.textContent = `${p.w} × ${p.h}`;
-    size.style.display = "block";
-    size.style.left = rect.x + "px";
-    size.style.top = Math.max(0, rect.y - 24) + "px";
+    const has = rect && rect.w >= 1 && rect.h >= 1;
+    sel.style.display = has ? "block" : "none";
+    if (has) {
+      Object.assign(sel.style, { left: rect.x + "px", top: rect.y + "px", width: rect.w + "px", height: rect.h + "px" });
+      const show = mode !== "new" && !picking;
+      sel.querySelectorAll("i").forEach((h) => {
+        h.style.display = show && rect.w > 24 && rect.h > 24 ? "block" : "none";
+        const d = h.dataset.h, cx = d.includes("w") ? 0 : d.includes("e") ? rect.w : rect.w / 2, cy = d.includes("n") ? 0 : d.includes("s") ? rect.h : rect.h / 2;
+        h.style.left = (cx - 4.5) + "px"; h.style.top = (cy - 4.5) + "px";
+      });
+      const p = toImg(rect);
+      size.textContent = `${p.w} × ${p.h}`;
+      size.style.display = "block";
+      size.style.left = rect.x + "px";
+      size.style.top = (rect.y >= 26 ? rect.y - 24 : rect.y + 4) + "px";
+    } else size.style.display = "none";
+    drawHover();
+  }
+  function drawHover() {
+    const has = rect && rect.w >= 1 && rect.h >= 1;
+    const show = hovered && !mode && !picking && !(has && inside(rect, mouse.x, mouse.y));
+    if (show) {
+      Object.assign(hov.style, { display: "block", left: hovered.x + "px", top: hovered.y + "px", width: hovered.w + "px", height: hovered.h + "px" });
+      hov.classList.toggle("mask", !has);
+    } else hov.style.display = "none";
+    dim.style.display = has || (show && !has) ? "none" : "block";
+  }
+  function updateHover() {
+    if (mouse.x < 0) return;
+    const ix = mouse.x * sx(), iy = mouse.y * sy();
+    const w = wins.find((r) => ix >= r[0] && ix < r[0] + r[2] && iy >= r[1] && iy < r[1] + r[3]);
+    hovered = w ? fromImg(w) : null;
+    drawHover();
   }
   function showBar() {
     bar.style.display = "flex";
     const bw = bar.offsetWidth, bh = bar.offsetHeight;
-    let left = Math.min(rect.x + rect.w - bw, window.innerWidth - bw - 6);
+    let left = Math.min(rect.x + rect.w - bw, W() - bw - 6);
     left = Math.max(6, left);
     let top = rect.y + rect.h + 8;
-    if (top + bh > window.innerHeight - 6) top = Math.max(6, rect.y - bh - 8);
-    if (top < 6) top = rect.y + 8;
+    if (top + bh > H() - 6) top = Math.max(6, rect.y - bh - 8);
+    if (top < 6 || (top < rect.y + rect.h && top + bh > rect.y)) top = Math.min(rect.y + rect.h - bh - 8, H() - bh - 6);
     bar.style.left = left + "px"; bar.style.top = top + "px";
   }
+  function hideBar() { bar.style.display = "none"; tip.style.display = "none"; }
+  function setSelection(r) {
+    rect = r ? clampRect(r) : null;
+    hint.style.display = rect ? "none" : "block";
+    draw();
+    if (rect) showBar(); else hideBar();
+  }
+
+  /* ---------- actions ---------- */
   function act(a) {
     if (done) return;
     if (a === "cancel") { cancel(); return; }
+    if (a === "color") { setPicking(!picking); return; }
+    if (a === "reselect") { setPicking(false); setSelection(null); return; }
     if (!rect || rect.w < 3 || rect.h < 3) return;
     done = true;
     const p = toImg(rect);
-    invoke("finish_shot", { x: p.x, y: p.y, w: p.w, h: p.h, action: a }).catch((e) => { hint.textContent = "失败：" + e; done = false; });
+    invoke("finish_shot", { x: p.x, y: p.y, w: p.w, h: p.h, action: a }).catch((e) => { hint.textContent = t("err") + e; hint.style.display = "block"; done = false; });
   }
   function cancel() { invoke("cancel_shot").catch(() => {}); }
 
+  /* ---------- colour picker ---------- */
+  const lctx = $("lc").getContext("2d");
+  let lastHex = "", patchBusy = false, patchWant = false;
+  function setPicking(on) {
+    picking = on;
+    bar.querySelector('[data-a="color"]').classList.toggle("on", on);
+    loupe.style.display = on && mouse.x >= 0 ? "block" : "none";
+    hint.textContent = on ? t("hintColor") : t("hint");
+    hint.style.display = on || !rect ? "block" : "none";
+    $("lsub").textContent = t("colorSub");
+    if (on) { hovered = null; readPatch(); } else updateHover();
+    draw();
+  }
+  const hex2 = (n) => n.toString(16).padStart(2, "0").toUpperCase();
+  function readPatch() {
+    if (!picking || mouse.x < 0) return;
+    if (patchBusy) { patchWant = true; return; }
+    patchBusy = true;
+    const ix = Math.min(Math.max(0, Math.floor(mouse.x * sx())), (natW || 1) - 1), iy = Math.min(Math.max(0, Math.floor(mouse.y * sy())), (natH || 1) - 1);
+    invoke("shot_patch", { x: ix, y: iy, r: 7 }).then((px) => {
+      if (px && px.length === 15 * 15 * 3) {
+        const img = lctx.createImageData(15, 15);
+        for (let i = 0, j = 0; i < px.length; i += 3, j += 4) { img.data[j] = px[i]; img.data[j + 1] = px[i + 1]; img.data[j + 2] = px[i + 2]; img.data[j + 3] = 255; }
+        lctx.putImageData(img, 0, 0);
+        const c = (7 * 15 + 7) * 3;
+        lastHex = "#" + hex2(px[c]) + hex2(px[c + 1]) + hex2(px[c + 2]);
+        $("lhex").textContent = lastHex; $("lsw").style.background = lastHex;
+        // outline the centre pixel (canvas is 15 px, shown at 9×)
+        lctx.strokeStyle = (px[c] * 0.3 + px[c + 1] * 0.59 + px[c + 2] * 0.11) > 128 ? "rgba(0,0,0,.8)" : "rgba(255,255,255,.9)";
+        lctx.lineWidth = 0.12; lctx.strokeRect(7.06, 7.06, 0.88, 0.88);
+      }
+    }).catch(() => {}).finally(() => { patchBusy = false; if (patchWant) { patchWant = false; readPatch(); } });
+  }
+  function placeLoupe() {
+    if (!picking) return;
+    loupe.style.display = "block";
+    const lw = loupe.offsetWidth, lh = loupe.offsetHeight;
+    let x = mouse.x + 22, y = mouse.y + 22;
+    if (x + lw > W() - 4) x = mouse.x - lw - 22;
+    if (y + lh > H() - 4) y = mouse.y - lh - 22;
+    loupe.style.left = Math.max(4, x) + "px"; loupe.style.top = Math.max(4, y) + "px";
+  }
+  function pickNow() {
+    if (done || !lastHex) return;
+    done = true;
+    invoke("finish_color", { hex: lastHex }).catch((e) => { hint.textContent = t("err") + e; done = false; });
+  }
+
+  /* ---------- mouse ---------- */
+  function handleAt(x, y) {
+    if (!rect) return "";
+    const tol = 7, l = Math.abs(x - rect.x) <= tol, r = Math.abs(x - (rect.x + rect.w)) <= tol;
+    const tp = Math.abs(y - rect.y) <= tol, b = Math.abs(y - (rect.y + rect.h)) <= tol;
+    const inX = x >= rect.x - tol && x <= rect.x + rect.w + tol, inY = y >= rect.y - tol && y <= rect.y + rect.h + tol;
+    let h = "";
+    if (tp && inX) h += "n"; else if (b && inX) h += "s";
+    if (l && inY) h += "w"; else if (r && inY) h += "e";
+    return h;
+  }
+  const CURSOR = { n: "ns-resize", s: "ns-resize", e: "ew-resize", w: "ew-resize", ne: "nesw-resize", sw: "nesw-resize", nw: "nwse-resize", se: "nwse-resize" };
+
   document.addEventListener("mousedown", (e) => {
     if (e.target.closest("#bar")) return;
-    if (e.button === 2) { e.preventDefault(); if (rect && !dragging) { rect = null; bar.style.display = "none"; draw(); } else cancel(); return; }
+    if (e.button === 2) {
+      e.preventDefault();
+      if (picking) setPicking(false);
+      else if (rect && !mode) setSelection(null);
+      else cancel();
+      return;
+    }
     if (e.button !== 0) return;
     e.preventDefault();
-    start = { x: e.clientX, y: e.clientY }; dragging = true; rect = { x: start.x, y: start.y, w: 0, h: 0 };
-    bar.style.display = "none"; hint.style.display = "none"; draw();
+    if (picking) { pickNow(); return; }
+    start = { x: e.clientX, y: e.clientY };
+    handle = handleAt(e.clientX, e.clientY);
+    if (handle) { mode = "resize"; orig = { ...rect }; }
+    else if (inside(rect, e.clientX, e.clientY)) { mode = "move"; orig = { ...rect }; }
+    else mode = "pending";
+    hideBar(); drawHover();
   });
   document.addEventListener("mousemove", (e) => {
-    if (!dragging) return;
-    rect = { x: Math.min(start.x, e.clientX), y: Math.min(start.y, e.clientY), w: Math.abs(e.clientX - start.x), h: Math.abs(e.clientY - start.y) };
+    mouse = { x: e.clientX, y: e.clientY };
+    if (picking) { placeLoupe(); readPatch(); return; }
+    if (!mode) {
+      const h = handleAt(e.clientX, e.clientY);
+      document.body.style.cursor = h ? CURSOR[h] : inside(rect, e.clientX, e.clientY) ? "move" : "crosshair";
+      updateHover();
+      return;
+    }
+    const dx = e.clientX - start.x, dy = e.clientY - start.y;
+    if (mode === "pending" && Math.abs(dx) + Math.abs(dy) > 3) { mode = "new"; hint.style.display = "none"; hovered = null; }
+    if (mode === "new") {
+      rect = { x: Math.min(start.x, e.clientX), y: Math.min(start.y, e.clientY), w: Math.abs(dx), h: Math.abs(dy) };
+    } else if (mode === "move") {
+      rect = clampRect({ x: orig.x + dx, y: orig.y + dy, w: orig.w, h: orig.h });
+    } else if (mode === "resize") {
+      let x0 = orig.x, y0 = orig.y, x1 = orig.x + orig.w, y1 = orig.y + orig.h;
+      if (handle.includes("w")) x0 += dx; if (handle.includes("e")) x1 += dx;
+      if (handle.includes("n")) y0 += dy; if (handle.includes("s")) y1 += dy;
+      x0 = Math.max(0, Math.min(x0, W())); x1 = Math.max(0, Math.min(x1, W()));
+      y0 = Math.max(0, Math.min(y0, H())); y1 = Math.max(0, Math.min(y1, H()));
+      rect = { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) };
+    }
     draw();
   });
   document.addEventListener("mouseup", (e) => {
-    if (!dragging) return;
-    dragging = false;
-    if (!rect || rect.w < 3 || rect.h < 3) { rect = null; draw(); hint.style.display = "block"; return; }
-    showBar();
+    if (!mode) return;
+    const m = mode; mode = null;
+    if (m === "pending") {
+      // a click without a drag: take the window under the cursor
+      if (hovered) setSelection({ ...hovered });
+      else if (rect) showBar();
+      return;
+    }
+    if (!rect || rect.w < 3 || rect.h < 3) { setSelection(null); return; }
+    setSelection(rect);
   });
-  document.addEventListener("dblclick", (e) => { if (!e.target.closest("#bar") && rect) act("hang"); });
+  document.addEventListener("dblclick", (e) => { if (!e.target.closest("#bar") && !picking && inside(rect, e.clientX, e.clientY)) act("hang"); });
   document.addEventListener("contextmenu", (e) => e.preventDefault());
   document.addEventListener("dragstart", (e) => e.preventDefault());
+  document.addEventListener("mouseleave", () => { mouse = { x: -1, y: -1 }; hovered = null; loupe.style.display = "none"; drawHover(); });
+
+  /* ---------- keyboard ---------- */
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") cancel();
-    else if (e.key === "Enter") act("hang");
+    if (e.key === "Escape") { if (picking) setPicking(false); else cancel(); return; }
+    if (picking) { if (e.key === "Enter") pickNow(); return; }
+    if (e.key === "Enter") { act("hang"); return; }
+    const k = e.key.toLowerCase();
+    const map = { e: "annotate", w: "ocr", p: "pin", c: "color", a: "reselect" };
+    if (map[k] && !e.ctrlKey && !e.altKey) { e.preventDefault(); act(map[k]); return; }
+    if (rect && e.key.startsWith("Arrow")) {
+      e.preventDefault();
+      const s = e.shiftKey ? 10 : 1;
+      const d = { ArrowLeft: [-s, 0], ArrowRight: [s, 0], ArrowUp: [0, -s], ArrowDown: [0, s] }[e.key];
+      // Ctrl + arrows change the size; arrows alone move the frame
+      if (e.ctrlKey) rect = clampRect({ x: rect.x, y: rect.y, w: Math.max(3, rect.w + d[0]), h: Math.max(3, rect.h + d[1]) });
+      else rect = clampRect({ x: rect.x + d[0], y: rect.y + d[1], w: rect.w, h: rect.h });
+      draw(); showBar();
+    }
   });
+
+  /* ---------- bar ---------- */
   bar.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) act(b.dataset.a); });
+  bar.addEventListener("mouseover", (e) => {
+    const b = e.target.closest("button");
+    if (!b) { tip.style.display = "none"; return; }
+    tip.textContent = b.dataset.tip; tip.style.display = "block";
+    const br = b.getBoundingClientRect(), bb = bar.getBoundingClientRect();
+    let x = br.left + br.width / 2 - tip.offsetWidth / 2;
+    x = Math.max(6, Math.min(x, W() - tip.offsetWidth - 6));
+    let y = bb.top - tip.offsetHeight - 6;
+    if (y < 6) y = bb.bottom + 6;
+    tip.style.left = x + "px"; tip.style.top = y + "px";
+  });
+  bar.addEventListener("mouseleave", () => { tip.style.display = "none"; });
 </script>
 </body>
 </html>

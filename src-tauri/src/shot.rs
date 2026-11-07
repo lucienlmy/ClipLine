@@ -13,6 +13,9 @@ pub struct Capture {
     pub img: image::RgbaImage,
     pub x: i32,
     pub y: i32,
+    /// Visible top-level windows at capture time, front to back:
+    /// `[x, y, w, h]` in physical pixels, virtual-desktop coordinates.
+    pub wins: Vec<[i32; 4]>,
 }
 
 #[cfg(target_os = "windows")]
@@ -37,6 +40,8 @@ mod imp {
             if w <= 0 || h <= 0 {
                 return Err("无法获取屏幕尺寸".into());
             }
+            // before the overlay exists, so it isn't in the list
+            let wins = window_rects();
             let screen = GetDC(None);
             let mem = CreateCompatibleDC(screen);
             let bmp = CreateCompatibleBitmap(screen, w, h);
@@ -78,8 +83,58 @@ mod imp {
             }
             let img = image::RgbaImage::from_raw(w as u32, h as u32, buf)
                 .ok_or_else(|| "截屏数据无效".to_string())?;
-            Ok(Capture { img, x, y })
+            Ok(Capture { img, x, y, wins })
         }
+    }
+
+    /// Visible, non-minimised, non-cloaked top-level windows in z-order
+    /// (front first). Uses the DWM frame bounds so the invisible resize
+    /// border / shadow isn't part of the rectangle.
+    pub fn window_rects() -> Vec<[i32; 4]> {
+        use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT};
+        use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS};
+        use windows::Win32::UI::WindowsAndMessaging::{
+            EnumWindows, GetClassNameW, GetWindowLongW, GetWindowRect, IsIconic, IsWindowVisible,
+            GWL_EXSTYLE, WS_EX_TRANSPARENT,
+        };
+        unsafe extern "system" fn cb(h: HWND, lp: LPARAM) -> BOOL {
+            let v = &mut *(lp.0 as *mut Vec<[i32; 4]>);
+            if !IsWindowVisible(h).as_bool() || IsIconic(h).as_bool() {
+                return BOOL(1);
+            }
+            let mut cloaked: u32 = 0;
+            if DwmGetWindowAttribute(h, DWMWA_CLOAKED, &mut cloaked as *mut u32 as *mut _, 4).is_ok() && cloaked != 0 {
+                return BOOL(1);
+            }
+            if (GetWindowLongW(h, GWL_EXSTYLE) as u32) & WS_EX_TRANSPARENT.0 != 0 {
+                return BOOL(1); // click-through overlays
+            }
+            let mut cls = [0u16; 64];
+            let n = GetClassNameW(h, &mut cls).max(0) as usize;
+            let name = String::from_utf16_lossy(&cls[..n]);
+            if name == "Progman" || name == "WorkerW" {
+                return BOOL(1); // the desktop: monitors cover it
+            }
+            let mut r = RECT::default();
+            let ok = DwmGetWindowAttribute(
+                h,
+                DWMWA_EXTENDED_FRAME_BOUNDS,
+                &mut r as *mut RECT as *mut _,
+                std::mem::size_of::<RECT>() as u32,
+            )
+            .is_ok()
+                || GetWindowRect(h, &mut r).is_ok();
+            let (w, hh) = (r.right - r.left, r.bottom - r.top);
+            if ok && w >= 24 && hh >= 16 {
+                v.push([r.left, r.top, w, hh]);
+            }
+            BOOL(1)
+        }
+        let mut v: Vec<[i32; 4]> = Vec::new();
+        unsafe {
+            let _ = EnumWindows(Some(cb), LPARAM(&mut v as *mut Vec<[i32; 4]> as isize));
+        }
+        v
     }
 
     /// Recognise text in an image file with the OCR built into Windows.

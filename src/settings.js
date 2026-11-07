@@ -6,14 +6,14 @@ const getCurrentWindow = T.window.getCurrentWindow;
 
 const I = {
   zh: {
-    title: "设置", pgGeneral: "常规", pgInvoke: "呼出与快捷键", pgClip: "剪贴板", pgNotes: "便签", pgLook: "外观", pgAbout: "关于", secDrag: "拖出卡片", secBag: "收纳袋", secHotkeys: "快捷键", hkClip: "剪贴板绳", hkNotes: "便签绳", hkShot: "截图上绳", hkShotSub: "框选区域后可挂上绳、标注、识别文字或钉在桌面",
+    title: "设置", pgGeneral: "常规", pgInvoke: "呼出与快捷键", pgClip: "剪贴板", pgNotes: "便签", pgLook: "外观", pgAbout: "关于", pgDonate: "打赏", donateLead: "ClipLine 是免费、开源的。如果它确实替你省了事，可以扫码请我喝杯茶。", donateNote: "打赏完全自愿：不解锁任何功能（所有功能本来就都给你），也不换来「优先处理」，issue 一视同仁地看。", donateWx: "微信", donateAli: "支付宝", donateThanks: "谢谢你用它。", secDrag: "拖出卡片", secBag: "收纳袋", secHotkeys: "快捷键", hkClip: "剪贴板绳", hkNotes: "便签绳", hkShot: "截图上绳", hkShotSub: "框选区域或点选窗口后可挂上绳、标注、识别文字、钉在桌面；也能取色",
     hkHint: "点击后按下组合键录制", restoreDefault: "恢复默认",
     secInvoke: "呼出方式", hoverOn: "顶边悬停呼出", dwell: "停顿时长", flip: "左右翻转修饰键", hangOn: "拖文件到屏幕顶部自动放绳", moveMod: "拖出卡片时「移动」用的按键", foldDate: "按日期折叠", foldDateSub: "今天的卡片散挂；更早的自动折成「三日内 / 一周内 / 更早」三叠（底部「按日期」按钮也可切换）", moveModSub: "开始拖动时按住即为移动（之后可松开）；不按为复制。默认 Shift，与 Windows 习惯一致", textExt: "文字卡片拖到文件夹时保存为",
     flipNone: "关闭", mShift: "Shift", mCtrl: "Ctrl", mAlt: "Alt",
     secClean: "自动清理", retention: "剪贴板卡片保留", retentionSub: "超过天数的卡片自动取下（单位：天）；收藏的卡片不清理", days: "天", bagDays: "收纳袋便签保留", forever: "永久", bagDaysSub: "已完成的便签在收纳袋里保留多少天（单位：天）；绳上的便签不会被清理。收纳袋左下角也能直接改",
     secGeneral: "常规", language: "语言", langAuto: "跟随系统", autostart: "开机自启动",
     lineDisplay: "晾衣绳出现在", ldCursor: "跟随鼠标", ldPrimary: "主显示器", ldMon: "显示器", ldMain: "（主）", ldMissing: "（未连接）", ldSub: "跟随鼠标：在哪块屏幕顶边呼出就在哪块屏幕放下；选定的显示器未连接时改用主显示器。提醒和更新卡片也弹在这块屏幕上",
-    secTheme: "主题", accent: "强调色", trBlue: "百事蓝", trRed: "徕卡红", trayIcon: "托盘图标", trayIconSub: "保存后立即生效；程序文件（exe）的图标固定为陶土橙", dataDir: "数据文件夹", openDataDir: "打开数据文件夹", aTerra: "陶土橙", aMint: "薄荷绿", aSky: "晴空蓝", aNavy: "深海蓝", tSoft: "柔彩日常", tSilver: "经典银灰", tLinen: "棉麻木夹", tPorcelain: "奶白轻盈", tGraphite: "石墨金属",
+    secTheme: "主题", accent: "强调色", trBlue: "深海蓝", trRed: "徕卡红", trayIcon: "托盘图标", trayIconSub: "保存后立即生效；程序文件（exe）的图标固定为陶土橙", dataDir: "数据文件夹", openDataDir: "打开数据文件夹", aTerra: "陶土橙", aMint: "薄荷绿", aSky: "晴空蓝", aNavy: "深海蓝", tSoft: "柔彩日常", tSilver: "经典银灰", tLinen: "棉麻木夹", tPorcelain: "奶白轻盈", tGraphite: "石墨金属",
     secWatch: "监听文件夹", addFolder: "添加文件夹", watchHint: "这些文件夹新增文件会自动上绳", noFolders: "（未添加）",
     secFont: "字体", fontFamily: "字体", fontSize: "字号", fsSmall: "小", fsMedium: "中", fsLarge: "大",
     fDefault: "系统默认", fYahei: "微软雅黑", fDengxian: "等线", fSource: "思源黑体", fSimsun: "宋体", fKaiti: "楷体", fFangsong: "仿宋",
@@ -34,14 +34,14 @@ const I = {
     about: "ClipLine · 晾衣绳主题剪贴板 / 便签。灵感来自 Tendedero (MIT) 与 Clothespeg (Apache-2.0)；独立重写，名称与图标均为原创。",
   },
   en: {
-    title: "Settings", pgGeneral: "General", pgInvoke: "Invoke & hotkeys", pgClip: "Clipboard", pgNotes: "Notes", pgLook: "Appearance", pgAbout: "About", secDrag: "Dragging cards out", secBag: "Done bag", secHotkeys: "Hotkeys", hkClip: "Clipboard line", hkNotes: "Notes line", hkShot: "Screenshot", hkShotSub: "Select a region, then hang it, annotate, OCR or pin it",
+    title: "Settings", pgGeneral: "General", pgInvoke: "Invoke & hotkeys", pgClip: "Clipboard", pgNotes: "Notes", pgLook: "Appearance", pgAbout: "About", pgDonate: "Tip jar", donateLead: "ClipLine is free and open source. If it has saved you some trouble, you can scan a code to buy me a cup of tea.", donateNote: "Entirely optional: it unlocks nothing (you already have every feature) and buys no priority — every issue is read the same way.", donateWx: "WeChat Pay", donateAli: "Alipay", donateThanks: "Thanks for using it.", secDrag: "Dragging cards out", secBag: "Done bag", secHotkeys: "Hotkeys", hkClip: "Clipboard line", hkNotes: "Notes line", hkShot: "Screenshot", hkShotSub: "Select a region or click a window, then hang, annotate, OCR or pin it — or pick a colour",
     hkHint: "Click, then press a key combo", restoreDefault: "Restore defaults",
     secInvoke: "Invoke", hoverOn: "Drop on top-edge hover", dwell: "Dwell", flip: "Flip modifier", hangOn: "Drag files to top edge to drop the line", moveMod: "Key for moving when dragging a card out", foldDate: "Fold by date", foldDateSub: "Today's cards hang loose; older ones fold into Last 3 days / This week / Older (also via the By date button)", moveModSub: "Hold it when the drag starts to move (you can let go afterwards); otherwise it copies. Default Shift, as in Windows", textExt: "Text card dragged to a folder becomes",
     flipNone: "Off", mShift: "Shift", mCtrl: "Ctrl", mAlt: "Alt",
     secClean: "Auto cleanup", retention: "Keep clipboard cards", retentionSub: "Cards older than this (days) are taken down; favourites are kept", days: "days", bagDays: "Keep notes in the done bag", forever: "Forever", bagDaysSub: "How many days finished notes stay in the done bag; notes on the line are never cleaned up. Also changeable from the bag itself",
     secGeneral: "General", language: "Language", langAuto: "Follow system", autostart: "Launch at startup",
     lineDisplay: "Line appears on", ldCursor: "Follow the mouse", ldPrimary: "Primary display", ldMon: "Display", ldMain: " (primary)", ldMissing: " (not connected)", ldSub: "Follow the mouse: it drops on whichever screen's top edge you use; a chosen display that is unplugged falls back to the primary one. Reminder and update cards appear on that screen too",
-    secTheme: "Theme", accent: "Accent", trBlue: "Pepsi blue", trRed: "Leica red", trayIcon: "Tray icon", trayIconSub: "Applies on save; the exe icon itself stays terracotta", dataDir: "Data folder", openDataDir: "Open data folder", aTerra: "Terracotta", aMint: "Mint", aSky: "Sky", aNavy: "Navy", tSoft: "Soft color", tSilver: "Classic silver", tLinen: "Linen & wood", tPorcelain: "Porcelain", tGraphite: "Graphite",
+    secTheme: "Theme", accent: "Accent", trBlue: "Navy", trRed: "Leica red", trayIcon: "Tray icon", trayIconSub: "Applies on save; the exe icon itself stays terracotta", dataDir: "Data folder", openDataDir: "Open data folder", aTerra: "Terracotta", aMint: "Mint", aSky: "Sky", aNavy: "Navy", tSoft: "Soft color", tSilver: "Classic silver", tLinen: "Linen & wood", tPorcelain: "Porcelain", tGraphite: "Graphite",
     secWatch: "Watched folders", addFolder: "Add folder", watchHint: "New files in these folders hang automatically", noFolders: "(none)",
     secFont: "Font", fontFamily: "Typeface", fontSize: "Size", fsSmall: "S", fsMedium: "M", fsLarge: "L",
     fDefault: "System", fYahei: "Microsoft YaHei", fDengxian: "DengXian", fSource: "Source Han Sans", fSimsun: "SimSun", fKaiti: "KaiTi", fFangsong: "FangSong",
@@ -130,7 +130,7 @@ document.addEventListener("keydown", (e) => {
 
 const PAGES = [
   ["general", "⚙", "pgGeneral"], ["invoke", "⌨", "pgInvoke"], ["clip", "📋", "pgClip"],
-  ["notes", "📝", "pgNotes"], ["look", "🎨", "pgLook"], ["about", "ℹ", "pgAbout"],
+  ["notes", "📝", "pgNotes"], ["look", "🎨", "pgLook"], ["about", "ℹ", "pgAbout"], ["donate", "☕", "pgDonate"],
 ];
 let page = "general";
 function goPage(p) { page = p; render(); $("sbody").scrollTop = 0; }
@@ -147,7 +147,7 @@ function render() {
   });
   const body = $("sbody"); body.innerHTML = "";
   const h = document.createElement("h2"); h.className = "spage-title"; h.textContent = t(PAGES.find((x) => x[0] === page)[2]); body.appendChild(h);
-  ({ general: pageGeneral, invoke: pageInvoke, clip: pageClip, notes: pageNotes, look: pageLook, about: pageAbout })[page](body);
+  ({ general: pageGeneral, invoke: pageInvoke, clip: pageClip, notes: pageNotes, look: pageLook, about: pageAbout, donate: pageDonate })[page](body);
   $("cancelBtn").textContent = t("cancel");
   $("saveBtn").textContent = t("save");
 }
@@ -283,7 +283,7 @@ function pageLook(body) {
   st.appendChild(grid);
   // Accent colour — combine freely with any theme
   const ar = document.createElement("div"); ar.className = "accent-row";
-  [["terra", "#d97757", t("aTerra")], ["mint", "#58b980", t("aMint")], ["sky", "#5db2fc", t("aSky")], ["navy", "#193584", t("aNavy")]].forEach(([v, c, name]) => {
+  [["terra", "#d97757", t("aTerra")], ["mint", "#58b980", t("aMint")], ["sky", "#5db2fc", t("aSky")], ["navy", "#193584", t("aNavy")], ["leica", "#d41f26", t("trRed")]].forEach(([v, c, name]) => {
     const sw = document.createElement("div"); sw.className = "accent-sw" + ((draft.accent || "terra") === v ? " on" : "");
     sw.innerHTML = `<i style="background:${c}"></i><span>${name}</span>`;
     sw.onclick = () => {
@@ -342,6 +342,23 @@ function pageAbout(body) {
   const g = document.createElement("div"); g.className = "g";
   t("help").forEach(([k, v]) => { const kk = document.createElement("div"); kk.className = "k"; kk.textContent = k; const vv = document.createElement("div"); vv.textContent = v; g.appendChild(kk); g.appendChild(vv); });
   help.appendChild(g); s5.appendChild(help); body.appendChild(s5);
+}
+
+/* Tip jar: two QR codes, nothing to unlock. */
+function pageDonate(body) {
+  const s = section(null);
+  const lead = document.createElement("div"); lead.className = "donate-lead"; lead.textContent = t("donateLead"); s.appendChild(lead);
+  const row = document.createElement("div"); row.className = "donate-row";
+  [["donate-wechat.png", t("donateWx")], ["donate-alipay.png", t("donateAli")]].forEach(([img, name]) => {
+    const f = document.createElement("figure"); f.className = "donate-qr";
+    f.innerHTML = `<img src="img/${img}" alt="" draggable="false"><figcaption></figcaption>`;
+    f.lastChild.textContent = name;
+    row.appendChild(f);
+  });
+  s.appendChild(row);
+  const note = document.createElement("div"); note.className = "set-about"; note.textContent = t("donateNote"); s.appendChild(note);
+  const thx = document.createElement("div"); thx.className = "set-about"; thx.style.marginTop = "6px"; thx.textContent = t("donateThanks"); s.appendChild(thx);
+  body.appendChild(s);
 }
 
 /* Update history: every release from the CHANGELOG built into the app,

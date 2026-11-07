@@ -59,11 +59,11 @@ struct Settings {
     reminder_presets: Vec<String>, // ids shown in the reminder popover
     drop_to_hang: bool,            // dragging files to the top edge drops the line
     text_drag_ext: String,         // txt | md — file type when a text card is dragged to Explorer
-    accent: String,                // terra | mint | sky | navy
+    accent: String,                // terra | mint | sky | navy | leica
     move_mod: String,              // shift | alt | ctrl — held when a card drag starts = move
     fold_by_date: bool,            // fold older clips into date stacks
     hotkey_shot: String,           // region screenshot ("" = off)
-    tray_icon: String,             // a terracotta | b pepsi blue | c leica red | d sky | e mint
+    tray_icon: String,             // a terracotta | b deep-sea blue | c leica red | d sky | e mint
     update_mode: String,           // auto | notify | off — background check against GitHub Releases
     skipped_version: String,       // "Skip this version" — not offered again by the background check
     line_display: String,          // cursor | primary | a monitor device name (\\.\DISPLAY2)
@@ -970,6 +970,61 @@ async fn get_shot_image() -> Result<String, String> {
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Where to snap in the overlay, in overlay image pixels: the windows that
+/// were visible (front first), then each monitor (the desktop behind them).
+#[tauri::command]
+fn get_shot_windows() -> Vec<[i32; 4]> {
+    let guard = SHOT.lock().unwrap();
+    let Some(cap) = guard.as_ref() else { return Vec::new() };
+    let (ox, oy) = (cap.x, cap.y);
+    let (iw, ih) = (cap.img.width() as i32, cap.img.height() as i32);
+    let clip = |r: [i32; 4]| -> Option<[i32; 4]> {
+        let (x0, y0) = ((r[0] - ox).max(0), (r[1] - oy).max(0));
+        let (x1, y1) = ((r[0] - ox + r[2]).min(iw), (r[1] - oy + r[3]).min(ih));
+        (x1 - x0 >= 8 && y1 - y0 >= 8).then_some([x0, y0, x1 - x0, y1 - y0])
+    };
+    let mut out: Vec<[i32; 4]> = cap.wins.iter().filter_map(|r| clip(*r)).collect();
+    out.extend(display::list().iter().filter_map(|m| clip([m.x, m.y, m.w, m.h])));
+    out
+}
+
+/// Exact pixels around (x, y) for the colour picker's loupe: a square of
+/// side 2r+1, row by row, RGB triplets (outside the screen = 0).
+#[tauri::command]
+fn shot_patch(x: i32, y: i32, r: i32) -> Vec<u8> {
+    let r = r.clamp(1, 12);
+    let guard = SHOT.lock().unwrap();
+    let mut out = Vec::with_capacity(((2 * r + 1) * (2 * r + 1) * 3) as usize);
+    let Some(cap) = guard.as_ref() else { return out };
+    let (iw, ih) = (cap.img.width() as i32, cap.img.height() as i32);
+    for yy in y - r..=y + r {
+        for xx in x - r..=x + r {
+            if xx >= 0 && yy >= 0 && xx < iw && yy < ih {
+                let p = cap.img.get_pixel(xx as u32, yy as u32);
+                out.extend_from_slice(&[p[0], p[1], p[2]]);
+            } else {
+                out.extend_from_slice(&[0, 0, 0]);
+            }
+        }
+    }
+    out
+}
+
+/// Colour picked in the overlay: copy `#RRGGBB` and hang it as a colour card.
+#[tauri::command]
+async fn finish_color(app: AppHandle, hex: String) -> Result<(), String> {
+    *SHOT.lock().unwrap() = None;
+    SHOOTING.store(false, Ordering::Relaxed);
+    if let Some(w) = app.get_webview_window("shot") {
+        let _ = w.close();
+    }
+    let item = serde_json::json!({ "id": format!("c{}", now_ms()), "kind": "text", "text": hex, "ts": now_ms() as u64 });
+    native::set_text(&hex);
+    let _ = app.emit("clip:add", item);
+    drop_line_ex(Deck::Clipboard, false, true);
+    Ok(())
 }
 
 #[tauri::command]
@@ -1997,6 +2052,9 @@ fn main() {
             open_data_dir,
             start_shot,
             get_shot_image,
+            get_shot_windows,
+            shot_patch,
+            finish_color,
             cancel_shot,
             finish_shot,
             annotate_image,

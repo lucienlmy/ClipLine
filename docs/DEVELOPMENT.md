@@ -7,13 +7,13 @@
   - `main.rs`：命令、窗口、托盘、设置（`Settings` 带 `#[serde(default)]`，新字段必须给默认值）、光标线程（顶边悬停、拖文件到顶部接住、自动收起）、文件夹监听。
   - `native.rs`：剪贴板（arboard / clipboard-win）、光标、粘贴回原应用、图片卡保存 `save_rgba_card`。
   - `winx.rs`：低级鼠标钩子、自研 OLE 拖出（文字卡：资源管理器得到文件 / 其它应用得到文字；文件卡：shell 数据对象）、自研拖入目标（替代 wry 失效的那个）、资源管理器选中项兜底、诊断日志 `dlog`。
-  - `shot.rs`：GDI 截全虚拟屏、Windows 自带 OCR（Windows.Media.Ocr）。
+  - `shot.rs`：GDI 截全虚拟屏、Windows 自带 OCR（Windows.Media.Ocr）。截屏前先用 `window_rects` 记下可见顶层窗口（`EnumWindows` 的 z 序，前面的在前；跳过最小化、cloaked、点击穿透的窗口和桌面 Progman/WorkerW；矩形取 DWM 的 `EXTENDED_FRAME_BOUNDS`，不含阴影），存进 `Capture.wins`。`main.rs` 的 `get_shot_windows` 把它们换成截图坐标、再在末尾补上各块显示器，供选区吸附；`shot_patch` 给取色放大镜返回原始像素（背景图是 JPEG，颜色不准，取色一律问 Rust）；`finish_color` 复制 `#RRGGBB` 并发一张文字卡（前端 `classify` 认成颜色卡）。
   - `display.rs`：显示器列表（Win32 `EnumDisplayMonitors` + `GetDpiForMonitor`，缓存 1 秒，插拔后自动更新）、系统界面语言。`main.rs` 里 `target_monitor` 按设置 `line_display`（`cursor` / `primary` / 设备名如 `\\.\DISPLAY2`）选屏，`fit_line_to` 按那块屏的缩放重算绳子尺寸，`place_window` 先移位再改尺寸再移位（跨缩放比例移动时 Windows 会先自动缩放一次）。提醒 / 更新卡片用 `place_corner_card` 放在同一块屏右下角。
   - 更新历史：`get_changelog(lang)` 用 `include_str!` 把仓库根目录的 `CHANGELOG.md` / `CHANGELOG.en.md` 编进 exe（离线可看，改了要重新编译）。启动时 `note_version_seen` 比较设置里的 `seen_version` 和当前版本：新装（没有 settings.json 也没有 data.json）不弹，降级不弹，`seen_version` 为空（v1.7.0 之前存的设置）算升级；需要弹时约 2.5 秒后开 `news.html`（标签 `news`，右下角）。「全部更新历史」走 `open_changelog`：设置窗口已开就发 `settings:goto`，没开就先记在 `SETTINGS_GOTO`，`settings.js` 启动时用 `settings_goto` 取走。
   - `update.rs`：检查更新。用系统的 `URLDownloadToFileW` 访问 GitHub API（`releases/latest`）和下载安装文件，不引入 TLS 库，走系统代理；状态集中在 `STATUS`，每次变化由 `main.rs` 广播 `update:status`，`update.html` 负责显示。
 - `src/md.js`：小型 Markdown 渲染器（先整体转义再生成标记，链接只给 `data-href`，由页面自己 `invoke("open_url")`）。便签卡片、阅读视图、编辑器预览、提醒卡片、更新历史共用；`MD.releases` 把 CHANGELOG 按 `## v1.2.3 · 日期` 切成各个版本；按行渲染，待办方框带 `data-idx`（源文本行号），打勾用 `MD.toggle`。待办写法兼容 `- [ ]` / `[ ]` / `[]`。提醒卡片和「已更新」卡片里各有一份同样的 Markdown 样式（`remind.html`、`news.html` 不加载 `styles.css`），改样式时几处一起改。
-- 设置窗口（`settings.html` / `settings.js`）：左侧分类栏 + 右侧单页，`PAGES` 列出六页（general / invoke / clip / notes / look / about），每页一个 `pageXxx(body)` 函数，`goPage` 切页后整页重绘。所有页共用一份 `draft`，「保存」一次提交；错误提示统一写在底部的 `#setErr`（`setErr()`）。打开「更新历史」时会先切到「关于」页。新增设置项时放进对应的页函数，别再加新的长区块。窗口尺寸在 `create_settings_window`（720×540，最小 600×420）。
-- `src/`：前端静态页。`app.js` 主界面（绳子布局：收藏区 / 今天 / 日期叠、卡片、便签、提醒、整理），`settings.*`、`pin.html`、`shot.html`（截图选区）、`annotate.html`（标注）、`remind.html`（提醒卡片）、`update.html`（更新卡片）、`news.html`（「已更新到 vX」卡片）。
+- 设置窗口（`settings.html` / `settings.js`）：左侧分类栏 + 右侧单页，`PAGES` 列出七页（general / invoke / clip / notes / look / about / donate；打赏页的收款码在 `src/img/donate-*.png`，是 `assets/` 里同名文件的副本），每页一个 `pageXxx(body)` 函数，`goPage` 切页后整页重绘。所有页共用一份 `draft`，「保存」一次提交；错误提示统一写在底部的 `#setErr`（`setErr()`）。打开「更新历史」时会先切到「关于」页。新增设置项时放进对应的页函数，别再加新的长区块。窗口尺寸在 `create_settings_window`（720×540，最小 600×420）。
+- `src/`：前端静态页。`app.js` 主界面（绳子布局：收藏区 / 今天 / 日期叠、卡片、便签、提醒、整理），`settings.*`、`pin.html`、`shot.html`（截图选区：先选后截——拖动框选或单击选窗口，选区可拖柄调整 / 移动 / 方向键微调，回车或双击才执行；浮条是图标 + 快捷键角标，主题为 graphite 时用深色，强调色从设置读，色值表 `ACCENTS` 要和 `styles.css` 的 `data-accent` 同步；`C` 进入取色）、`annotate.html`（标注）、`remind.html`（提醒卡片）、`update.html`（更新卡片）、`news.html`（「已更新到 vX」卡片）。
   - 便签分类：分类就是「有名字的底色」，存在 `data.json` 的 `state.cats`（`[{tint, name}]`，`name` 为空时用默认名 `cat_<tint>` 翻译）；便签仍然只存 `tint`，`catOf(tint)` 查分类，不在 `cats` 里的算未分类。`TINTS` 共 12 色（含无色），所以最多 11 个分类。删除分类时把绳上和收纳袋里对应 `tint` 的便签改成 `null`。底部筛选用 `ui.cat`（`""` 全部 / tint / `"none"`），分类不到两种时不显示。
   - 收纳袋：挂在绳子右端（`updateBasket` 按 `ropeY` 定位），便签布局时右侧留出 `BAG_ROOM`。数据在 `state.done`，便签取下时复制一份加 `doneAt`（去掉提醒字段）。`cleanup` 按设置 `history_days`（默认 30，0 = 永久）清理。`#tidy` 按钮两边共用：剪贴板绳是「失效文件卡」，便签绳是「待办全部打勾的便签」（`updateNoteTidy` / `runNoteTidy`）。统计里的「项」是打勾的待办数（`MD.progress` 的第一个数）。
   - 收纳袋保留天数：收纳袋底部的「保留 N 天 ▾」由 `fillBasketKeep` 生成，点开就地选天数；改短会删掉便签时先显示「清理 N 张？」（`keepArmed`），确认后 `setHistoryDays` 先 `cleanup()`，再按 `get_settings` → 改 `history_days` → `update_settings` 写回（与「按日期」按钮同一做法）。
@@ -48,6 +48,7 @@ RUSTC_BOOTSTRAP=1 cargo check -Zbuild-std=std,panic_abort --target x86_64-pc-win
 - 只改发布说明不用重新编译：运行 **Release notes** 工作流，填上标签即可。
 - 排查问题：在 exe 旁边放一个空的 `clipline-debug.log`，程序就会写诊断日志。
 - 截图：`使用说明.md` 用的配图在 `assets/guide-*.png`，界面改了要记得重截；README 首图是 `assets/screenshot.png`。
+- 图标：全部由 `tools/make_icons.py` 从一份 SVG 模板生成（需要 `rsvg-convert` 和 Pillow）：`assets/icon.svg`、`src-tauri/icons/` 下的 png / ico、五种托盘图标（`src-tauri/icons/tray/` 和设置页预览用的 `src/img/tray-*.png`）。改图标只改脚本里的模板或颜色表，再运行一次。
 
 ## 设计决定
 已经定下的取舍，改之前先想清楚当初为什么这样定。
@@ -61,6 +62,9 @@ RUSTC_BOOTSTRAP=1 cargo check -Zbuild-std=std,panic_abort --target x86_64-pc-win
 - **阅读视图是绳子窗口里的浮层，不是独立窗口**：不碰 Rust、不抢焦点，打勾直接改主窗口里的数据；代价是高度受绳子窗口限制（约 360px），长便签在里面滚动。
 - **便签分类 = 有名字的颜色，一张便签只属于一个分类**：不做多标签。多标签要做标签管理和组合筛选，对挂在绳上的便签太重；单分类像记账软件，选起来最省事，而且老便签按颜色自然归类，不用迁移。
 - **便签取下 = 完成，进收纳袋**：「取下」默认留记录，方便按月统计；真的不想留的走右键「删除（不进收纳袋）」。收纳袋只做计数，不做图表，免得变成另一个待办软件。
+- **截图先选后截**：拖动、单击窗口都只是「选」，回车 / 双击 / ✓ 才「拍」。同一个手势在成为图片之前还能改，不必拍完再重来。
+- **截图不做翻译、长图**：Windows 没有系统自带的离线翻译，要做就得接在线服务（Key、联网、隐私），和本程序轻量离线的定位冲突；长图要模拟滚动再拼接，各应用表现差异大。以后要做也是可选功能。
+- **不做便签录音**：麦克风权限、音频存储、波形与续录的成本高，离剪贴板 + 便签的核心用途远。
 - **更新历史打包进程序、只维护一份**：`CHANGELOG.md` / `CHANGELOG.en.md` 编译时嵌入，不联网也能看，也不必再维护一份网页或 JSON。
 - **「已更新」卡片每个版本只弹一次，新装和降级不弹**：新用户还没用过旧版，没有「更新了什么」可言；降级多半是在排查问题，不打扰。
 - **设置用分类栏而不是一长页**：设置项越来越多，一长页要一路往下拖；分类栏每页一屏，和 Windows 自己的设置一致。
