@@ -2,11 +2,12 @@
 
 Newest first. This file is built into the app and is what Settings → About → "Update history" shows; the Chinese version is `CHANGELOG.md` — keep the two in step.
 
-## v1.10.2 · 2026-11-07
+## v1.10.3 · 2026-11-07
 
 ### 🐞 Fixed
-- Screenshots: with a laptop's external monitor, moving the mouse a few times after drawing a frame could freeze the whole desktop, pointer included. The overlay was one huge window spanning every screen and was fully redrawn on each mouse move, which a screen on another graphics chip couldn't keep up with. Each monitor now gets its own overlay, the dimming is drawn far more cheaply, and mouse moves are handled once per screen refresh.
-- With several monitors, a selection stays within one screen; starting a frame on another screen drops the old one. Screens with different scaling work as well.
+- Screenshots: after drawing a frame, a few mouse moves could freeze the whole desktop, pointer included (most visible on a second monitor), until Esc was pressed. The overlay was GPU-rendered, which on some machines (e.g. a mini PC's integrated graphics) stalled the whole desktop's redraw. The overlay is now software-rendered; other windows are unaffected.
+- Each monitor gets its own overlay and a selection stays within one screen; starting a frame on another screen drops the old one. Screens with different scaling work too.
+- The dimming is drawn far more cheaply and mouse moves are handled once per screen refresh.
 
 ## v1.10.1 · 2026-11-07
 

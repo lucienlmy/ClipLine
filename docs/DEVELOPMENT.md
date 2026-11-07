@@ -32,7 +32,7 @@
 8. 语言设置 `lang` 可为 `auto`：`get_settings` / `update_settings` 返回的 JSON 额外带 `sys_lang`（zh / en），前端用 `pickLang` 解析；`Settings` 默认值是 `auto`，但已存的 settings.json 保留原值。
 9. 提醒卡片 / 更新卡片自带中英文表：提醒卡片的语言由主窗口随数据传过来（`lang`），缺省时自己读设置；更新卡片读 `get_settings`。更新出错的文字来自 Rust（中文），`update.html` 的 `ERR_EN` 按前缀翻译——在 `update.rs` 新增或修改错误文字时，记得同步这张表。
 10. **截图界面调用的命令一律 `async`**：同步命令跑在主线程上，等 `SHOT` 锁（背景 JPEG 编码时被占着）会把全屏置顶的截图窗口冻住，表现为鼠标能动、什么都点不了。拿 `SHOT` 用 `shot_lock()`（锁中毒也能取回），拷出数据就放锁，别在锁里做慢活。截图页的诊断写进 `clipline-debug.log`（`shot_log`，带窗口标签）。
-11. **截图界面不要做成横跨多块屏的一个大窗口**：笔记本外接屏常在另一块显卡上，跨屏窗口每次重画都要跨显卡合成，鼠标一动整个桌面连指针一起卡（v1.10.1 及以前）。遮罩也别用 `box-shadow: 0 0 0 9999px`（每帧重画整屏），用四块面板；`pointermove` 按 `requestAnimationFrame` 合并。
+11. **截图界面用软件绘制**（`--disable-gpu`，单独的 WebView2 数据目录 `EBWebView-shot`——浏览器参数不同的窗口必须用不同的数据目录，还要自己带上 wry 默认的 `--disable-features=…`）：显卡绘制时，框选后整个桌面连指针一起卡住，只有键盘能用（v1.10.0～v1.10.2，迷你主机核显 + 双屏上复现，加 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--disable-gpu` 启动就好了）。别改回去。截图界面每块屏一个窗口；遮罩用四块面板而不是 `box-shadow: 0 0 0 9999px`；`pointermove` 按 `requestAnimationFrame` 合并。
 12. 版本比较只看 `主.次.修订` 三段数字；发布时 `tauri.conf.json`、`Cargo.toml` 的版本号和标签必须一致，否则会反复提示更新。
 
 ## 在 Linux 上检查 Windows 代码

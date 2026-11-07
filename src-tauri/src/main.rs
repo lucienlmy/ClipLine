@@ -980,7 +980,17 @@ async fn start_shot(app: AppHandle) -> Result<(), String> {
     for (i, (sx, sy, r)) in regions.iter().enumerate() {
         let label = format!("shot-{i}");
         SHOT_MONS.lock().unwrap().insert(label.clone(), *r);
-        let win = match tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App("shot.html".into()))
+        let mut builder = tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App("shot.html".into()));
+        // Software rendering for the overlay only: GPU-composited, the
+        // full-screen overlay froze the whole desktop (pointer included) on
+        // some machines once a frame was drawn. Other browser arguments need
+        // their own WebView2 data folder; keep wry's default flags too.
+        if let Ok(dir) = app.path().app_local_data_dir() {
+            builder = builder
+                .data_directory(dir.join("EBWebView-shot"))
+                .additional_browser_args("--disable-gpu --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection");
+        }
+        let win = match builder
             .title("ClipLine 截图")
             .decorations(false)
             .always_on_top(true)
