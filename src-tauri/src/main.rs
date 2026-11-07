@@ -916,10 +916,39 @@ fn shot_lock() -> std::sync::MutexGuard<'static, Option<shot::Capture>> {
 /// A screenshot overlay is open: no hover-drop / drag-catch meanwhile.
 static SHOOTING: AtomicBool = AtomicBool::new(false);
 
-/// Hide the line, freeze the desktop, open the selection overlay.
+/// One overlay window per monitor (label `shot-N`) → that monitor's part of
+/// the capture, in capture-image pixels `[x, y, w, h]`. A single window
+/// spanning several displays had to be recomposited across them on every
+/// mouse move — on a laptop with an external screen (another GPU) that
+/// stalled the whole desktop, pointer included.
+static SHOT_MONS: Lazy<Mutex<HashMap<String, [i32; 4]>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+
+fn is_shot_label(l: &str) -> bool {
+    l.starts_with("shot-")
+}
+
+fn shot_windows(app: &AppHandle) -> Vec<tauri::WebviewWindow> {
+    app.webview_windows().into_iter().filter(|(l, _)| is_shot_label(l)).map(|(_, w)| w).collect()
+}
+
+/// Close every overlay window and forget the capture.
+fn close_shot(app: &AppHandle) {
+    *shot_lock() = None;
+    SHOOTING.store(false, Ordering::Relaxed);
+    SHOT_MONS.lock().unwrap().clear();
+    for w in shot_windows(app) {
+        let _ = w.close();
+    }
+}
+
+fn shot_region(label: &str) -> Option<[i32; 4]> {
+    SHOT_MONS.lock().unwrap().get(label).copied()
+}
+
+/// Hide the line, freeze the desktop, open the selection overlays.
 #[tauri::command]
 async fn start_shot(app: AppHandle) -> Result<(), String> {
-    if let Some(w) = app.get_webview_window("shot") {
+    if let Some(w) = shot_windows(&app).into_iter().next() {
         let _ = w.set_focus();
         return Ok(());
     }
@@ -932,22 +961,48 @@ async fn start_shot(app: AppHandle) -> Result<(), String> {
         Ok(Err(e)) => { SHOOTING.store(false, Ordering::Relaxed); return Err(e); }
         Err(e) => { SHOOTING.store(false, Ordering::Relaxed); return Err(e.to_string()); }
     };
-    let (x, y, w, h) = (cap.x, cap.y, cap.img.width(), cap.img.height());
+    let (cx, cy, cw, ch) = (cap.x, cap.y, cap.img.width() as i32, cap.img.height() as i32);
     *shot_lock() = Some(cap);
-    let win = tauri::WebviewWindowBuilder::new(&app, "shot", tauri::WebviewUrl::App("shot.html".into()))
-        .title("ClipLine 截图")
-        .decorations(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .resizable(false)
-        .visible(false)
-        .shadow(false)
-        .build()
-        .map_err(|e| e.to_string())?;
-    let _ = win.set_position(PhysicalPosition::new(x, y));
-    let _ = win.set_size(PhysicalSize::new(w, h));
-    let _ = win.show();
-    let _ = win.set_focus();
+    // each monitor's rectangle inside the capture (clipped, just in case)
+    let mut regions: Vec<(i32, i32, [i32; 4])> = Vec::new();
+    for m in display::list() {
+        let (x0, y0) = ((m.x - cx).max(0), (m.y - cy).max(0));
+        let (x1, y1) = ((m.x - cx + m.w).min(cw), (m.y - cy + m.h).min(ch));
+        if x1 - x0 >= 8 && y1 - y0 >= 8 {
+            regions.push((x0 + cx, y0 + cy, [x0, y0, x1 - x0, y1 - y0]));
+        }
+    }
+    if regions.is_empty() {
+        regions.push((cx, cy, [0, 0, cw, ch]));
+    }
+    let cursor = native::cursor_pos();
+    let mut focus: Option<tauri::WebviewWindow> = None;
+    for (i, (sx, sy, r)) in regions.iter().enumerate() {
+        let label = format!("shot-{i}");
+        SHOT_MONS.lock().unwrap().insert(label.clone(), *r);
+        let win = match tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App("shot.html".into()))
+            .title("ClipLine 截图")
+            .decorations(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .visible(false)
+            .shadow(false)
+            .build()
+        {
+            Ok(w) => w,
+            Err(e) => { close_shot(&app); return Err(e.to_string()); }
+        };
+        place_window(&win, *sx, *sy, r[2] as u32, r[3] as u32);
+        let _ = win.show();
+        let under = cursor.map_or(i == 0, |(px, py)| px >= *sx && px < sx + r[2] && py >= *sy && py < sy + r[3]);
+        if under || focus.is_none() {
+            focus = Some(win);
+        }
+    }
+    if let Some(w) = focus {
+        let _ = w.set_focus();
+    }
     Ok(())
 }
 
@@ -955,13 +1010,29 @@ async fn tokio_sleep(ms: u64) {
     let _ = tauri::async_runtime::spawn_blocking(move || std::thread::sleep(std::time::Duration::from_millis(ms))).await;
 }
 
-/// The frozen desktop for the overlay background (JPEG data URL — fast to encode).
+/// This overlay window's part of the capture, in capture-image pixels.
 #[tauri::command]
-async fn get_shot_image() -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(|| {
+async fn get_shot_region(window: tauri::WebviewWindow) -> Option<[i32; 4]> {
+    shot_region(window.label())
+}
+
+/// The overlay window under the pointer takes the keyboard.
+#[tauri::command]
+async fn shot_focus(window: tauri::WebviewWindow) {
+    let _ = window.set_focus();
+}
+
+/// This monitor's frozen desktop for the overlay background (JPEG data URL — fast to encode).
+#[tauri::command]
+async fn get_shot_image(window: tauri::WebviewWindow) -> Result<String, String> {
+    let r = shot_region(window.label()).ok_or("没有截图")?;
+    tauri::async_runtime::spawn_blocking(move || {
         use base64::Engine;
         // copy the pixels and let go of the lock before the slow encode
-        let img = shot_lock().as_ref().map(|c| c.img.clone()).ok_or("没有截图")?;
+        let img = shot_lock()
+            .as_ref()
+            .map(|c| image::imageops::crop_imm(&c.img, r[0] as u32, r[1] as u32, r[2] as u32, r[3] as u32).to_image())
+            .ok_or("没有截图")?;
         let rgb = image::DynamicImage::ImageRgba8(img).to_rgb8();
         let mut buf = Vec::new();
         image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 88)
@@ -976,34 +1047,34 @@ async fn get_shot_image() -> Result<String, String> {
     .map_err(|e| e.to_string())?
 }
 
-/// Where to snap in the overlay, in overlay image pixels: the windows that
-/// were visible (front first), then each monitor (the desktop behind them).
+/// Where to snap in this overlay, in pixels of its own background image:
+/// the windows that were visible (front first), then the monitor itself.
 #[tauri::command]
-async fn get_shot_windows() -> Vec<[i32; 4]> {
+async fn get_shot_windows(window: tauri::WebviewWindow) -> Vec<[i32; 4]> {
     // async: runs off the main thread, so waiting for the capture lock (held
-    // while the background JPEG is encoded) can never freeze the overlay.
-    // Copy what we need and drop the lock before asking for the monitors.
-    let (ox, oy, iw, ih, wins) = {
+    // while a background JPEG is encoded) can never freeze the overlay.
+    let Some([rx, ry, rw, rh]) = shot_region(window.label()) else { return Vec::new() };
+    let (ox, oy, wins) = {
         let guard = shot_lock();
         let Some(cap) = guard.as_ref() else { return Vec::new() };
-        (cap.x, cap.y, cap.img.width() as i32, cap.img.height() as i32, cap.wins.clone())
+        (cap.x + rx, cap.y + ry, cap.wins.clone())
     };
     let clip = |r: [i32; 4]| -> Option<[i32; 4]> {
         let (x0, y0) = ((r[0] - ox).max(0), (r[1] - oy).max(0));
-        let (x1, y1) = ((r[0] - ox + r[2]).min(iw), (r[1] - oy + r[3]).min(ih));
+        let (x1, y1) = ((r[0] - ox + r[2]).min(rw), (r[1] - oy + r[3]).min(rh));
         (x1 - x0 >= 8 && y1 - y0 >= 8).then_some([x0, y0, x1 - x0, y1 - y0])
     };
     let mut out: Vec<[i32; 4]> = wins.iter().filter_map(|r| clip(*r)).collect();
-    out.extend(display::list().iter().filter_map(|m| clip([m.x, m.y, m.w, m.h])));
-    winx::dlog(&format!("shot: {} snap targets, origin ({ox},{oy}) size {iw}x{ih}", out.len()));
+    out.push([0, 0, rw, rh]);
+    winx::dlog(&format!("shot {}: {} snap targets, region ({rx},{ry}) {rw}x{rh}", window.label(), out.len()));
     out
 }
 
 /// Diagnostics from the screenshot overlay (only written when
 /// clipline-debug.log exists next to the exe).
 #[tauri::command]
-async fn shot_log(msg: String) {
-    winx::dlog(&format!("shot.html: {msg}"));
+async fn shot_log(window: tauri::WebviewWindow, msg: String) {
+    winx::dlog(&format!("{}: {msg}", window.label()));
 }
 
 /// Exact pixels around (x, y) for the colour picker's loupe: a square of
@@ -1031,11 +1102,7 @@ async fn shot_patch(x: i32, y: i32, r: i32) -> Vec<u8> {
 /// Colour picked in the overlay: copy `#RRGGBB` and hang it as a colour card.
 #[tauri::command]
 async fn finish_color(app: AppHandle, hex: String) -> Result<(), String> {
-    *shot_lock() = None;
-    SHOOTING.store(false, Ordering::Relaxed);
-    if let Some(w) = app.get_webview_window("shot") {
-        let _ = w.close();
-    }
+    close_shot(&app);
     let item = serde_json::json!({ "id": format!("c{}", now_ms()), "kind": "text", "text": hex, "ts": now_ms() as u64 });
     native::set_text(&hex);
     let _ = app.emit("clip:add", item);
@@ -1045,11 +1112,7 @@ async fn finish_color(app: AppHandle, hex: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn cancel_shot(app: AppHandle) -> Result<(), String> {
-    *shot_lock() = None;
-    SHOOTING.store(false, Ordering::Relaxed);
-    if let Some(w) = app.get_webview_window("shot") {
-        let _ = w.close();
-    }
+    close_shot(&app);
     Ok(())
 }
 
@@ -1057,12 +1120,9 @@ async fn cancel_shot(app: AppHandle) -> Result<(), String> {
 /// the follow-up the user picked: hang | annotate | ocr | pin.
 #[tauri::command]
 async fn finish_shot(app: AppHandle, x: u32, y: u32, w: u32, h: u32, action: String) -> Result<(), String> {
-    // take the capture BEFORE closing the overlay (its destroy handler clears it)
+    // take the capture BEFORE closing the overlays (closing clears it)
     let cap = shot_lock().take();
-    SHOOTING.store(false, Ordering::Relaxed);
-    if let Some(win) = app.get_webview_window("shot") {
-        let _ = win.close();
-    }
+    close_shot(&app);
     let cap = cap.ok_or("没有截图")?;
     let (iw, ih) = cap.img.dimensions();
     let x = x.min(iw.saturating_sub(1));
@@ -2021,9 +2081,9 @@ fn main() {
     tauri::Builder::default()
         .on_window_event(|w, e| {
             if let tauri::WindowEvent::Destroyed = e {
-                if w.label() == "shot" {
-                    SHOOTING.store(false, Ordering::Relaxed);
-                    *shot_lock() = None;
+                // one overlay gone (e.g. Alt+F4) → close them all
+                if is_shot_label(w.label()) && SHOOTING.load(Ordering::Relaxed) {
+                    close_shot(w.app_handle());
                 }
             }
             if let tauri::WindowEvent::DragDrop(d) = e {
@@ -2068,6 +2128,8 @@ fn main() {
             open_data_dir,
             start_shot,
             get_shot_image,
+            get_shot_region,
+            shot_focus,
             get_shot_windows,
             shot_log,
             shot_patch,

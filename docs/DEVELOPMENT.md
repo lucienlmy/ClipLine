@@ -7,7 +7,7 @@
   - `main.rs`：命令、窗口、托盘、设置（`Settings` 带 `#[serde(default)]`，新字段必须给默认值）、光标线程（顶边悬停、拖文件到顶部接住、自动收起）、文件夹监听。
   - `native.rs`：剪贴板（arboard / clipboard-win）、光标、粘贴回原应用、图片卡保存 `save_rgba_card`。
   - `winx.rs`：低级鼠标钩子、自研 OLE 拖出（文字卡：资源管理器得到文件 / 其它应用得到文字；文件卡：shell 数据对象）、自研拖入目标（替代 wry 失效的那个）、资源管理器选中项兜底、诊断日志 `dlog`。
-  - `shot.rs`：GDI 截全虚拟屏、Windows 自带 OCR（Windows.Media.Ocr）。截屏前先用 `window_rects` 记下可见顶层窗口（`EnumWindows` 的 z 序，前面的在前；跳过最小化、cloaked、点击穿透的窗口和桌面 Progman/WorkerW；矩形取 DWM 的 `EXTENDED_FRAME_BOUNDS`，不含阴影），存进 `Capture.wins`。`main.rs` 的 `get_shot_windows` 把它们换成截图坐标、再在末尾补上各块显示器，供选区吸附；`shot_patch` 给取色放大镜返回原始像素（背景图是 JPEG，颜色不准，取色一律问 Rust）；`finish_color` 复制 `#RRGGBB` 并发一张文字卡（前端 `classify` 认成颜色卡）。
+  - `shot.rs`：GDI 截全虚拟屏、Windows 自带 OCR（Windows.Media.Ocr）。截屏前先用 `window_rects` 记下可见顶层窗口（`EnumWindows` 的 z 序，前面的在前；跳过最小化、cloaked、点击穿透的窗口和桌面 Progman/WorkerW；矩形取 DWM 的 `EXTENDED_FRAME_BOUNDS`，不含阴影），存进 `Capture.wins`。截图界面**每块显示器一个窗口**（标签 `shot-0`、`shot-1`…，`SHOT_MONS` 记着每个窗口在整张截图里的区域 `[x,y,w,h]`；`close_shot` 一次关掉全部，任何一个被关掉也会连带全关）。`get_shot_region` / `get_shot_image` / `get_shot_windows` 都按调用窗口的标签取自己那一块；`get_shot_windows` 把窗口矩形换成这块屏的坐标、末尾补上这块屏本身，供选区吸附；页面调 `shot_patch` / `finish_shot` 时加上区域偏移换回整张截图的坐标。各屏之间用 `shot:sync` 事件同步：开始框选时通知别的屏取消选区，取色模式也一起开关；鼠标移进哪块屏就 `shot_focus` 把键盘焦点给它。`shot_patch` 给取色放大镜返回原始像素（背景图是 JPEG，颜色不准，取色一律问 Rust）；`finish_color` 复制 `#RRGGBB` 并发一张文字卡（前端 `classify` 认成颜色卡）。
   - `display.rs`：显示器列表（Win32 `EnumDisplayMonitors` + `GetDpiForMonitor`，缓存 1 秒，插拔后自动更新）、系统界面语言。`main.rs` 里 `target_monitor` 按设置 `line_display`（`cursor` / `primary` / 设备名如 `\\.\DISPLAY2`）选屏，`fit_line_to` 按那块屏的缩放重算绳子尺寸，`place_window` 先移位再改尺寸再移位（跨缩放比例移动时 Windows 会先自动缩放一次）。提醒 / 更新卡片用 `place_corner_card` 放在同一块屏右下角。
   - 更新历史：`get_changelog(lang)` 用 `include_str!` 把仓库根目录的 `CHANGELOG.md` / `CHANGELOG.en.md` 编进 exe（离线可看，改了要重新编译）。启动时 `note_version_seen` 比较设置里的 `seen_version` 和当前版本：新装（没有 settings.json 也没有 data.json）不弹，降级不弹，`seen_version` 为空（v1.7.0 之前存的设置）算升级；需要弹时约 2.5 秒后开 `news.html`（标签 `news`，右下角）。「全部更新历史」走 `open_changelog`：设置窗口已开就发 `settings:goto`，没开就先记在 `SETTINGS_GOTO`，`settings.js` 启动时用 `settings_goto` 取走。
   - `update.rs`：检查更新。用系统的 `URLDownloadToFileW` 访问 GitHub API（`releases/latest`）和下载安装文件，不引入 TLS 库，走系统代理；状态集中在 `STATUS`，每次变化由 `main.rs` 广播 `update:status`，`update.html` 负责显示。
@@ -31,8 +31,9 @@
 7. 便携版更新：运行中的 exe 可以改名但不能覆盖，所以先把自己改名为 `*.exe.old`，新文件放到原路径，再带 `--after-update <pid>` 启动新版（新版先等旧进程退出，再清理 `.old`）。安装版更新：运行 setup 带 `/P /UPDATE /R`（免打扰、保留自启动项、装完重新打开）。
 8. 语言设置 `lang` 可为 `auto`：`get_settings` / `update_settings` 返回的 JSON 额外带 `sys_lang`（zh / en），前端用 `pickLang` 解析；`Settings` 默认值是 `auto`，但已存的 settings.json 保留原值。
 9. 提醒卡片 / 更新卡片自带中英文表：提醒卡片的语言由主窗口随数据传过来（`lang`），缺省时自己读设置；更新卡片读 `get_settings`。更新出错的文字来自 Rust（中文），`update.html` 的 `ERR_EN` 按前缀翻译——在 `update.rs` 新增或修改错误文字时，记得同步这张表。
-10. **截图界面调用的命令一律 `async`**：同步命令跑在主线程上，等 `SHOT` 锁（背景 JPEG 编码时被占着）会把全屏置顶的截图窗口冻住，表现为鼠标能动、什么都点不了。拿 `SHOT` 用 `shot_lock()`（锁中毒也能取回），拷出数据就放锁，别在锁里做慢活。截图页的诊断写进 `clipline-debug.log`（`shot_log`）。
-11. 版本比较只看 `主.次.修订` 三段数字；发布时 `tauri.conf.json`、`Cargo.toml` 的版本号和标签必须一致，否则会反复提示更新。
+10. **截图界面调用的命令一律 `async`**：同步命令跑在主线程上，等 `SHOT` 锁（背景 JPEG 编码时被占着）会把全屏置顶的截图窗口冻住，表现为鼠标能动、什么都点不了。拿 `SHOT` 用 `shot_lock()`（锁中毒也能取回），拷出数据就放锁，别在锁里做慢活。截图页的诊断写进 `clipline-debug.log`（`shot_log`，带窗口标签）。
+11. **截图界面不要做成横跨多块屏的一个大窗口**：笔记本外接屏常在另一块显卡上，跨屏窗口每次重画都要跨显卡合成，鼠标一动整个桌面连指针一起卡（v1.10.1 及以前）。遮罩也别用 `box-shadow: 0 0 0 9999px`（每帧重画整屏），用四块面板；`pointermove` 按 `requestAnimationFrame` 合并。
+12. 版本比较只看 `主.次.修订` 三段数字；发布时 `tauri.conf.json`、`Cargo.toml` 的版本号和标签必须一致，否则会反复提示更新。
 
 ## 在 Linux 上检查 Windows 代码
 ```bash
