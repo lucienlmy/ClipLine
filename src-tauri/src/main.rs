@@ -599,15 +599,16 @@ fn paste_text(text: String) {
     });
 }
 
-/// Drag a text card out. Explorer / the desktop receive a .txt/.md file,
-/// every other drop target receives the text itself.
+/// Drag a text card or a note out. Explorer / the desktop receive a .txt/.md
+/// file, every other drop target receives the text itself. `name` is the
+/// file name to use (a note passes its title); without it the first line is.
 #[tauri::command]
-async fn drag_text(app: AppHandle, text: String) -> Result<bool, String> {
+async fn drag_text(app: AppHandle, text: String, name: Option<String>) -> Result<bool, String> {
     let ext = {
         let s = SETTINGS.lock().unwrap();
         if s.text_drag_ext == "md" { "md" } else { "txt" }
     };
-    let file = write_drag_temp(&text, ext)?;
+    let file = write_drag_temp(&text, name.as_deref(), ext)?;
     let (tx, rx) = std::sync::mpsc::channel();
     app.run_on_main_thread(move || {
         let _ = tx.send(winx::drag_text(&text, &file));
@@ -644,7 +645,7 @@ async fn drag_files(app: AppHandle, paths: Vec<String>, mov: bool) -> Result<boo
 }
 
 /// %TEMP%\ClipLine\drag\<stamp>\<first line>.<ext>
-fn write_drag_temp(text: &str, ext: &str) -> Result<std::path::PathBuf, String> {
+fn write_drag_temp(text: &str, name: Option<&str>, ext: &str) -> Result<std::path::PathBuf, String> {
     let base = std::env::temp_dir().join("ClipLine").join("drag");
     // Housekeeping: forget drag files older than a day.
     if let Ok(rd) = std::fs::read_dir(&base) {
@@ -667,7 +668,7 @@ fn write_drag_temp(text: &str, ext: &str) -> Result<std::path::PathBuf, String> 
         .unwrap_or(0);
     let dir = base.join(stamp.to_string());
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let name = drag_file_stem(text);
+    let name = drag_file_stem(name.filter(|n| !n.trim().is_empty()).unwrap_or(text));
     let path = dir.join(format!("{name}.{ext}"));
     // UTF-8 with BOM so old Notepad builds pick the right encoding.
     let mut bytes = vec![0xEF, 0xBB, 0xBF];

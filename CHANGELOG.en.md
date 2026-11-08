@@ -2,6 +2,17 @@
 
 Newest first. This file is built into the app and is what Settings → About → "Update history" shows; the Chinese version is `CHANGELOG.md` — keep the two in step.
 
+## v1.11.0 · 2026-11-08
+
+### ☑ Tick to-dos anywhere
+- **On the reminder card**: click a to-do's box on a reminder that has popped up to tick or untick it. The note on the line updates too, and the card stays open.
+- **While editing**: click inside a `[ ]` to make it `[x]` (click again to clear it); `Ctrl+Enter` ticks the caret's line, or every selected line (if any is open they are all ticked, otherwise all cleared). `Ctrl+Z` undoes either.
+
+### 📄 Drag a note to the desktop as a file
+- Drag a note by its body: dropped on the desktop or in a folder it becomes a file named after the note's title; dropped into a chat box or document it inserts the Markdown text. The note stays on the line.
+- .txt or .md follows the same setting as text cards: Settings → Clipboard → "Text cards & notes dragged to a folder become".
+- Dragging by the clip still reorders; ticking boxes, clicking links and dragging the scrollbar work as before.
+
 ## v1.10.3 · 2026-11-07
 
 ### 🐞 Fixed

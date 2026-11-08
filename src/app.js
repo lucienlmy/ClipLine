@@ -90,9 +90,9 @@ const I18N = {
     editorPh: "写点什么…\n第一行是标题，支持 Markdown（**粗体**、# 标题、- 列表）\n点上方 ☑ 或输入 - [ ] 加待办，卡片上点方框打勾",
     nextPage: "下一屏", shotLabel: "截图", blankNote: "（空白便签）", todoProg: "待办完成进度",
     moreLines: "还有 {n} 行", moreTip: "滚轮查看其余内容 · 单击打开阅读视图", readEdit: "✎ 编辑", readEditTip: "编辑这张便签（也可以双击便签）", readHint: "Esc 或点空白处关闭 · 双击便签直接编辑",
-    tbTodo: "待办清单", tbBold: "粗体（Ctrl+B）", tbItalic: "斜体（Ctrl+I）", tbStrike: "删除线", tbHead: "标题", tbList: "列表", tbNum: "编号列表", tbQuote: "引用", tbCode: "代码", tbLink: "链接", tbPreview: "预览", tbEdit: "编辑", phText: "文字", phLink: "链接文字",
+    tbTodo: "待办清单（单击 [ ] 或 Ctrl+Enter 勾选）", tbBold: "粗体（Ctrl+B）", tbItalic: "斜体（Ctrl+I）", tbStrike: "删除线", tbHead: "标题", tbList: "列表", tbNum: "编号列表", tbQuote: "引用", tbCode: "代码", tbLink: "链接", tbPreview: "预览", tbEdit: "编辑", phText: "文字", phLink: "链接文字",
     linkNote: "备注", linkNotePh: "给这个链接写个备注，例如「报销系统入口」", addNote: "添加备注", editNote: "编辑备注",
-    editorHint: "Ctrl+S 保存 · Esc 关闭", save: "保存", remind: "提醒",
+    editorHint: "Ctrl+S 保存 · Esc 关闭", editorHintNote: "Ctrl+Enter 勾选 · Ctrl+S 保存 · Esc 关闭", tbTodoLabel: "待办清单", save: "保存", remind: "提醒",
     r15: "15 分钟后", r1h: "1 小时后", rtm: "明天此时", rclr: "清除提醒",
     p_m5: "5 分钟后", p_m10: "10 分钟后", p_m15: "15 分钟后", p_m30: "30 分钟后", p_h1: "1 小时后", p_h2: "2 小时后", p_h3: "3 小时后", p_tonight: "今晚 20:00", p_tomorrow: "明天此时", p_tomorrow9: "明早 9:00", p_nextweek: "下周此时",
     pinDesktop: "钉到桌面", custom: "自定义时间", setTime: "设为提醒", ok: "确定", tpPast: "这个时间已经过了",
@@ -136,9 +136,9 @@ const I18N = {
     editorPh: "Write something…\nFirst line is the title; Markdown works (**bold**, # heading, - list)\nClick ☑ above or type - [ ] for a to-do, then tick it on the card",
     nextPage: "Next", shotLabel: "Snip", blankNote: "(Blank note)", todoProg: "To-dos done",
     moreLines: "{n} more lines", moreTip: "Scroll for the rest · click to open the reading view", readEdit: "✎ Edit", readEditTip: "Edit this note (or double-click the note)", readHint: "Esc or click outside to close · double-click a note to edit it",
-    tbTodo: "To-do list", tbBold: "Bold (Ctrl+B)", tbItalic: "Italic (Ctrl+I)", tbStrike: "Strikethrough", tbHead: "Heading", tbList: "Bullet list", tbNum: "Numbered list", tbQuote: "Quote", tbCode: "Code", tbLink: "Link", tbPreview: "Preview", tbEdit: "Edit", phText: "text", phLink: "link text",
+    tbTodo: "To-do list (click [ ] or Ctrl+Enter to tick)", tbBold: "Bold (Ctrl+B)", tbItalic: "Italic (Ctrl+I)", tbStrike: "Strikethrough", tbHead: "Heading", tbList: "Bullet list", tbNum: "Numbered list", tbQuote: "Quote", tbCode: "Code", tbLink: "Link", tbPreview: "Preview", tbEdit: "Edit", phText: "text", phLink: "link text",
     linkNote: "Note", linkNotePh: "Add a note for this link, e.g. \"Expense system login\"", addNote: "Add note", editNote: "Edit note",
-    editorHint: "Ctrl+S save · Esc close", save: "Save", remind: "Remind",
+    editorHint: "Ctrl+S save · Esc close", editorHintNote: "Ctrl+Enter tick · Ctrl+S save · Esc close", tbTodoLabel: "To-do list", save: "Save", remind: "Remind",
     r15: "In 15 min", r1h: "In 1 hour", rtm: "Tomorrow", rclr: "Clear reminder",
     p_m5: "In 5 min", p_m10: "In 10 min", p_m15: "In 15 min", p_m30: "In 30 min", p_h1: "In 1 hour", p_h2: "In 2 hours", p_h3: "In 3 hours", p_tonight: "Tonight 20:00", p_tomorrow: "Tomorrow, same time", p_tomorrow9: "Tomorrow 9:00", p_nextweek: "Next week",
     pinDesktop: "Pin to desktop", custom: "Custom time", setTime: "Set reminder", ok: "OK", tpPast: "That time has passed",
@@ -1103,6 +1103,7 @@ function buildNoteCard(note) {
     noteClickTimer = setTimeout(() => openReader(note), 250);
   });
   body.addEventListener("dblclick", () => { clearTimeout(noteClickTimer); openEditor(note); });
+  attachNoteDragOut(body, note);
   card.addEventListener("contextmenu", (e) => showCtx(e, note, true));
   return card;
 }
@@ -1309,6 +1310,33 @@ function attachDragOut(card, item) {
   });
   card.addEventListener("pointerup", () => { armed = false; });
   card.addEventListener("pointercancel", () => { armed = false; });
+}
+
+/* A note dragged by its body (the clip still reorders) leaves as a file in
+ * Explorer / on the desktop, named after its title, .txt or .md as set for
+ * text cards; other apps get the Markdown text. The note stays on the line. */
+function attachNoteDragOut(body, note) {
+  let sx = 0, sy = 0, armed = false;
+  body.addEventListener("pointerdown", (e) => {
+    armed = false;
+    if (e.button !== 0 || e.target.closest(".corner, .box, a.md-a, .note-foot, .note-more")) return;
+    const lines = e.target.closest(".note-lines");
+    if (lines && e.offsetX >= lines.clientWidth) return; // on the scrollbar
+    armed = true; sx = e.clientX; sy = e.clientY;
+  });
+  body.addEventListener("pointermove", (e) => {
+    if (!armed || (Math.abs(e.clientX - sx) < 6 && Math.abs(e.clientY - sy) < 6)) return;
+    armed = false;
+    if (!(note.body || "").trim()) return;
+    clearTimeout(noteClickTimer);
+    suppressClickUntil = Date.now() + 500;
+    selfDragUntil = Date.now() + 60000;
+    const name = MD.plain(MD.titleOf(note.body).text);
+    invoke("drag_text", { text: note.body, name }).catch((err) => toast(t("dragFail") + err))
+      .finally(() => { selfDragUntil = Date.now() + 400; });
+  });
+  body.addEventListener("pointerup", () => { armed = false; });
+  body.addEventListener("pointercancel", () => { armed = false; });
 }
 
 /* ---------- reorder: hold an unpinned card's clip and slide it ---------- */
@@ -1570,6 +1598,7 @@ function openEditorFor(note) {
   const ta = $("editorBody"); ta.value = note.body || ""; ta.placeholder = note._clip ? t("editorPhClip") : t("editorPh");
   $("bellText").textContent = note.remindAt ? fmtWhen(note.remindAt) : t("remind");
   renderCatChip(note);
+  const hint = document.querySelector(".editor-foot .hint"); if (hint) hint.textContent = t(note._clip ? "editorHint" : "editorHintNote");
   $("editor").hidden = false; refreshModal();
   setTimeout(() => (note._focusNote ? $("linkNote") : $("editorBody")).focus(), 30);
 }
@@ -1608,7 +1637,7 @@ function buildTools() {
     if (id === "~") { const i = document.createElement("span"); i.className = "tgrow"; box.appendChild(i); return; }
     const b = document.createElement("button"); b.type = "button"; b.className = "tb tb-" + id; b.dataset.tool = id;
     b.textContent = id === "preview" ? "👁 " + t("tbPreview") : label; b.title = t(TOOL_TIP[id]);
-    if (id === "todo") b.innerHTML = `☑ <span>${escapeHtml(t("tbTodo"))}</span>`;
+    if (id === "todo") b.innerHTML = `☑ <span>${escapeHtml(t("tbTodoLabel"))}</span>`;
     b.addEventListener("mousedown", (e) => e.preventDefault()); // keep the textarea's selection
     b.addEventListener("click", () => runTool(id));
     box.appendChild(b);
@@ -1701,6 +1730,7 @@ $("editorBody").addEventListener("keydown", (e) => {
   if (!editing || editing._clip || e.isComposing || e.keyCode === 229) return;
   const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
   if (mod && !e.shiftKey && !e.altKey && (k === "b" || k === "i")) { e.preventDefault(); runTool(k === "b" ? "bold" : "italic"); return; }
+  if (mod && !e.shiftKey && !e.altKey && e.key === "Enter") { e.preventDefault(); tickLines(); return; }
   const ta = e.target, v = ta.value, s = ta.selectionStart;
   const ls = v.lastIndexOf("\n", s - 1) + 1;
   if (e.key === "Tab" && !mod && !e.altKey) {
@@ -1721,6 +1751,31 @@ $("editorBody").addEventListener("keydown", (e) => {
   e.preventDefault();
   if (empty) edReplace(ls, s, "", ls, ls);
   else edReplace(s, s, "\n" + prefix, s + 1 + prefix.length, s + 1 + prefix.length);
+});
+/* Ticking while typing. Ctrl+Enter flips the to-dos on the caret's line (or
+ * every selected line: if any is open they all get ticked, otherwise all are
+ * cleared); a plain click inside "[ ]" flips that one. Both go through
+ * edReplace, so Ctrl+Z undoes them. */
+const RE_BOX = /^(\s*(?:[-*+]\s+)?)\[( |x|X)?\]/;
+function tickLines() {
+  edLines((lines) => {
+    const tasks = lines.filter((l) => RE_BOX.test(l));
+    if (!tasks.length) return lines;
+    const tick = tasks.some((l) => !/^x$/i.test(l.match(RE_BOX)[2] || ""));
+    return lines.map((l) => l.replace(RE_BOX, (_, pre) => pre + (tick ? "[x]" : "[ ]")));
+  });
+}
+$("editorBody").addEventListener("click", (e) => {
+  if (!editing || editing._clip || e.detail !== 1 || e.shiftKey || e.ctrlKey || e.altKey) return;
+  const ta = $("editorBody"), p = ta.selectionStart;
+  if (p !== ta.selectionEnd) return;
+  const v = ta.value, ls = v.lastIndexOf("\n", p - 1) + 1;
+  const m = v.slice(ls).match(RE_BOX);
+  if (!m) return;
+  const bs = ls + m[1].length, be = ls + m[0].length;
+  if (p <= bs || p >= be) return; // only a click inside the brackets ticks
+  const done = /^x$/i.test(m[2] || "");
+  edReplace(bs, be, done ? "[ ]" : "[x]", p, p);
 });
 function linkNoteCount() { $("linkNoteCnt").textContent = `${$("linkNote").value.length}/100`; }
 $("linkNote").addEventListener("input", linkNoteCount);
@@ -1899,15 +1954,27 @@ function openTimePicker(e, note, commit, back) {
 
 /* A due reminder pops up as its own card window (bottom-right, with a chime). */
 function popReminder(n) {
-  // The card renders Markdown itself (md.js); send the raw lines after the title.
+  // The card renders Markdown itself (md.js): it gets the whole note and the
+  // line the body starts at, so its to-do boxes carry the note's own line
+  // numbers and can be ticked from the card (remind:toggle).
   const tl = MD.titleOf(n.body);
   const title = tl.index < 0 ? t("remind") : tl.text;
-  const body = tl.index < 0 ? "" : (n.body || "").split("\n").slice(tl.index + 1).join("\n").replace(/^\s*\n/, "").trimEnd();
+  const body = tl.index < 0 ? "" : (n.body || "");
+  const from = tl.index < 0 ? 0 : tl.index + 1;
   const tt = tintOf(n.tint);
   const rep = { daily: t("rDaily"), weekly: t("rWeekly"), monthly: t("rMonthly") }[n.repeat] || "";
   const when = fmtWhen(n.remindAt) + (rep ? " · " + rep : "");
-  invoke("show_reminder", { data: { id: n.id, title, body, when, bg: tt.bg, ink: tt.ink, repeat: !!rep, lang: LANG } })
+  invoke("show_reminder", { data: { id: n.id, title, body, from, when, bg: tt.bg, ink: tt.ink, repeat: !!rep, lang: LANG } })
     .catch(() => { toast("🔔 " + MD.plainLine(title)); });
+}
+/* A to-do ticked on a reminder card. `line` is the line as the card saw it;
+ * if the note was edited meanwhile and that line moved, nothing is changed. */
+function onRemindToggle(p) {
+  const n = state.notes.find((x) => x.id === (p && p.id));
+  if (!n) return;
+  const idx = +p.idx, lines = (n.body || "").split("\n");
+  if (lines[idx] !== p.line) return;
+  toggleCheck(n, idx);
 }
 function onRemindAction(p) {
   const n = state.notes.find((x) => x.id === (p && p.id));
@@ -2319,6 +2386,7 @@ async function wire() {
   await listen("line:catch", () => startCatch());
   await listen("ocr:done", (ev) => onOcrDone(ev.payload));
   await listen("remind:action", (ev) => onRemindAction(ev.payload));
+  await listen("remind:toggle", (ev) => onRemindToggle(ev.payload));
   await listen("files:enter", () => stage.classList.add("catch-over"));
   await listen("files:over", () => stage.classList.add("catch-over"));
   await listen("files:leave", () => stage.classList.remove("catch-over"));

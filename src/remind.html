@@ -21,7 +21,8 @@
   .md-h { font-weight: 650; margin: 2px 0; } .md-h1 { font-size: 1.15em; } .md-h2 { font-size: 1.08em; }
   .md-li { display: flex; gap: 6px; align-items: flex-start; }
   .md-dot, .md-num { flex: none; opacity: 0.7; min-width: 8px; }
-  .md-task .box { width: 13px; height: 13px; border: 1.5px solid currentColor; border-radius: 4px; flex: none; margin-top: 2px; opacity: 0.7; font-size: 10px; text-align: center; line-height: 12px; }
+  .md-task .box { width: 13px; height: 13px; border: 1.5px solid currentColor; border-radius: 4px; flex: none; margin-top: 2px; opacity: 0.7; font-size: 10px; text-align: center; line-height: 12px; cursor: pointer; }
+  .md-task .box:hover { opacity: 1; }
   .md-task.done .md-tx { opacity: 0.55; text-decoration: line-through; }
   .md-quote { border-left: 3px solid rgba(0,0,0,0.18); padding-left: 8px; opacity: 0.85; }
   .md-hr { border-top: 1px solid rgba(0,0,0,0.15); margin: 5px 0; }
@@ -96,13 +97,31 @@
     applyLang(lang);
     $("when").textContent = data.when || "";
     $("title").innerHTML = data.title ? MD.inline(data.title) : MD.esc(tr.remind);
-    $("body").innerHTML = MD.render(data.body || "");
-    document.querySelectorAll("a.md-a").forEach((a) => a.addEventListener("click", (e) => {
+    drawBody();
+    if (data.sound !== false) chime();
+  })();
+
+  // The body is the whole note from line `from` on, so each to-do box's
+  // data-idx is the note's own line number. Ticking here updates the note in
+  // the main window (remind:toggle) and redraws the card in place.
+  function drawBody() {
+    const el = $("body"), top = el.scrollTop;
+    el.innerHTML = MD.render(data.body || "", { from: data.from || 0 });
+    el.querySelectorAll("a.md-a").forEach((a) => a.addEventListener("click", (e) => {
       e.preventDefault();
       const u = a.dataset.href || ""; invoke("open_url", { url: /^https?:\/\//i.test(u) ? u : "http://" + u }).catch(() => {});
     }));
-    if (data.sound !== false) chime();
-  })();
+    el.querySelectorAll(".box").forEach((b) => b.addEventListener("click", () => {
+      const idx = parseInt(b.dataset.idx, 10);
+      const line = String(data.body || "").split("\n")[idx];
+      const nb = MD.toggle(data.body || "", idx);
+      if (nb === data.body) return;
+      data.body = nb;
+      try { T.event.emit("remind:toggle", { id: data.id || "", idx, line }).catch(() => {}); } catch (e) {}
+      drawBody();
+    }));
+    el.scrollTop = top;
+  }
 
   const act = (a) => invoke("reminder_action", { label, id: data.id || "", action: a }).catch(() => {});
   $("ack").onclick = () => act("ack");
