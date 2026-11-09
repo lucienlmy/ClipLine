@@ -435,6 +435,7 @@ fn drop_line(deck: Deck, sticky: bool) {
 /// focus in the middle of someone else's drag is unnecessary and jarring.
 fn drop_line_ex(deck: Deck, sticky: bool, focus: bool) {
     native::remember_foreground();
+    ROLL_SEQ.fetch_add(1, Ordering::Relaxed);
     // Lay the line out on the right monitor before it shows (the hover thread
     // reads the new geometry right away).
     let rect = target_monitor(None).map(|m| fit_line_to(&m));
@@ -515,13 +516,32 @@ fn rollup_ex(restore: bool) {
         st.dropped = false;
     }
     CATCHING.store(false, Ordering::Relaxed);
+    let seq = ROLL_SEQ.fetch_add(1, Ordering::Relaxed) + 1;
     if let Some(app) = APP.get() {
         let _ = app.emit("line:rollup", ());
     }
     if restore {
         native::restore_foreground();
     }
+    // The window is normally hidden when the roll-up animation ends
+    // (rollup_done). A drop followed at once by a roll-up — "hang" after a
+    // screenshot, with the pointer still mid-screen — lands in one frame, no
+    // animation runs and that never comes: the shown, invisible window then
+    // swallowed clicks along the top of the screen (title-bar buttons).
+    // Hide it anyway once the animation would have finished.
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        if ROLL_SEQ.load(Ordering::Relaxed) == seq && !STATE.lock().unwrap().dropped {
+            with_window(|w| {
+                let _ = w.hide();
+            });
+        }
+    });
 }
+
+/// Bumped on every drop and roll-up, so a delayed hide only acts if nothing
+/// happened to the line since.
+static ROLL_SEQ: AtomicU64 = AtomicU64::new(0);
 
 fn toggle_deck(deck: Deck) {
     let (dropped, cur) = {

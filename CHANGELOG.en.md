@@ -2,6 +2,11 @@
 
 Newest first. This file is built into the app and is what Settings → About → "Update history" shows; the Chinese version is `CHANGELOG.md` — keep the two in step.
 
+## v1.11.1 · 2026-11-09
+
+### 🐞 Fixed
+- After hanging a screenshot on the line, a strip along the top of the screen ignored clicks — the close / maximise buttons on browser and Explorer title bars did nothing until the line was summoned once. The line dropped and, with the pointer away from it, rolled up in the same instant; the roll-up animation never ran, so the line's window stayed shown, invisible, over the top of the screen. It is now always hidden once the roll-up is due to finish.
+
 ## v1.11.0 · 2026-11-08
 
 ### ☑ Tick to-dos anywhere
