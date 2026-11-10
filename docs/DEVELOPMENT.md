@@ -11,6 +11,8 @@
   - `display.rs`：显示器列表（Win32 `EnumDisplayMonitors` + `GetDpiForMonitor`，缓存 1 秒，插拔后自动更新）、系统界面语言。`main.rs` 里 `target_monitor` 按设置 `line_display`（`cursor` / `primary` / 设备名如 `\\.\DISPLAY2`）选屏，`fit_line_to` 按那块屏的缩放重算绳子尺寸，`place_window` 先移位再改尺寸再移位（跨缩放比例移动时 Windows 会先自动缩放一次）。提醒 / 更新卡片用 `place_corner_card` 放在同一块屏右下角。
   - 更新历史：`get_changelog(lang)` 用 `include_str!` 把仓库根目录的 `CHANGELOG.md` / `CHANGELOG.en.md` 编进 exe（离线可看，改了要重新编译）。启动时 `note_version_seen` 比较设置里的 `seen_version` 和当前版本：新装（没有 settings.json 也没有 data.json）不弹，降级不弹，`seen_version` 为空（v1.7.0 之前存的设置）算升级；需要弹时约 2.5 秒后开 `news.html`（标签 `news`，右下角）。「全部更新历史」走 `open_changelog`：设置窗口已开就发 `settings:goto`，没开就先记在 `SETTINGS_GOTO`，`settings.js` 启动时用 `settings_goto` 取走。
   - `update.rs`：检查更新。用系统的 `URLDownloadToFileW` 访问 GitHub API（`releases/latest`）和下载安装文件，不引入 TLS 库，走系统代理；状态集中在 `STATUS`，每次变化由 `main.rs` 广播 `update:status`，`update.html` 负责显示。
+- **钉到桌面**（`main.rs` 的 `open_pin`、`src/pinwin.js`、`pin.html` / `pinnote.html`、`app.js` 的「desktop pins」一节）：每个钉住的窗口标签 `pin<毫秒>`，内容由 `PIN_SPECS`（标签 → spec）交给页面，`get_pin` 取：`{kind:"image", path, w, h}` 走 `pin.html`，`{kind:"text", text, ref}` / `{kind:"note", ref}` 走 `pinnote.html`；spec 里 Rust 另加 `top`，按存下的位置还原时再加 `restored`（图片窗口据此不按原图尺寸重设大小）。`pin_image`（图片预览、截图「钉在桌面」）也走 `open_pin`。清单存在 `data.json` 的 `state.desk`（`[{id: 标签, spec, x, y, w, h, top}]`，物理像素），由绳子窗口维护；窗口自己用 `pinwin.js` 报告：`pin:hello`（打开，不在清单里就加上——所以 Rust 直接打开的钉图也会被记住）、`pin:geom`（移动 / 改大小 / 切置顶，400 ms 合并）、`pin:bye`（用户关掉，删掉）。**用户关闭一律走 `PW.close()`**；程序退出时窗口直接销毁、不发 `bye`，所以重启能还原。启动时 `restoreDesk` 逐个 `open_pin(label, geom)`，位置已不在任何显示器上就居中，图片文件没了就删掉这条；还原时不抢焦点。文字卡是快照（存 `text`），便签是活的：`save()` 末尾 `syncPins()` 把内容有变的便签发 `pin:data {label, body, bg, ink, lang}`（`deskSent` 记上次发的，避免重复），便签不在了发 `gone`，浮窗自己取下；浮窗打勾复用 `remind:toggle`，双击走 `pin_open_note` → `pin:edit`。同一张便签只钉一份。绳上卡片有 `spec.ref` 指向它时加 `.desk-mark` 小圆点。
+- 夹子手势（`attachReorder` / `attachZoneReorder` + `pullAt`）：左右拖是排序；指针比按下时往下超过 `PULL`（70px）就进入「拉下」状态（`.pulling`，卡片跟手、`data-pull` 显示提示），松手 `pinToDesk(item, isNote, true)` 在鼠标处开浮窗；拉回去又是排序。指针已捕获，拉出绳子窗口下沿也能收到事件；`set_modal` 让绳子在拖动中不收起。不能排序的卡（收藏卡、分区里只有一张）也挂上手势，只是不能左右动；文件卡不能钉（`deskSpecOf` 返回 null），夹子照旧只排序。
 - `src/md.js`：小型 Markdown 渲染器（先整体转义再生成标记，链接只给 `data-href`，由页面自己 `invoke("open_url")`）。便签卡片、阅读视图、编辑器预览、提醒卡片、更新历史共用；`MD.releases` 把 CHANGELOG 按 `## v1.2.3 · 日期` 切成各个版本；按行渲染，待办方框带 `data-idx`（源文本行号），打勾用 `MD.toggle`。待办写法兼容 `- [ ]` / `[ ]` / `[]`。提醒卡片收到整篇便签和正文起始行号 `from`（`MD.render(body, {from})`），方框的 `data-idx` 就是便签里的行号；打勾时卡片自己 `emit("remind:toggle", {id, idx, line})`，主窗口核对该行原文没变再 `toggleCheck`。提醒卡片和「已更新」卡片里各有一份同样的 Markdown 样式（`remind.html`、`news.html` 不加载 `styles.css`），改样式时几处一起改。
 - 设置窗口（`settings.html` / `settings.js`）：左侧分类栏 + 右侧单页，`PAGES` 列出七页（general / invoke / clip / notes / look / about / donate；打赏页的收款码在 `src/img/donate-*.png`，是 `assets/` 里同名文件的副本），每页一个 `pageXxx(body)` 函数，`goPage` 切页后整页重绘。所有页共用一份 `draft`，「保存」一次提交；错误提示统一写在底部的 `#setErr`（`setErr()`）。打开「更新历史」时会先切到「关于」页。新增设置项时放进对应的页函数，别再加新的长区块。窗口尺寸在 `create_settings_window`（720×540，最小 600×420）。
 - `src/`：前端静态页。`app.js` 主界面（绳子布局：收藏区 / 今天 / 日期叠、卡片、便签、提醒、整理），`settings.*`、`pin.html`、`shot.html`（截图选区：先选后截——拖动框选或单击选窗口，选区可拖柄调整 / 移动 / 方向键微调，回车或双击才执行；浮条是图标 + 快捷键角标，主题为 graphite 时用深色，强调色从设置读，色值表 `ACCENTS` 要和 `styles.css` 的 `data-accent` 同步；`C` 进入取色）、`annotate.html`（标注）、`remind.html`（提醒卡片）、`update.html`（更新卡片）、`news.html`（「已更新到 vX」卡片）。
@@ -35,6 +37,8 @@
 10. **截图界面调用的命令一律 `async`**：同步命令跑在主线程上，等 `SHOT` 锁（背景 JPEG 编码时被占着）会把全屏置顶的截图窗口冻住，表现为鼠标能动、什么都点不了。拿 `SHOT` 用 `shot_lock()`（锁中毒也能取回），拷出数据就放锁，别在锁里做慢活。截图页的诊断写进 `clipline-debug.log`（`shot_log`，带窗口标签）。
 11. **截图界面用软件绘制**（`--disable-gpu`，单独的 WebView2 数据目录 `EBWebView-shot`——浏览器参数不同的窗口必须用不同的数据目录，还要自己带上 wry 默认的 `--disable-features=…`）：显卡绘制时，框选后整个桌面连指针一起卡住，只有键盘能用（v1.10.0～v1.10.2，迷你主机核显 + 双屏上复现，加 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--disable-gpu` 启动就好了）。别改回去。截图界面每块屏一个窗口；遮罩用四块面板而不是 `box-shadow: 0 0 0 9999px`；`pointermove` 按 `requestAnimationFrame` 合并。
 12. 版本比较只看 `主.次.修订` 三段数字；发布时 `tauri.conf.json`、`Cargo.toml` 的版本号和标签必须一致，否则会反复提示更新。
+13. `pinnote.html` 拖动窗口用 `startDragging()`，**不用 `data-tauri-drag-region`**：后者双击会最大化窗口，而双击便签浮窗是「打开编辑器」。
+14. `update_settings` 不接收前端传来的 `skipped_version` / `seen_version`（防止早开的设置窗口拿旧值覆盖）；设置里「恢复提醒」要走单独的 `clear_skipped_update`。
 
 ## 在 Linux 上检查 Windows 代码
 ```bash
@@ -75,4 +79,7 @@ RUSTC_BOOTSTRAP=1 cargo check -Zbuild-std=std,panic_abort --target x86_64-pc-win
 - **设置用分类栏而不是一长页**：设置项越来越多，一长页要一路往下拖；分类栏每页一屏，和 Windows 自己的设置一致。
 - **提醒时间用月历 + 数字，不用表盘**：表盘要分两步拨（先时后分），鼠标操作比滚轮或直接输入慢，而且绳子窗口只有约 360px 高，放不下够大的表盘。
 - **便签「复制内容」复制 Markdown 原文**：粘回便签还是原样；要纯文本的话打开阅读视图选中复制。
+- **钉到桌面 = 多一个视图，原卡留在绳上**：钉住不是搬走，绳上的卡照常复制、排序、清理；文字卡钉出去存快照，免得剪贴板清理把桌面上的浮窗带走；便签钉出去是同步的，因为便签本来就会改。
+- **钉住的窗口默认置顶，可在窗口上关掉**：不做「贴在桌面层」（像 Windows 便笺那样在所有窗口下面）——Win+D、虚拟桌面切换时在桌面层的窗口表现不稳定。
+- **拉下夹子钉住，不用另一种拖法**：按住正文拖已经是「拖出到别的程序 / 存成文件」，夹子原来只做左右排序，往下拉正好空着，也最像把卡片从绳上摘下来。
 - **更新卡片里的说明来自 GitHub 发布页，「已更新」卡片的说明来自程序自带的 CHANGELOG**：前者是还没装上的新版本，只能联网取；后者是已经装上的版本，用自带的。

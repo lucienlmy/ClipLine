@@ -2,6 +2,19 @@
 
 Newest first. This file is built into the app and is what Settings → About → "Update history" shows; the Chinese version is `CHANGELOG.md` — keep the two in step.
 
+## v1.12.0 · 2026-11-10
+
+### 📌 Pin cards and notes to the desktop
+- **Pull the clip down**: the card leaves the line, shows "Let go to pin to the desktop", and becomes a small floating window under the mouse when you let go; bring it back up and it is sorting again. Or right-click → Pin to desktop. Works for text, link, colour and image cards and for notes.
+- Drag the window anywhere and resize it by its edges; the "On top" switch in its corner turns it into an ordinary window; `Esc` or ✕ unpins it. The card stays on the line, with a small dot in its top-left corner.
+- **Pinned notes stay in sync**: edit the note on the line or in the editor and the window follows; tick to-dos and open links right on it, double-click to edit; when the note is done or deleted the window goes away.
+- A pinned text card keeps the text it had, so the window stays even after the card on the line is cleaned up.
+- **They come back after a restart**: pinned windows (image previews and screenshot "Pin" too) remember their place, size and on-top setting. Favourites and single cards in a zone can now be pulled down by the clip as well.
+
+### 🔄 Software updates
+- The "Automatic updates" setting is now called "Software updates", and "Off" is "Don't check".
+- After "Skip this version" on the update card, Settings shows "Skipped vX" with an "Offer it again" button to undo it.
+
 ## v1.11.1 · 2026-11-09
 
 ### 🐞 Fixed

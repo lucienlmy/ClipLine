@@ -4,6 +4,7 @@
 const TAURI = window.__TAURI__;
 const invoke = TAURI ? TAURI.core.invoke : async () => {};
 const listen = TAURI ? TAURI.event.listen : async () => () => {};
+const emit = TAURI ? TAURI.event.emit : async () => {};
 const convertFileSrc = (p) => { try { return TAURI ? TAURI.core.convertFileSrc(p) : p; } catch (e) { return p; } };
 const isImagePath = (p) => /\.(png|jpe?g|gif|bmp|webp)$/i.test(p || "");
 const FILE_SVG = '<svg width="40" height="44" viewBox="0 0 40 44" xmlns="http://www.w3.org/2000/svg"><path d="M7 2h18l9 9v29a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#f1efe8" stroke="#c9b79a" stroke-width="2"/><path d="M25 2v9h9" fill="none" stroke="#c9b79a" stroke-width="2"/><line x1="11" y1="20" x2="29" y2="20" stroke="#d8d3c8" stroke-width="2.5" stroke-linecap="round"/><line x1="11" y1="27" x2="29" y2="27" stroke="#d8d3c8" stroke-width="2.5" stroke-linecap="round"/><line x1="11" y1="34" x2="23" y2="34" stroke="#d8d3c8" stroke-width="2.5" stroke-linecap="round"/></svg>';
@@ -83,7 +84,7 @@ const I18N = {
     emptyClip: "绳上还空着 — 复制点什么试试",
     emptyNotes: "绳上还没有便签 — 点上方的 + 写一张",
     plus: "新建便签", gear: "设置", prev: "上一屏", next: "下一屏", pinOnly: "只看收藏（钉住）的卡片",
-    take: "取下", preview: "预览", edit: "编辑", confirmTake: "确认取下钉住的卡？", dragSort: "按住夹子左右拖动排序", takeDelete: "取下（删除原文件）", confirmTrash: "将 {n} 个原文件移到回收站，并从绳上取下？", toTrash: "移到回收站", trashed: "已移到回收站", trashFail: "删除失败: ",
+    take: "取下", preview: "预览", edit: "编辑", confirmTake: "确认取下钉住的卡？", dragSort: "按住夹子左右拖动排序", dragSortPull: "按住夹子：左右拖动排序，往下拉钉到桌面", dragPull: "按住夹子往下拉，钉到桌面", pullPin: "松手钉到桌面", deskPin: "钉到桌面", deskOn: "已钉在桌面", deskShow: "显示桌面上的这张", deskNo: "文件卡不能钉到桌面", deskFail: "钉到桌面失败: ", takeDelete: "取下（删除原文件）", confirmTrash: "将 {n} 个原文件移到回收站，并从绳上取下？", toTrash: "移到回收站", trashed: "已移到回收站", trashFail: "删除失败: ",
     copy: "复制", copyImg: "复制图片", copyPath: "复制文件地址",
     pin: "收藏（钉住）", unpin: "取消收藏", favOn: "已收藏，不会被自动清理", favOff: "已取消收藏", noFav: "还没有收藏：鼠标移到卡片上，点右下角 ☆", reveal: "在资源管理器中显示", openIt: "打开",
     openLink: "在浏览器打开", saveDesktop: "保存到桌面", toNote: "转为便签",
@@ -129,7 +130,7 @@ const I18N = {
     emptyClip: "The line is empty — copy something",
     emptyNotes: "No notes yet — click + above to write one",
     plus: "New note", gear: "Settings", prev: "Previous", next: "Next", pinOnly: "Favourites (pinned) only",
-    take: "Remove", preview: "Preview", edit: "Edit", confirmTake: "Remove pinned card?", dragSort: "Hold the clip and slide to reorder", takeDelete: "Remove & delete original", confirmTrash: "Move {n} original file(s) to the Recycle Bin and take the card down?", toTrash: "Move to Recycle Bin", trashed: "Moved to Recycle Bin", trashFail: "Delete failed: ",
+    take: "Remove", preview: "Preview", edit: "Edit", confirmTake: "Remove pinned card?", dragSort: "Hold the clip and slide to reorder", dragSortPull: "Hold the clip: slide to reorder, pull down to pin it to the desktop", dragPull: "Hold the clip and pull down to pin it to the desktop", pullPin: "Let go to pin to the desktop", deskPin: "Pin to desktop", deskOn: "Pinned to the desktop", deskShow: "Show it on the desktop", deskNo: "File cards can't be pinned to the desktop", deskFail: "Couldn't pin: ", takeDelete: "Remove & delete original", confirmTrash: "Move {n} original file(s) to the Recycle Bin and take the card down?", toTrash: "Move to Recycle Bin", trashed: "Moved to Recycle Bin", trashFail: "Delete failed: ",
     copy: "Copy", copyImg: "Copy image", copyPath: "Copy file path",
     pin: "Favourite (pin)", unpin: "Remove favourite", favOn: "Favourited — kept from auto-cleanup", favOff: "Removed from favourites", noFav: "No favourites yet: hover a card and click ☆ at the bottom right", reveal: "Show in Explorer", openIt: "Open",
     openLink: "Open in browser", saveDesktop: "Save to Desktop", toNote: "Turn into note",
@@ -195,7 +196,7 @@ const catKey = (note) => (catOf(note.tint) ? note.tint : "none");
 const tintOf = (k) => TINTS.find((x) => x.key === k) || TINTS[0];
 
 /* ---------- state ---------- */
-let state = { clips: [], notes: [], done: [], cats: null, ordered: true };
+let state = { clips: [], notes: [], done: [], cats: null, ordered: true, desk: [] };
 let cfg = { history_days: 30, hotkey_clip: "Ctrl+Alt+C", hotkey_notes: "Ctrl+Alt+N", hover_enabled: true, dwell_ms: 250, flip_mod: "shift", retention_days: 30, lang: "auto", autostart: false, theme: "soft", watch_folders: [], font_family: "default", font_size: "medium", reminder_presets: ["m15", "h1", "tomorrow"] };
 const FONTS = {
   default: '-apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif',
@@ -239,6 +240,7 @@ let saveTimer = null;
 function save() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => invoke("save_state", { data: JSON.stringify(state) }).catch(() => {}), 250);
+  syncPins();
 }
 async function load() {
   try {
@@ -250,6 +252,7 @@ async function load() {
       state.done = Array.isArray(d.done) ? d.done : [];
       state.cats = Array.isArray(d.cats) ? d.cats : null;
       state.ordered = !!d.ordered;
+      state.desk = Array.isArray(d.desk) ? d.desk.filter((x) => x && x.id && x.spec) : [];
     }
   } catch (e) {}
   try {
@@ -426,30 +429,36 @@ function renderClips() {
   updateTidy();
 }
 
-/* reorder by the clip, within one zone (favourites, or today's loose cards) */
+/* reorder by the clip, within one zone (favourites, or today's loose cards);
+ * pulling the clip down pins the card to the desktop instead (pullAt). */
 function attachZoneReorder(entries, zone) {
   const zs = entries.filter((e) => e.kind === "card" && e.zone === zone);
-  if (zs.length < 2) return;
+  const canSort = zs.length >= 2;
   const xs = zs.map((z) => z.x), cardW = 170;
   zs.forEach((e, idx) => {
     const card = e.el, peg = card.querySelector(".peg");
-    if (!peg) return;
-    peg.classList.add("grab"); peg.title = t("dragSort");
+    const canPull = canDesk(e.item, false);
+    if (!peg || (!canSort && !canPull)) return;
+    peg.classList.add("grab"); peg.title = canSort ? t(canPull ? "dragSortPull" : "dragSort") : t("dragPull");
     peg.addEventListener("pointerdown", (ev) => {
       if (ev.button !== 0) return;
       ev.stopPropagation(); ev.preventDefault();
-      const startLeft = parseFloat(card.style.left) || 0, sx = ev.clientX;
+      const startLeft = parseFloat(card.style.left) || 0, startTop = parseFloat(card.style.top) || 0, sx = ev.clientX, sy = ev.clientY;
       let target = idx;
       try { peg.setPointerCapture(ev.pointerId); } catch (x) {}
-      card.classList.add("dragging");
+      card.classList.add("dragging"); card.dataset.pull = t("pullPin");
       zs.forEach((z) => { if (z.el !== card) z.el.classList.add("reflow"); });
       invoke("set_modal", { on: true }).catch(() => {});
       const move = (mv) => {
         const left = startLeft + (mv.clientX - sx), cx = left + cardW / 2;
-        card.style.left = left + "px";
-        card.style.top = ropeY(Math.max(0, Math.min(window.innerWidth, cx))) + "px";
-        let best = 0, bd = 1e9;
-        xs.forEach((x, i) => { const d = Math.abs(x - cx); if (d < bd) { bd = d; best = i; } });
+        let best = idx;
+        if (!pullAt(card, mv, sx, sy, startLeft, startTop, canPull)) {
+          if (!canSort) { card.style.left = startLeft + "px"; card.style.top = startTop + "px"; return; }
+          card.style.left = left + "px";
+          card.style.top = ropeY(Math.max(0, Math.min(window.innerWidth, cx))) + "px";
+          let bd = 1e9;
+          xs.forEach((x, i) => { const d = Math.abs(x - cx); if (d < bd) { bd = d; best = i; } });
+        }
         if (best === target) return;
         target = best;
         let slot = 0;
@@ -460,10 +469,12 @@ function attachZoneReorder(entries, zone) {
           slot++;
         });
       };
-      const up = () => {
+      const up = (u) => {
         peg.removeEventListener("pointermove", move); peg.removeEventListener("pointerup", up); peg.removeEventListener("pointercancel", up);
-        card.classList.remove("dragging"); refreshModal();
-        if (target !== idx) reorderSubset(zs.map((z) => z.item), idx, target);
+        const pulled = card.classList.contains("pulling") && u.type === "pointerup";
+        card.classList.remove("dragging", "pulling"); refreshModal();
+        if (pulled) pinToDesk(e.item, false, true);
+        else if (target !== idx) reorderSubset(zs.map((z) => z.item), idx, target);
         ui.noAnim = true; render();
       };
       peg.addEventListener("pointermove", move); peg.addEventListener("pointerup", up); peg.addEventListener("pointercancel", up);
@@ -1190,6 +1201,7 @@ function wireLinks(root) {
 
 /* ---------- corners ---------- */
 function addCorners(card, body, item, isNote) {
+  if (onDesk(item.id)) { const m = document.createElement("i"); m.className = "desk-mark"; m.title = t("deskOn"); card.appendChild(m); }
   const x = document.createElement("button");
   x.className = "corner x"; x.textContent = "✕"; x.title = isNote ? t("takeNote") : t("take");
   x.addEventListener("click", (e) => { e.stopPropagation(); if (item.pinned) confirmRemove(e, item, isNote); else removeItem(item, isNote); });
@@ -1339,12 +1351,14 @@ function attachNoteDragOut(body, note) {
   body.addEventListener("pointercancel", () => { armed = false; });
 }
 
-/* ---------- reorder: hold an unpinned card's clip and slide it ---------- */
+/* ---------- reorder: hold an unpinned card's clip and slide it ----------
+ * (favourites keep their place but can still be pulled down to the desktop) */
 function attachReorder(card, item, isNote) {
   const peg = card.querySelector(".peg");
-  if (!peg || item.pinned) return;
+  const canSort = !item.pinned, canPull = canDesk(item, isNote);
+  if (!peg || (!canSort && !canPull)) return;
   peg.classList.add("grab");
-  peg.title = t("dragSort");
+  peg.title = canSort ? t(canPull ? "dragSortPull" : "dragSort") : t("dragPull");
   peg.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
     e.stopPropagation(); e.preventDefault();
@@ -1353,23 +1367,27 @@ function attachReorder(card, item, isNote) {
     const fromIdx = cards.indexOf(card);
     if (fromIdx < 0) return;
     const pinnedCount = L.slice.filter((x) => x.pinned).length;
-    const startLeft = parseFloat(card.style.left) || 0;
-    const sx = e.clientX;
+    const startLeft = parseFloat(card.style.left) || 0, startTop = parseFloat(card.style.top) || 0;
+    const sx = e.clientX, sy = e.clientY;
     let target = fromIdx;
     const slotLeft = (i) => L.marginX + (i + 0.5) * L.pitch - L.cardW / 2;
     const slotTop = (i) => ropeY(L.marginX + (i + 0.5) * L.pitch);
     try { peg.setPointerCapture(e.pointerId); } catch (x) {}
-    card.classList.add("dragging");
+    card.classList.add("dragging"); card.dataset.pull = t("pullPin");
     cards.forEach((c) => { if (c !== card) c.classList.add("reflow"); });
     invoke("set_modal", { on: true }).catch(() => {});
 
     const move = (ev) => {
       const left = startLeft + (ev.clientX - sx);
       const cx = left + L.cardW / 2;
-      card.style.left = left + "px";
-      card.style.top = ropeY(Math.max(0, Math.min(window.innerWidth, cx))) + "px";
-      let tIdx = Math.round((cx - L.marginX) / L.pitch - 0.5);
-      tIdx = Math.max(pinnedCount, Math.min(cards.length - 1, tIdx));
+      let tIdx = fromIdx;
+      if (!pullAt(card, ev, sx, sy, startLeft, startTop, canPull)) {
+        if (!canSort) { card.style.left = startLeft + "px"; card.style.top = startTop + "px"; return; }
+        card.style.left = left + "px";
+        card.style.top = ropeY(Math.max(0, Math.min(window.innerWidth, cx))) + "px";
+        tIdx = Math.round((cx - L.marginX) / L.pitch - 0.5);
+        tIdx = Math.max(pinnedCount, Math.min(cards.length - 1, tIdx));
+      }
       if (tIdx === target) return;
       target = tIdx;
       let slot = 0;
@@ -1381,13 +1399,15 @@ function attachReorder(card, item, isNote) {
         slot++;
       });
     };
-    const up = () => {
+    const up = (u) => {
       peg.removeEventListener("pointermove", move);
       peg.removeEventListener("pointerup", up);
       peg.removeEventListener("pointercancel", up);
-      card.classList.remove("dragging");
+      const pulled = card.classList.contains("pulling") && u.type === "pointerup";
+      card.classList.remove("dragging", "pulling");
       refreshModal();
-      if (target !== fromIdx) applyReorder(L.start + fromIdx, L.start + target);
+      if (pulled) pinToDesk(item, isNote, true);
+      else if (target !== fromIdx) applyReorder(L.start + fromIdx, L.start + target);
       ui.noAnim = true;
       render();
     };
@@ -1395,6 +1415,93 @@ function attachReorder(card, item, isNote) {
     peg.addEventListener("pointerup", up);
     peg.addEventListener("pointercancel", up);
   });
+}
+
+/* Pulling a card down by its clip: once the pointer is PULL px below where it
+ * started, the card follows it freely ("let go to pin") and letting go pins it
+ * to the desktop under the mouse; back up above that and it is sorting again.
+ * The pointer is captured, so this keeps working below the line window. */
+const PULL = 70;
+function pullAt(card, ev, sx, sy, startLeft, startTop, ok) {
+  const on = ok && ev.clientY - sy > PULL;
+  card.classList.toggle("pulling", on);
+  if (on) {
+    card.style.left = startLeft + (ev.clientX - sx) + "px";
+    card.style.top = startTop + (ev.clientY - sy) + "px";
+  }
+  return on;
+}
+
+/* ---------- desktop pins ----------
+ * state.desk = [{id: window label, spec, x, y, w, h, top}]: the pin windows,
+ * saved so they come back after a restart. Images and text cards are pinned
+ * as snapshots (spec.path / spec.text — the card on the line can be cleaned
+ * up later without the pin going away); a note pin is live: it shows the note
+ * spec.ref and follows its edits (pin:data), and closes when the note is
+ * taken down. The windows report themselves (pinwin.js): pin:hello / pin:geom
+ * / pin:bye, so pins opened from Rust (screenshot → pin) are kept too. */
+const deskSent = {};
+function deskSpecOf(item, isNote) {
+  if (isNote) return { kind: "note", ref: item.id };
+  const img = imagePathOf(item);
+  if (img) return { kind: "image", path: img, w: item.w || 640, h: item.h || 480, ref: item.id };
+  if (item.vis === "file" || !(item.text || "").length) return null;
+  return { kind: "text", text: item.text, ref: item.id };
+}
+function canDesk(item, isNote) { return !!deskSpecOf(item, isNote); }
+function onDesk(id) { return state.desk.some((d) => d.spec && d.spec.ref === id); }
+function pinToDesk(item, isNote, at) {
+  const spec = deskSpecOf(item, isNote);
+  if (!spec) { toast(t("deskNo")); return; }
+  // A note shows once: if it is already on the desktop, bring that one up.
+  const d = isNote && state.desk.find((x) => x.spec.kind === "note" && x.spec.ref === item.id);
+  if (d) { invoke("open_pin", { spec: d.spec, label: d.id, geom: null, top: d.top !== false, at: false }).catch(() => {}); return; }
+  invoke("open_pin", { spec, label: null, geom: null, top: true, at: !!at }).catch((e) => toast(t("deskFail") + e));
+}
+function deskChanged() { save(); if (!stage.classList.contains("up")) { ui.noAnim = true; render(); } }
+function onPinHello(p) {
+  if (!p || !p.label || state.desk.some((x) => x.id === p.label)) return;
+  state.desk.push({ id: p.label, spec: p.spec || {}, top: p.top !== false });
+  deskChanged();
+}
+function onPinGeom(p) {
+  const d = p && state.desk.find((x) => x.id === p.label);
+  if (!d) return;
+  Object.assign(d, { x: Math.round(p.x), y: Math.round(p.y), w: Math.round(p.w), h: Math.round(p.h), top: p.top !== false });
+  save();
+}
+function onPinBye(p) {
+  const n = state.desk.length;
+  state.desk = state.desk.filter((x) => x.id !== (p && p.label));
+  delete deskSent[p && p.label];
+  if (state.desk.length !== n) deskChanged();
+}
+/* Send each pinned note its content when it changed (or when it asks). */
+function syncPins(only) {
+  state.desk.forEach((d) => {
+    if (d.spec.kind !== "note" || (only && d.id !== only)) return;
+    const n = state.notes.find((x) => x.id === d.spec.ref);
+    const tt = n ? tintOf(n.tint) : null;
+    const p = n ? { label: d.id, body: n.body || "", bg: tt.bg, ink: tt.ink, lang: LANG } : { label: d.id, gone: true };
+    const k = JSON.stringify(p);
+    if (!only && deskSent[d.id] === k) return;
+    deskSent[d.id] = k;
+    emit("pin:data", p).catch(() => {});
+  });
+}
+/* At startup: open the saved pins again where they were. */
+function restoreDesk() {
+  state.desk = state.desk.filter((d) => d.spec.kind !== "note" || state.notes.some((n) => n.id === d.spec.ref));
+  state.desk.slice().forEach((d) => {
+    const geom = d.w && d.h ? [d.x | 0, d.y | 0, d.w | 0, d.h | 0] : null;
+    invoke("open_pin", { spec: d.spec, label: d.id, geom, top: d.top !== false, at: false })
+      .catch(() => { state.desk = state.desk.filter((x) => x !== d); save(); });
+  });
+}
+function onPinEdit(p) {
+  const n = state.notes.find((x) => x.id === (p && p.id));
+  if (!n) return;
+  setTimeout(() => { setDeck("notes"); render(); openEditor(n); }, 150);
 }
 
 // Move one visible card from position `from` to `to` (indices into
@@ -1526,6 +1633,7 @@ function showCtx(e, item, isNote) {
     add(t("pasteBack"), () => invoke("paste_text", { text: item.body || "" }).catch(()=>{}));
   }
   add(item.pinned ? t("unpin") : t("pin"), () => { item.pinned = !item.pinned; save(); render(); });
+  if (canDesk(item, isNote)) add(isNote && onDesk(item.id) ? t("deskShow") : t("deskPin"), () => pinToDesk(item, isNote, false));
   sep();
   add(isNote ? t("takeNote") : t("take"), () => removeItem(item, isNote));
   if (isNote) { add(t("deleteNote"), () => deleteNotes([item])); ctx.lastChild.style.color = "#c0392b"; }
@@ -2387,6 +2495,11 @@ async function wire() {
   await listen("ocr:done", (ev) => onOcrDone(ev.payload));
   await listen("remind:action", (ev) => onRemindAction(ev.payload));
   await listen("remind:toggle", (ev) => onRemindToggle(ev.payload));
+  await listen("pin:hello", (ev) => onPinHello(ev.payload));
+  await listen("pin:geom", (ev) => onPinGeom(ev.payload));
+  await listen("pin:bye", (ev) => onPinBye(ev.payload));
+  await listen("pin:want", (ev) => syncPins((ev.payload || {}).label || ""));
+  await listen("pin:edit", (ev) => onPinEdit(ev.payload));
   await listen("files:enter", () => stage.classList.add("catch-over"));
   await listen("files:over", () => stage.classList.add("catch-over"));
   await listen("files:leave", () => stage.classList.remove("catch-over"));
@@ -2410,4 +2523,5 @@ async function wire() {
   applyFont(cfg);
   await wire();
   render();
+  restoreDesk();
 })();

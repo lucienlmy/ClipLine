@@ -1317,36 +1317,128 @@ fn get_pin_path(label: String) -> String {
 /// (via get_pin_path), never through the URL, so long/Unicode paths are safe.
 #[tauri::command]
 async fn pin_image(app: AppHandle, path: String, w: Option<u32>, h: Option<u32>) -> Result<(), String> {
-    let label = format!("pin{}", now_ms());
-    PIN_PATHS
+    let spec = serde_json::json!({ "kind": "image", "path": path, "w": w, "h": h });
+    open_pin(app, spec, None, None, None, None).await.map(|_| ())
+}
+
+/// What each desktop pin shows, by window label: `{kind: "image", path, w, h}`,
+/// `{kind: "text", text, ref}` (a snapshot of a text card) or
+/// `{kind: "note", ref}` (live: the line window sends the note's content).
+static PIN_SPECS: Lazy<Mutex<HashMap<String, serde_json::Value>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+#[tauri::command]
+fn get_pin(label: String) -> serde_json::Value {
+    PIN_SPECS
         .lock()
         .unwrap()
-        .insert(label.clone(), path.clone());
-    let url = "pin.html".to_string();
+        .get(&label)
+        .cloned()
+        .unwrap_or(serde_json::Value::Null)
+}
 
-    let mut iw = w.unwrap_or(480) as f64;
-    let mut ih = h.unwrap_or(360) as f64;
-    let (maxw, maxh) = (900.0_f64, 680.0_f64);
-    if iw > maxw {
-        ih = ih * maxw / iw;
-        iw = maxw;
+/// Open a desktop pin (image, text or note). `label` and `geom`
+/// (`[x, y, w, h]`, physical pixels) come back from data.json when pins are
+/// restored at startup; a geometry that is no longer on any monitor is
+/// dropped. `at` = put it under the mouse (pulled off the line).
+/// Returns the window label.
+#[tauri::command]
+async fn open_pin(
+    app: AppHandle,
+    mut spec: serde_json::Value,
+    label: Option<String>,
+    geom: Option<[i32; 4]>,
+    top: Option<bool>,
+    at: Option<bool>,
+) -> Result<String, String> {
+    let label = label
+        .filter(|l| l.starts_with("pin") && l.len() < 40)
+        .unwrap_or_else(|| format!("pin{}", now_ms()));
+    if let Some(w) = app.get_webview_window(&label) {
+        let _ = w.show();
+        let _ = w.set_focus();
+        return Ok(label);
     }
-    if ih > maxh {
-        iw = iw * maxh / ih;
-        ih = maxh;
+    let kind = spec.get("kind").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let (url, lw, lh) = match kind.as_str() {
+        "image" => {
+            let path = spec.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            if path.is_empty() || !std::path::Path::new(&path).exists() {
+                return Err("图片不存在".into());
+            }
+            PIN_PATHS.lock().unwrap().insert(label.clone(), path);
+            let mut iw = spec.get("w").and_then(|v| v.as_f64()).unwrap_or(480.0);
+            let mut ih = spec.get("h").and_then(|v| v.as_f64()).unwrap_or(360.0);
+            let (maxw, maxh) = (900.0_f64, 680.0_f64);
+            if iw > maxw {
+                ih = ih * maxw / iw;
+                iw = maxw;
+            }
+            if ih > maxh {
+                iw = iw * maxh / ih;
+                ih = maxh;
+            }
+            ("pin.html", iw.max(180.0), ih.max(140.0) + 30.0)
+        }
+        "text" | "note" => ("pinnote.html", 270.0, 240.0),
+        _ => return Err("unknown pin kind".into()),
+    };
+    if let Some(o) = spec.as_object_mut() {
+        o.insert("top".into(), serde_json::Value::Bool(top.unwrap_or(true)));
     }
+    // Saved place, if it is still on a connected monitor (at least its top
+    // strip, so it can be grabbed and moved).
+    let saved = geom.filter(|g| {
+        g[2] > 40 && g[3] > 40 && display::list().iter().any(|m| m.contains(g[0] + g[2] / 2, g[1] + 10))
+    });
+    if saved.is_some() {
+        if let Some(o) = spec.as_object_mut() {
+            o.insert("restored".into(), serde_json::Value::Bool(true));
+        }
+    }
+    PIN_SPECS.lock().unwrap().insert(label.clone(), spec);
 
-    tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App(url.into()))
+    let win = tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App(url.into()))
         .title("ClipLine")
         .decorations(false)
         .transparent(true)
-        .always_on_top(true)
+        .always_on_top(top.unwrap_or(true))
         .resizable(true)
         .skip_taskbar(true)
-        .inner_size(iw.max(180.0), ih.max(140.0) + 30.0)
+        .visible(false)
+        .focused(saved.is_none()) // restored at startup: don't steal focus
+        .inner_size(lw, lh)
         .build()
         .map_err(|e| e.to_string())?;
-    Ok(())
+
+    if let Some([x, y, w, h]) = saved {
+        place_window(&win, x, y, w as u32, h as u32);
+    } else if at.unwrap_or(false) {
+        // Under the mouse, its pin (top centre) at the pointer, kept inside
+        // the work area of that monitor.
+        if let Some((cx, cy)) = native::cursor_pos() {
+            if let Some(m) = display::at(cx, cy) {
+                let (pw, ph) = ((lw * m.scale) as i32, (lh * m.scale) as i32);
+                let x = (cx - pw / 2).clamp(m.wx, (m.wx + m.ww - pw).max(m.wx));
+                let y = (cy - (12.0 * m.scale) as i32).clamp(m.wy, (m.wy + m.wh - ph).max(m.wy));
+                place_window(&win, x, y, pw.max(1) as u32, ph.max(1) as u32);
+            }
+        }
+    } else {
+        let _ = win.center();
+    }
+    let _ = win.show();
+    if saved.is_none() {
+        let _ = win.set_focus();
+    }
+    Ok(label)
+}
+
+/// Double-click on a pinned note: drop the notes line and open its editor.
+#[tauri::command]
+fn pin_open_note(app: AppHandle, id: String) {
+    drop_line(Deck::Notes, true);
+    let _ = app.emit("pin:edit", serde_json::json!({ "id": id }));
 }
 
 /// Create (or focus) the Settings window. Must NOT be called from a
@@ -1533,6 +1625,17 @@ async fn install_update(app: AppHandle) -> Result<(), String> {
             Err(e)
         }
     }
+}
+
+/// Settings → "Show again": forget a skipped version.
+#[tauri::command]
+fn clear_skipped_update(app: AppHandle) -> Result<(), String> {
+    let s = {
+        let mut g = SETTINGS.lock().unwrap();
+        g.skipped_version.clear();
+        g.clone()
+    };
+    save_settings(&app, &s)
 }
 
 #[tauri::command]
@@ -2205,6 +2308,10 @@ fn main() {
             download_update,
             install_update,
             skip_update,
+            clear_skipped_update,
+            open_pin,
+            get_pin,
+            pin_open_note,
             open_release_page,
             open_update_window,
             get_changelog,

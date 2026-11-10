@@ -23,7 +23,8 @@
     font-size: 11px; padding: 0 8px; cursor: pointer; opacity: 0; transition: opacity 0.12s; }
   #frame:hover .pbtn { opacity: 1; }
   .pbtn:hover { background: rgba(0,0,0,0.65); }
-  #annBtn { left: 8px; } #ocrBtn { left: 62px; }
+  #annBtn { left: 8px; } #ocrBtn { left: 62px; } #topBtn { left: 116px; }
+  #topBtn.on { background: rgba(217,119,87,0.9); }
   #close:hover { background: #e9573f; }
   #hint { position: absolute; bottom: 6px; right: 8px; z-index: 3; font-size: 10px; color: #fff; background: rgba(0,0,0,0.35); padding: 1px 7px; border-radius: 6px; opacity: 0; transition: opacity 0.12s; }
   #frame:hover #hint { opacity: 1; }
@@ -57,8 +58,10 @@
     <button id="close" title="关闭 (Esc)">✕</button>
     <button class="pbtn" id="annBtn" title="标注这张图">✎ 标注</button>
     <button class="pbtn" id="ocrBtn" title="识别图中文字">文 识别</button>
+    <button class="pbtn on" id="topBtn">置顶</button>
     <div id="hint">滚轮缩放 · 可拖动</div>
   </div>
+<script src="pinwin.js"></script>
 <script>
   const T = window.__TAURI__;
   const img = document.getElementById("img");
@@ -66,7 +69,7 @@
   const showErr = (m) => { errBox.textContent = m; errBox.style.display = "flex"; };
 
   function win() { try { return T.window.getCurrentWindow(); } catch (e) { return null; } }
-  let natW = 480, natH = 360, scale = 1;
+  let natW = 480, natH = 360, scale = 1, restored = false;
 
   function applySize() {
     try {
@@ -81,6 +84,10 @@
   img.onload = () => {
     natW = img.naturalWidth || natW;
     natH = img.naturalHeight || natH;
+    if (restored) { // keep the size it was left at; wheel zoom goes on from there
+      scale = Math.max(0.15, Math.min(6, (window.innerWidth - 12) / natW));
+      return;
+    }
     scale = Math.min(1, 900 / natW, 680 / natH);
     applySize();
   };
@@ -93,6 +100,9 @@
       path = await T.core.invoke("get_pin_path", { label });
     } catch (e) { showErr("无法获取路径：" + e); return; }
     if (!path) { showErr("未提供图片路径"); return; }
+    const spec = await PW.spec();
+    restored = !!spec.restored; delete spec.restored;
+    PW.hello(spec); drawTop();
     try {
       img.src = await T.core.invoke("read_image_data", { path });
     } catch (e) {
@@ -118,8 +128,14 @@
 
   document.getElementById("annBtn").addEventListener("click", (e) => { e.stopPropagation(); if (path) T.core.invoke("annotate_image", { path, w: null, h: null }).catch(() => {}); });
   document.getElementById("ocrBtn").addEventListener("click", (e) => { e.stopPropagation(); if (path) T.core.invoke("ocr_to_line", { path }).catch(() => {}); });
-  ["annBtn", "ocrBtn"].forEach((id) => document.getElementById(id).addEventListener("mousedown", (e) => e.stopPropagation()));
-  function closeSelf() { const w = win(); if (w) { w.close(); } else { window.close(); } }
+  const topBtn = document.getElementById("topBtn");
+  function drawTop() {
+    topBtn.classList.toggle("on", PW.top);
+    topBtn.title = PW.top ? "已置顶：点一下取消，可被其他窗口盖住" : "没有置顶：点一下让它总在最上面";
+  }
+  topBtn.addEventListener("click", async (e) => { e.stopPropagation(); await PW.setTop(!PW.top); drawTop(); });
+  ["annBtn", "ocrBtn", "topBtn"].forEach((id) => document.getElementById(id).addEventListener("mousedown", (e) => e.stopPropagation()));
+  function closeSelf() { PW.close(); }
   document.getElementById("close").addEventListener("click", (e) => { e.stopPropagation(); closeSelf(); });
   window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSelf(); });
   window.addEventListener("wheel", (e) => {

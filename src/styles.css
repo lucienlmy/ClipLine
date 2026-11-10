@@ -389,6 +389,15 @@ html, body {
 .card.dragging .peg { cursor: grabbing; }
 .card.dragging .card-body { transform: translateY(-6px) rotate(1.5deg); box-shadow: 0 18px 32px rgba(50,40,30,0.30); }
 .card.reflow { transition: left .2s ease, top .2s ease; }
+/* pulled down off the line by the clip: let go to pin it to the desktop */
+.card.pulling { z-index: 95; }
+.card.pulling .card-body { transform: scale(0.94) rotate(-3deg); box-shadow: 0 24px 40px rgba(50,40,30,0.36); }
+.card.pulling::after { content: attr(data-pull); position: absolute; left: 50%; top: -34px; transform: translateX(-50%); white-space: nowrap;
+  font-size: 12px; padding: 3px 10px; border-radius: 10px; background: var(--clay); color: #fff; box-shadow: 0 3px 8px rgba(0,0,0,0.25); pointer-events: none; }
+/* this card is also pinned to the desktop (a small pin head, hidden on hover where the ✕ shows) */
+.card .desk-mark { position: absolute; top: 21px; left: 9px; width: 9px; height: 9px; border-radius: 50%; z-index: 4; pointer-events: none;
+  background: radial-gradient(circle at 35% 30%, #fff 0 18%, var(--clay) 22%); box-shadow: 0 1px 2px rgba(0,0,0,0.35); transition: opacity 0.12s; }
+.card:hover .desk-mark { opacity: 0; }
 .no-anim .card { animation: none !important; }
 
 /* text-clip editing: bigger, plain sheet */

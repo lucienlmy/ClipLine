@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<title>ClipLine</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; user-select: none; -webkit-user-select: none; }
+  body { padding: 18px 8px 10px; }
+  #card { position: relative; height: 100%; border-radius: 12px; background: var(--bg, #fffdf7); color: var(--ink, #2b2a27);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.30), 0 0 0 1px rgba(0,0,0,0.07); display: flex; flex-direction: column; overflow: hidden; }
+  #grip { flex: none; height: 26px; cursor: move; }
+  #pin { position: fixed; top: 0; left: 50%; transform: translateX(-50%); width: 36px; height: 44px; z-index: 5; pointer-events: none;
+    --pin-base: #e2604a; --pin-hi: #f6b3a6; --pin-dk: #a93b2a; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25)); }
+  #tools { position: absolute; top: 4px; right: 6px; display: flex; gap: 4px; opacity: 0; transition: opacity 0.12s; z-index: 4; }
+  #card:hover #tools { opacity: 1; }
+  #tools button { height: 20px; min-width: 20px; padding: 0 7px; border: none; border-radius: 10px; font-size: 11px; cursor: pointer;
+    background: rgba(0,0,0,0.08); color: inherit; white-space: nowrap; font-family: inherit; }
+  #tools button:hover { background: rgba(0,0,0,0.16); }
+  #tools #x:hover { background: #e9573f; color: #fff; }
+  #tools #topBtn.on { background: var(--acc, #d97757); color: #fff; }
+  #body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 14px 12px; font-size: 13px; line-height: 1.55; word-break: break-word; }
+  #body.text { white-space: pre-wrap; user-select: text; -webkit-user-select: text; cursor: text; }
+  #body.note { cursor: move; }
+  #body::-webkit-scrollbar { width: 5px; } #body::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 9px; }
+  .empty { opacity: 0.5; }
+  #toast { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: #fff; font-size: 11px;
+    padding: 3px 10px; border-radius: 9px; opacity: 0; transition: opacity 0.15s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  /* Markdown (shared with the note cards; keep in step with styles.css / remind.html) */
+  .md-h { font-weight: 650; margin: 2px 0; } .md-h1 { font-size: 1.15em; } .md-h2 { font-size: 1.08em; }
+  .md-li { display: flex; gap: 6px; align-items: flex-start; }
+  .md-dot, .md-num { flex: none; opacity: 0.7; min-width: 8px; }
+  .md-task .box { width: 13px; height: 13px; border: 1.5px solid currentColor; border-radius: 4px; flex: none; margin-top: 3px; opacity: 0.7; font-size: 10px; text-align: center; line-height: 12px; cursor: pointer; }
+  .md-task .box:hover { opacity: 1; }
+  .md-task.done .md-tx { opacity: 0.55; text-decoration: line-through; }
+  .md-quote { border-left: 3px solid rgba(0,0,0,0.18); padding-left: 8px; opacity: 0.85; }
+  .md-hr { border-top: 1px solid rgba(0,0,0,0.15); margin: 5px 0; }
+  .md-gap { height: 5px; }
+  .md-pre { margin: 3px 0; padding: 5px 7px; border-radius: 6px; background: rgba(0,0,0,0.06); font: 11px/1.45 Consolas, monospace; white-space: pre-wrap; }
+  code { font: 0.92em Consolas, monospace; background: rgba(0,0,0,0.07); padding: 0 3px; border-radius: 3px; }
+  a.md-a { color: #c0613f; text-decoration: underline; cursor: pointer; }
+</style>
+</head>
+<body>
+  <div id="card">
+    <div id="grip"></div>
+    <div id="tools">
+      <button id="topBtn" class="on"></button>
+      <button id="copy"></button>
+      <button id="x">✕</button>
+    </div>
+    <div id="body"></div>
+    <div id="toast"></div>
+  </div>
+    <svg id="pin" viewBox="0 0 40 48" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="pg" x1="0" y1="0" x2="1" y2="0.8">
+          <stop offset="0" style="stop-color:var(--pin-hi)"/>
+          <stop offset="0.55" style="stop-color:var(--pin-base)"/>
+          <stop offset="1" style="stop-color:var(--pin-dk)"/>
+        </linearGradient>
+        <linearGradient id="ng" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#eef2f6"/><stop offset="1" stop-color="#76838f"/>
+        </linearGradient>
+      </defs>
+      <ellipse cx="22" cy="44.6" rx="7.5" ry="2.2" fill="rgba(20,24,30,0.22)"/>
+      <g transform="rotate(-12 20 34)">
+        <path d="M19.2,28 L19.75,43.4 Q20,45 20.25,43.4 L20.8,28 Z" fill="url(#ng)"/>
+        <ellipse cx="20" cy="27" rx="10.5" ry="3.8" fill="url(#pg)" style="stroke:var(--pin-dk)" stroke-width="0.6"/>
+        <path d="M14,11 C15.6,15 16,19.5 12.6,24.6 L27.4,24.6 C24,19.5 24.4,15 26,11 Z" fill="url(#pg)"/>
+        <ellipse cx="20" cy="10.5" rx="9.2" ry="4.4" fill="url(#pg)" style="stroke:var(--pin-dk)" stroke-width="0.6"/>
+        <path d="M13.5,9.2 Q16.5,7.3 20.5,7.7" stroke="#fff" stroke-opacity="0.75" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+        <path d="M12.6,25.8 Q16.5,24.2 20.6,24.7" stroke="#fff" stroke-opacity="0.55" stroke-width="1" fill="none" stroke-linecap="round"/>
+      </g>
+    </svg>
+<script src="md.js"></script>
+<script src="pinwin.js"></script>
+<script>
+  /* A text card (a snapshot of its text) or a note (live: the line window
+   * sends its content as pin:data whenever it changes) pinned to the desktop. */
+  const T = window.__TAURI__;
+  const invoke = T.core.invoke;
+  const $ = (id) => document.getElementById(id);
+  const L = {
+    zh: { top: "置顶", topOn: "已置顶：点一下取消，可被其他窗口盖住", topOff: "没有置顶：点一下让它总在最上面", copy: "复制", copied: "已复制", close: "取下（Esc）", empty: "（空）", edit: "双击编辑" },
+    en: { top: "On top", topOn: "Stays on top — click to let other windows cover it", topOff: "Not on top — click to keep it above other windows", copy: "Copy", copied: "Copied", close: "Unpin (Esc)", empty: "(empty)", edit: "Double-click to edit" },
+  };
+  let tr = L.zh, spec = {}, body = "";
+  const PIN_COLORS = {
+    soft: ["#e2604a", "#f6b3a6", "#a93b2a"],
+    silver: ["#8fa0b3", "#e3e9f0", "#5d6b7b"],
+    linen: ["#c99a5b", "#f0d9b4", "#8c6633"],
+    porcelain: ["#efece6", "#ffffff", "#b3aea5"],
+    graphite: ["#4b5059", "#9aa0aa", "#24272d"],
+  };
+  const ACCENTS = { terra: "#d97757", mint: "#58b980", sky: "#5db2fc", navy: "#193584", leica: "#d41f26" };
+
+  function applyLang(lang) {
+    tr = L[lang === "en" ? "en" : "zh"];
+    document.documentElement.lang = lang === "en" ? "en" : "zh";
+    $("topBtn").textContent = tr.top; $("copy").textContent = tr.copy; $("x").title = tr.close;
+    drawTop();
+  }
+  function drawTop() { $("topBtn").classList.toggle("on", PW.top); $("topBtn").title = PW.top ? tr.topOn : tr.topOff; }
+  function toast(m) { const el = $("toast"); el.textContent = m; el.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("show"), 1200); }
+
+  function draw() {
+    const el = $("body"), top = el.scrollTop;
+    if (spec.kind === "text") {
+      el.className = "text";
+      el.textContent = body || tr.empty;
+    } else {
+      el.className = "note";
+      el.title = tr.edit;
+      if (!(body || "").trim()) { el.innerHTML = `<div class="empty">${MD.esc(tr.empty)}</div>`; return; }
+      el.innerHTML = MD.render(body, { from: 0 });
+      el.querySelectorAll("a.md-a").forEach((a) => a.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const u = a.dataset.href || ""; invoke("open_url", { url: /^https?:\/\//i.test(u) ? u : "http://" + u }).catch(() => {});
+      }));
+      el.querySelectorAll(".box").forEach((b) => b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const idx = parseInt(b.dataset.idx, 10);
+        const line = String(body).split("\n")[idx];
+        const nb = MD.toggle(body, idx);
+        if (nb === body) return;
+        body = nb;
+        T.event.emit("remind:toggle", { id: spec.ref || "", idx, line }).catch(() => {});
+        draw();
+      }));
+    }
+    el.scrollTop = top;
+  }
+
+  (async () => {
+    spec = await PW.spec();
+    let cfg = {};
+    try { cfg = JSON.parse(await invoke("get_settings")) || {}; } catch (e) {}
+    applyLang(cfg.lang === "auto" ? cfg.sys_lang : cfg.lang);
+    const c = PIN_COLORS[cfg.theme] || PIN_COLORS.soft, pin = $("pin");
+    pin.style.setProperty("--pin-base", c[0]); pin.style.setProperty("--pin-hi", c[1]); pin.style.setProperty("--pin-dk", c[2]);
+    document.documentElement.style.setProperty("--acc", ACCENTS[cfg.accent] || ACCENTS.terra);
+    PW.hello(spec); drawTop();
+    if (spec.kind === "text") { body = spec.text || ""; draw(); return; }
+    // A note: ask the line window for its content and follow its changes.
+    await T.event.listen("pin:data", (ev) => {
+      const p = ev.payload || {};
+      if (p.label !== PW.label) return;
+      if (p.gone) { PW.close(); return; }
+      if (p.bg) $("card").style.setProperty("--bg", p.bg);
+      if (p.ink) $("card").style.setProperty("--ink", p.ink);
+      if (p.lang) applyLang(p.lang);
+      body = p.body || ""; draw();
+    });
+    T.event.emit("pin:want", { label: PW.label }).catch(() => {});
+  })();
+
+  // Move by the top strip, or (notes) anywhere that is not a box or a link.
+  function grab(e) {
+    if (e.button !== 0 || e.detail > 1) return;
+    if (e.target.closest("#tools, .box, a.md-a")) return;
+    if (e.target.closest("#body") && spec.kind === "text") return; // text stays selectable
+    try { PW.win.startDragging(); } catch (x) {}
+  }
+  $("grip").addEventListener("mousedown", grab);
+  $("body").addEventListener("mousedown", grab);
+  $("body").addEventListener("dblclick", (e) => {
+    if (spec.kind !== "note" || e.target.closest(".box, a.md-a")) return;
+    invoke("pin_open_note", { id: spec.ref || "" }).catch(() => {});
+  });
+  $("topBtn").onclick = async () => { await PW.setTop(!PW.top); drawTop(); };
+  $("copy").onclick = () => {
+    const text = spec.kind === "text" ? body : body;
+    invoke("copy_text", { text }).then(() => toast(tr.copied)).catch(() => {});
+  };
+  $("x").onclick = () => PW.close();
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape") PW.close(); });
+</script>
+</body>
+</html>

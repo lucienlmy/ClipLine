@@ -21,8 +21,8 @@ const I = {
     p_m5: "5 分钟后", p_m10: "10 分钟后", p_m15: "15 分钟后", p_m30: "30 分钟后", p_h1: "1 小时后", p_h2: "2 小时后", p_h3: "3 小时后", p_tonight: "今晚 20:00", p_tomorrow: "明天此时", p_tomorrow9: "明早 9:00", p_nextweek: "下周此时",
     secHelp: "使用说明", secAbout: "关于", save: "保存", cancel: "取消",
     history: "更新历史", historySub: "历次版本更新了什么（打包在程序里，不联网也能看）", historyOpen: "查看", historyBack: "‹ 返回设置", historyCur: "当前版本",
-    version: "当前版本", checkUpdate: "检查更新", updMode: "自动更新", updAuto: "自动下载", updNotify: "有新版时提醒", updOff: "关闭",
-    updModeSub: "从 GitHub 发布页检查新版本。「自动下载」会在后台下好，提示一次后重启即可完成，不重启的话下次退出时自动安装；「有新版时提醒」只弹卡片，由你决定是否更新",
+    version: "当前版本", checkUpdate: "检查更新", updMode: "软件更新", updAuto: "自动下载", updNotify: "有新版时提醒", updOff: "不检查", updSkipped: "已跳过 {v}", updSkippedSub: "在更新卡片上点了「跳过此版本」，这个版本不会再提醒；更新的版本出来照样会提醒", updUnskip: "恢复提醒",
+    updModeSub: "从 GitHub 发布页检查新版本。「自动下载」会在后台下好，提示一次后重启即可完成，不重启的话下次退出时自动安装；「有新版时提醒」只弹卡片，可以「立即更新」「以后再说」或「跳过此版本」；「不检查」则不联网检查，仍可在「关于」页手动检查",
     help: [
       ["呼出", "鼠标顶到屏幕最上沿：左半剪贴板绳、右半便签绳；按住翻转键左右对调。或用快捷键。"],
       ["剪贴板卡", "单击复制（卡上浮现「已复制」）；文字卡双击放大编辑，图片双击复制，文件双击打开；右键看更多操作。"],
@@ -49,8 +49,8 @@ const I = {
     p_m5: "In 5 min", p_m10: "In 10 min", p_m15: "In 15 min", p_m30: "In 30 min", p_h1: "In 1 hour", p_h2: "In 2 hours", p_h3: "In 3 hours", p_tonight: "Tonight 20:00", p_tomorrow: "Tomorrow, same time", p_tomorrow9: "Tomorrow 9:00", p_nextweek: "Next week",
     secHelp: "How to use", secAbout: "About", save: "Save", cancel: "Cancel",
     history: "Update history", historySub: "What changed in each version (built in, works offline)", historyOpen: "View", historyBack: "‹ Back to settings", historyCur: "this version",
-    version: "Version", checkUpdate: "Check for updates", updMode: "Automatic updates", updAuto: "Download automatically", updNotify: "Notify me", updOff: "Off",
-    updModeSub: "Checks the GitHub releases page. Download automatically fetches it in the background and installs on restart (or when you quit); Notify me only shows a card and lets you decide",
+    version: "Version", checkUpdate: "Check for updates", updMode: "Software updates", updAuto: "Download automatically", updNotify: "Notify me", updOff: "Don't check", updSkipped: "Skipped {v}", updSkippedSub: "You chose “Skip this version” on the update card, so this one won't be offered again; newer versions still will", updUnskip: "Offer it again",
+    updModeSub: "Checks the GitHub releases page. Download automatically fetches it in the background and installs on restart (or when you quit); Notify me only shows a card — update now, later, or skip that version; Don't check never goes online for it (you can still check by hand under About)",
     help: [
       ["Invoke", "Top edge: left = clipboard, right = notes; hold the flip key to swap. Or hotkeys."],
       ["Clips", "Click copies; double-click edits text, copies an image or opens a file; right-click for more."],
@@ -175,6 +175,12 @@ function pageGeneral(body) {
   ldSel.onchange = () => { draft.line_display = ldSel.value; };
   s.appendChild(row(t("lineDisplay"), ldSel, t("ldSub")));
   s.appendChild(row(t("updMode"), seg(draft.update_mode || "notify", [["auto", t("updAuto")], ["notify", t("updNotify")], ["off", t("updOff")]], (v) => draft.update_mode = v), t("updModeSub")));
+  if (draft.skipped_version) {
+    const un = document.createElement("button"); un.className = "btn-mini"; un.textContent = t("updUnskip");
+    const r = row(t("updSkipped").replace("{v}", "v" + String(draft.skipped_version).replace(/^v/i, "")), un, t("updSkippedSub"));
+    un.onclick = () => invoke("clear_skipped_update").then(() => { draft.skipped_version = ""; r.remove(); }).catch((e) => setErr(String(e)));
+    s.appendChild(r);
+  }
   body.appendChild(s);
 }
 
